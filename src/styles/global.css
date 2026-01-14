@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Opcional: estilos base del proyecto */
+:root {
+  color-scheme: light;
+}

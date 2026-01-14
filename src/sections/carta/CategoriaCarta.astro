@@ -1,0 +1,11 @@
+---
+import ProductCard from "@/components/carta/ProductCard.astro";
+import { getProductsByCategoryId } from "@/features/catalog/data/products";
+
+const { categoryId } = Astro.props as { categoryId: number };
+const products = await getProductsByCategoryId(categoryId);
+---
+
+<div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {products.map((p) => <ProductCard product={p} />)}
+</div>

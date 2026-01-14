@@ -1,5 +1,27 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  "exclude": ["dist", "node_modules"],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["src/*"],
+      "@/pages/*": ["src/pages/*"],
+      "@/sections/*": ["src/sections/*"],
+      "@/components/*": ["src/components/*"],
+      "@/islands/*": ["src/islands/*"],
+      "@/features/*": ["src/features/*"],
+      "@/server/*": ["src/server/*"],
+      "@/lib/*": ["src/lib/*"],
+      "@/styles/*": ["src/styles/*"]
+    },
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "noEmit": true,
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "incremental": true,
+    "tsBuildInfoFile": ".astro/tsbuildinfo"
+  }
 }

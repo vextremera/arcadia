@@ -1,0 +1,22 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { getActiveCategories } from "@/features/catalog/data/categories";
+const categories = await getActiveCategories();
+---
+
+<SiteLayout title="Carta · Arcadia">
+  <h1 class="text-2xl font-semibold tracking-tight">Carta</h1>
+  <p class="mt-1 text-zinc-600">Elige una categoría:</p>
+
+  <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {categories.map((c) => (
+      <a
+        href={`/carta/${c.slug}`}
+        class="rounded-2xl border border-zinc-200 p-5 hover:bg-zinc-50"
+      >
+        <div class="text-lg font-semibold">{c.name}</div>
+        <div class="mt-1 text-sm text-zinc-600">Ver productos</div>
+      </a>
+    ))}
+  </div>
+</SiteLayout>

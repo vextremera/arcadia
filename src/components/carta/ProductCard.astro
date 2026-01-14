@@ -1,0 +1,35 @@
+---
+import AddToCartButton from "@/islands/cart/AddToCartButton";
+const { product } = Astro.props as {
+  product: {
+    id: number;
+    name: string;
+    imageUrl?: string | null;
+    priceCents: number;
+    deliveryEnabled: boolean;
+    pickupEnabled: boolean;
+  };
+};
+---
+
+<article class="rounded-2xl border border-zinc-200 p-5">
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h3 class="text-base font-semibold">{product.name}</h3>
+      <p class="mt-1 text-sm text-zinc-600">
+        {(product.priceCents / 100).toFixed(2)} €
+      </p>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <AddToCartButton
+      client:visible
+      productId={product.id}
+      name={product.name}
+      basePriceCents={product.priceCents}
+      channel="DELIVERY"
+      enabled={product.deliveryEnabled}
+    />
+  </div>
+</article>
