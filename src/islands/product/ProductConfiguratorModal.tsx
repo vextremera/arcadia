@@ -325,9 +325,8 @@ export default function ProductConfiguratorModal() {
                               return (
                                 <button
                                   type="button"
-                                  class={`flex items-center justify-between rounded-xl border p-3 text-left text-sm ${
-                                    checked ? "border-zinc-900" : "border-zinc-200"
-                                  } ${disable ? "opacity-50" : ""}`}
+                                  class={`flex items-center justify-between rounded-xl border p-3 text-left text-sm ${checked ? "border-zinc-900" : "border-zinc-200"
+                                    } ${disable ? "opacity-50" : ""}`}
                                   onClick={() => !disable && toggleOption(g, o.id)}
                                 >
                                   <span>{o.name}</span>

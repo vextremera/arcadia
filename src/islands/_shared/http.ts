@@ -1,17 +1,16 @@
-export async function api<T>(input: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(input, {
+export async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
     ...init,
     headers: {
-      "content-type": "application/json",
       ...(init?.headers ?? {}),
+      "content-type": "application/json",
     },
-    credentials: "include",
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    throw new Error(text || `HTTP ${res.status}`);
   }
 
-  return res.json() as Promise<T>;
+  return (await res.json()) as T;
 }
