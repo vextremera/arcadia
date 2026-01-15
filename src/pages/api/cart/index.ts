@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, Product, ProductVariant, ModifierOption, inArray } from "astro:db";
+import { db, Product, ProductVariant, ModifierOption, Ingredient, inArray } from "astro:db";
 
 type CartItemSession = {
   lineId: string;
@@ -7,7 +7,8 @@ type CartItemSession = {
   variantId?: number;
   qty: number;
   modifierOptionIds?: number[];
-  notes?: string;
+  addedIngredientIds?: number[];
+  removedIngredientIds?: number[];
 };
 
 function json(data: unknown, status = 200) {
@@ -50,6 +51,26 @@ async function hydrateCart(items: CartItemSession[]) {
         .where(inArray(ModifierOption.id, optionIds))
     : [];
 
+    const ingredientIds = [
+    ...new Set(
+      items.flatMap((i) => [...(i.addedIngredientIds ?? []), ...(i.removedIngredientIds ?? [])])
+    ),
+  ];
+
+  const ingredients = ingredientIds.length
+    ? await db
+        .select({
+          id: Ingredient.id,
+          name: Ingredient.name,
+          addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+          active: Ingredient.active,
+        })
+        .from(Ingredient)
+        .where(inArray(Ingredient.id, ingredientIds))
+    : [];
+
+  const ingredientById = new Map(ingredients.map((x) => [x.id, x]));
+
   const productById = new Map(products.map((p) => [p.id, p]));
   const variantById = new Map(variants.map((v) => [v.id, v]));
   const optionById = new Map(options.map((o) => [o.id, o]));
@@ -70,10 +91,22 @@ async function hydrateCart(items: CartItemSession[]) {
         .filter((o): o is NonNullable<typeof o> => !!o && o.active)
         .map((o) => ({ id: o.id, name: o.name, priceDeltaCents: o.priceDeltaCents }));
 
+      const added = (i.addedIngredientIds ?? [])
+        .map((id) => ingredientById.get(id))
+        .filter((ing): ing is NonNullable<typeof ing> => !!ing && ing.active)
+        .map((ing) => ({ id: ing.id, name: ing.name, priceDeltaCents: ing.addPriceDeltaCents }));
+
+      const removed = (i.removedIngredientIds ?? [])
+        .map((id) => ingredientById.get(id))
+        .filter((ing): ing is NonNullable<typeof ing> => !!ing && ing.active)
+        .map((ing) => ({ id: ing.id, name: ing.name }));
+
       const variantDelta = v && v.active ? v.priceDeltaCents : 0;
       const modifiersDelta = modifierObjs.reduce((acc, m) => acc + (m.priceDeltaCents ?? 0), 0);
+      const addedDelta = added.reduce((acc, a) => acc + (a.priceDeltaCents ?? 0), 0);
 
-      const unitPriceCents = p.priceCents + variantDelta + modifiersDelta;
+      const unitPriceCents = p.priceCents + variantDelta + modifiersDelta + addedDelta;
+
       const lineTotalCents = unitPriceCents * i.qty;
 
       subtotalCents += lineTotalCents;
@@ -91,6 +124,10 @@ async function hydrateCart(items: CartItemSession[]) {
         qty: i.qty,
         unitPriceCents,
         lineTotalCents,
+
+        ingredientsAdded: added,
+        ingredientsRemoved: removed,
+
 
         modifiers: modifierObjs,
         notes: i.notes,

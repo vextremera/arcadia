@@ -6,7 +6,8 @@ type CartItemSession = {
   variantId?: number;
   qty: number;
   modifierOptionIds?: number[];
-  notes?: string;
+  addedIngredientIds?: number[];
+  removedIngredientIds?: number[];
 };
 
 function json(data: unknown, status = 200) {
@@ -26,37 +27,61 @@ async function parseJSON(request: Request) {
 
 function stableLineId(input: Omit<CartItemSession, "lineId" | "qty">) {
   const variant = input.variantId ?? 0;
+
   const opts = (input.modifierOptionIds ?? []).slice().sort((a, b) => a - b).join(",");
-  const notes = (input.notes ?? "").trim();
-  const raw = `${input.productId}|${variant}|${opts}|${notes}`;
+  const added = (input.addedIngredientIds ?? []).slice().sort((a, b) => a - b).join(",");
+  const removed = (input.removedIngredientIds ?? []).slice().sort((a, b) => a - b).join(",");
+
+  const raw = `${input.productId}|${variant}|opts:${opts}|add:${added}|rem:${removed}`;
   let h = 5381;
   for (let i = 0; i < raw.length; i++) h = (h * 33) ^ raw.charCodeAt(i);
   return `${input.productId}-${variant}-${(h >>> 0).toString(16)}`;
 }
 
 export const POST: APIRoute = async ({ request, session }) => {
+  if (!session) return new Response("Session not available", { status: 500 });
+
   const body = await parseJSON(request);
   if (!body) return json({ error: "INVALID_JSON" }, 400);
 
   const productId = Number(body.productId);
   const variantId = body.variantId == null ? undefined : Number(body.variantId);
   const qty = Math.max(1, Number(body.qty ?? 1));
+
   const modifierOptionIds = Array.isArray(body.modifierOptionIds)
     ? body.modifierOptionIds.map(Number).filter(Number.isFinite)
     : [];
-  const notes = typeof body.notes === "string" ? body.notes.slice(0, 200) : undefined;
+
+  const addedIngredientIds = Array.isArray(body.addedIngredientIds)
+    ? body.addedIngredientIds.map(Number).filter(Number.isFinite)
+    : [];
+
+  const removedIngredientIds = Array.isArray(body.removedIngredientIds)
+    ? body.removedIngredientIds.map(Number).filter(Number.isFinite)
+    : [];
 
   if (!Number.isFinite(productId)) return json({ error: "INVALID_PRODUCT_ID" }, 400);
 
-  const base = { productId, variantId, modifierOptionIds, notes };
+  const base = { productId, variantId, modifierOptionIds, addedIngredientIds, removedIngredientIds };
   const lineId = stableLineId(base);
 
-  const items = ((await session?.get("cart")) as CartItemSession[] | undefined) ?? [];
+  const items = ((await session.get("cart")) as CartItemSession[] | undefined) ?? [];
   const idx = items.findIndex((i) => i.lineId === lineId);
 
-  if (idx >= 0) items[idx] = { ...items[idx], qty: items[idx].qty + qty };
-  else items.push({ lineId, productId, variantId, qty, modifierOptionIds, notes });
+  if (idx >= 0) {
+    items[idx] = { ...items[idx], qty: items[idx].qty + qty };
+  } else {
+    items.push({
+      lineId,
+      productId,
+      variantId,
+      qty,
+      modifierOptionIds,
+      addedIngredientIds,
+      removedIngredientIds,
+    });
+  }
 
-  await session?.set("cart", items);
+  await session.set("cart", items);
   return json({ ok: true, lineId });
 };

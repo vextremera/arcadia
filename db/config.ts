@@ -123,6 +123,55 @@ const ProductVariant = defineTable({
   indexes: [{ on: "productId" }, { on: ["productId", "sortOrder"] }]
 });
 
+// Ingredientes (catálogo global)
+const Ingredient = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    name: column.text(),
+    slug: column.text({ unique: true }),
+
+    // precio extra al AÑADIR este ingrediente (céntimos)
+    addPriceDeltaCents: column.number({ default: 0 }),
+
+    // flags para UI
+    isCommon: column.boolean({ default: false }), // aparece en “añadir comunes”
+    active: column.boolean({ default: true }),
+
+    // futuras ampliaciones
+    meta: column.json({ optional: true }), // ej: { allergenKeys:[], glutenFree:true }
+  },
+  indexes: [{ on: "active" }, { on: "isCommon" }],
+});
+
+// Ingredientes por producto (los que vienen por defecto y se pueden quitar)
+const ProductIngredient = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    productId: column.number({ references: () => Product.columns.id }),
+    ingredientId: column.number({ references: () => Ingredient.columns.id }),
+
+    defaultIncluded: column.boolean({ default: true }),
+    removable: column.boolean({ default: true }),
+
+    sortOrder: column.number({ default: 0 }),
+  },
+  indexes: [
+    { on: ["productId", "ingredientId"], unique: true },
+    { on: ["productId", "sortOrder"] },
+  ],
+});
+
+// Opcional: qué ingredientes son “compatibles” por categoría (para filtrar “todos”)
+const CategoryIngredient = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    categoryId: column.number({ references: () => Category.columns.id }),
+    ingredientId: column.number({ references: () => Ingredient.columns.id }),
+  },
+  indexes: [{ on: ["categoryId", "ingredientId"], unique: true }],
+});
+
+
 const ModifierGroup = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -450,6 +499,10 @@ export default defineDb({
     Category,
     Product,
     ProductVariant,
+
+    Ingredient,
+    ProductIngredient,
+    CategoryIngredient,
 
     ModifierGroup,
     ModifierOption,

@@ -30,6 +30,8 @@ export async function addToCart(payload: {
   qty?: number;
   variantId?: number;
   modifierOptionIds?: number[];
+  addedIngredientIds?: number[];
+  removedIngredientIds?: number[];
   notes?: string;
 }) {
   await api("/api/cart/add", { method: "POST", body: JSON.stringify(payload) });

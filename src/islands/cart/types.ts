@@ -13,6 +13,10 @@ export type CartLine = {
   lineTotalCents: number;
 
   modifiers: Array<{ id: number; name: string; priceDeltaCents: number }>;
+
+  ingredientsAdded: Array<{ id: number; name: string; priceDeltaCents: number }>;
+  ingredientsRemoved: Array<{ id: number; name: string }>;
+
   notes?: string;
 };
 
