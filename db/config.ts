@@ -462,6 +462,16 @@ const ContentBlock = defineTable({
   indexes: [{ on: "published" }]
 });
 
+const AppSetting = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    key: column.text({ unique: true }),
+    value: column.json(),
+    updatedAt: column.date({ default: NOW }),
+  },
+  indexes: [{ on: "key", unique: true }],
+});
+
 const MediaAsset = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -534,6 +544,7 @@ export default defineDb({
     MenuItem,
 
     ContentBlock,
+    AppSetting,
     MediaAsset,
 
     AuditLog

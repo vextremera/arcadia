@@ -1,0 +1,31 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+const user = Astro.locals.user;
+---
+
+<SiteLayout title="Admin · Arcadia">
+  <h1 class="text-2xl font-semibold tracking-tight">Panel de administración</h1>
+
+  <div class="mt-4 rounded-2xl border border-zinc-200 p-5">
+    <div class="text-sm text-zinc-600">Sesión activa</div>
+    <div class="mt-1 font-semibold">
+      {user?.name ?? user?.email} · {user?.role}
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-2">
+      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/categorias">
+        Gestionar categorías
+      </a>
+
+      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/ajustes/pagos">
+        Ajustes de pago
+      </a>
+    </div>
+
+    <form class="mt-4" method="post" action="/api/admin/logout">
+      <button class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" type="submit">
+        Cerrar sesión
+      </button>
+    </form>
+  </div>
+</SiteLayout>

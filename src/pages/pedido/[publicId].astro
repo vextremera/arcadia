@@ -1,0 +1,82 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { db, Order, OrderItem, eq } from "astro:db";
+
+const publicId = String(Astro.params.publicId ?? "");
+const [order] = await db
+  .select({
+    id: Order.id,
+    publicId: Order.publicId,
+    type: Order.type,
+    status: Order.status,
+    totalCents: Order.totalCents,
+    customerName: Order.customerName,
+    customerPhone: Order.customerPhone,
+    notes: Order.notes,
+    addressSnapshot: Order.addressSnapshot,
+    createdAt: Order.createdAt,
+  })
+  .from(Order)
+  .where(eq(Order.publicId, publicId))
+  .limit(1);
+
+if (!order) return new Response("Pedido no encontrado", { status: 404 });
+
+const items = await db
+  .select({
+    id: OrderItem.id,
+    nameSnapshot: OrderItem.nameSnapshot,
+    qty: OrderItem.qty,
+    lineTotalCents: OrderItem.lineTotalCents,
+  })
+  .from(OrderItem)
+  .where(eq(OrderItem.orderId, order.id));
+
+const meta = (order.addressSnapshot ?? {}) as any;
+---
+
+<SiteLayout title={`Pedido ${order.publicId} · Arcadia`}>
+  <h1 class="text-2xl font-semibold tracking-tight">Pedido confirmado</h1>
+
+  <div class="mt-4 rounded-2xl border border-zinc-200 p-5">
+    <div class="text-sm text-zinc-600">Código</div>
+    <div class="text-xl font-semibold">{order.publicId}</div>
+
+    <div class="mt-4 grid gap-2 text-sm">
+      <div><span class="text-zinc-600">Tipo:</span> <b>{order.type}</b></div>
+      <div><span class="text-zinc-600">Estado:</span> <b>{order.status}</b></div>
+      <div><span class="text-zinc-600">Total:</span> <b>{(order.totalCents / 100).toFixed(2)} €</b></div>
+    </div>
+
+    {meta?.forcedPickup && (
+      <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <b>Nota:</b> el pedido se ha puesto como <b>RECOGIDA</b>. {meta?.forcedReason ?? ""}
+      </div>
+    )}
+  </div>
+
+  <div class="mt-6 rounded-2xl border border-zinc-200 p-5">
+    <h2 class="text-lg font-semibold">Resumen</h2>
+    <ul class="mt-3 space-y-2 text-sm">
+      {items.map((it) => (
+        <li class="flex items-baseline justify-between gap-3">
+          <span class="min-w-0 truncate">{it.qty}× {it.nameSnapshot}</span>
+          <span class="font-semibold">{(it.lineTotalCents / 100).toFixed(2)} €</span>
+        </li>
+      ))}
+    </ul>
+
+    {order.notes && (
+      <div class="mt-4 text-sm">
+        <div class="text-zinc-600">Comentarios</div>
+        <div class="mt-1">{order.notes}</div>
+      </div>
+    )}
+  </div>
+
+  <div class="mt-6">
+    <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/pedir">
+      Seguir pidiendo
+    </a>
+  </div>
+</SiteLayout>
