@@ -7,7 +7,9 @@ import {
   ProductVariant,
   ModifierOption,
   Ingredient,
+  AppSetting,
   eq,
+  and,
   inArray,
 } from "astro:db";
 import { getArcadiaAvailability } from "@/server/time/madrid";
@@ -59,6 +61,19 @@ export const POST: APIRoute = async ({ request, session }) => {
     );
   }
 
+  const DEFAULT_PAYMENTS = {
+    delivery: { cashEnabled: true, cardEnabled: true },
+    pickup: { cashEnabled: true, cardEnabled: true },
+  };
+
+  const [payRow] = await db
+    .select({ value: AppSetting.value })
+    .from(AppSetting)
+    .where(eq(AppSetting.key, "payments"))
+    .limit(1);
+
+  const payments = (payRow?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
+
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: "INVALID_JSON" }, 400);
 
@@ -93,6 +108,41 @@ export const POST: APIRoute = async ({ request, session }) => {
     type = "PICKUP";
     forcedPickup = true;
     forcedReason = `Fuera de horario de reparto (${availability.windows.delivery.start}–${availability.windows.delivery.end}).`;
+  }
+
+    const pm = paymentMethod === "CARD" ? "CARD" : "CASH";
+
+  const allowedCash = type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
+  const allowedCard = type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
+
+  if (pm === "CASH" && !allowedCash) {
+    return json(
+      {
+        error: "PAYMENT_METHOD_DISABLED",
+        message: `El pago en efectivo no está disponible para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+      },
+      400
+    );
+  }
+
+  if (pm === "CARD" && !allowedCard) {
+    return json(
+      {
+        error: "PAYMENT_METHOD_DISABLED",
+        message: `El pago con tarjeta no está disponible para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+      },
+      400
+    );
+  }
+
+  if (!allowedCash && !allowedCard) {
+    return json(
+      {
+        error: "NO_PAYMENT_METHODS",
+        message: `No hay métodos de pago disponibles para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+      },
+      400
+    );
   }
 
   // Cargar productos/variantes/opciones/ingredientes necesarios para calcular totales y snapshots
@@ -290,7 +340,7 @@ export const POST: APIRoute = async ({ request, session }) => {
 
     // addressSnapshot aunque sea pickup: guardamos meta útil
     addressSnapshot: {
-      paymentMethod: paymentMethod || "CASH",
+      paymentMethod: pm,
       forcedPickup,
       forcedReason,
       address: type === "DELIVERY" ? address : null,
