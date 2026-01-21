@@ -74,7 +74,7 @@ export default function UpsellModal() {
   if (!open) return null;
 
   return (
-    <div class="fixed inset-0 z-[60]">
+    <div class="fixed inset-0 z-60">
       <button
         class="absolute inset-0 bg-black/40"
         aria-label="Cerrar"
