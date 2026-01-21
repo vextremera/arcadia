@@ -28,7 +28,7 @@ export function getArcadiaAvailability(now = new Date()) {
   const OPEN_END = 24 * 60;       // 24:00
   const KITCHEN_START = 8 * 60;   // 08:00
   const KITCHEN_END = 23 * 60 + 20; // 23:20
-  const DELIVERY_START = 20 * 60; // 20:00
+  const DELIVERY_START = 15 * 60; // 20:00
   const DELIVERY_END = 22 * 60 + 50; // 22:50
 
   const isOpen = inWindow(mins, OPEN_START, OPEN_END);

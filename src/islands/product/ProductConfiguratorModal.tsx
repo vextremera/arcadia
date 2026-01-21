@@ -169,7 +169,7 @@ export default function ProductConfiguratorModal() {
       addedIngredientIds: addedIds,
       removedIngredientIds: removedIds,
     });
-    
+
     //Llamar a más productos sugeridos
     window.dispatchEvent(new Event("arcadia:upsell:open"));
 
@@ -301,26 +301,30 @@ export default function ProductConfiguratorModal() {
 
               {/* STEP 3: modifier groups */}
               {step === 3 && (
-                <section class="space-y-4">
-                  <h2 class="text-lg font-semibold">Extras</h2>
+                <section className="space-y-4">
+                  <h2 className="text-lg font-semibold">Extras</h2>
 
                   {data.modifierGroups.length === 0 ? (
-                    <p class="text-sm text-zinc-600">Este producto no tiene extras configurados.</p>
+                    <p className="text-sm text-zinc-600">
+                      Este producto no tiene extras configurados.
+                    </p>
                   ) : (
                     data.modifierGroups.map((g) => {
                       const groupOptionIds = new Set(g.options.map((o) => o.id));
-                      const selectedInGroup = selectedOptionIds.filter((id) => groupOptionIds.has(id));
+                      const selectedInGroup = selectedOptionIds.filter((id) =>
+                        groupOptionIds.has(id)
+                      );
 
                       return (
-                        <div class="rounded-2xl border border-zinc-200 p-4">
-                          <div class="flex items-baseline justify-between gap-3">
-                            <div class="font-semibold">{g.name}</div>
-                            <div class="text-xs text-zinc-600">
+                        <div key={g.id} className="rounded-2xl border border-zinc-200 p-4">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <div className="font-semibold">{g.name}</div>
+                            <div className="text-xs text-zinc-600">
                               {g.maxSelect === 1 ? "Elige 1 (opcional)" : `Máx ${g.maxSelect}`}
                             </div>
                           </div>
 
-                          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
                             {g.options.map((o) => {
                               const checked = selectedOptionIds.includes(o.id);
                               const disable =
@@ -328,13 +332,17 @@ export default function ProductConfiguratorModal() {
 
                               return (
                                 <button
+                                  key={o.id}
                                   type="button"
-                                  class={`flex items-center justify-between rounded-xl border p-3 text-left text-sm ${checked ? "border-zinc-900" : "border-zinc-200"
-                                    } ${disable ? "opacity-50" : ""}`}
-                                  onClick={() => !disable && toggleOption(g, o.id)}
+                                  className={`flex items-center justify-between rounded-xl border p-3 text-left text-sm ${checked ? "border-zinc-900" : "border-zinc-200"
+                                    } ${disable ? "opacity-50 pointer-events-none" : ""}`}
+                                  onClick={() => toggleOption(g, o.id)}
+                                  disabled={disable}
                                 >
                                   <span>{o.name}</span>
-                                  <span class="text-xs text-zinc-600">+{money(o.priceDeltaCents)}</span>
+                                  <span className="text-xs text-zinc-600">
+                                    +{money(o.priceDeltaCents)}
+                                  </span>
                                 </button>
                               );
                             })}
@@ -345,6 +353,7 @@ export default function ProductConfiguratorModal() {
                   )}
                 </section>
               )}
+
 
               {/* STEP 4: confirm */}
               {step === 4 && (

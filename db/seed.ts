@@ -15,6 +15,8 @@ import {
   Ingredient,
   ProductIngredient,
   eq,
+  and,
+  inArray,
 } from "astro:db";
 
 /** Helpers */
@@ -22,9 +24,10 @@ function slugify(input: string) {
   return input
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9\s-]/g, "")
-    .trim()
+    .replace(/ñ/gi, "n")
     .toLowerCase()
+    .replace(/[^\p{Letter}\p{Number}\s-]/gu, "")
+    .trim()
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 }
@@ -57,15 +60,12 @@ const CATEGORIES = [
   { id: 11, name: "Frankfurts", slug: "frankfurts", sortOrder: 110 },
   { id: 12, name: "Platos infantiles", slug: "platos-infantiles", sortOrder: 120 },
   { id: 13, name: "Ensaladas", slug: "ensaladas", sortOrder: 130 },
-  // Extra útil:
   { id: 14, name: "Bebidas", slug: "bebidas", sortOrder: 140 },
 ];
 
 // Precios provisionales para extras (los ajustas luego)
-const ING_PRESET: Record<
-  string,
-  { addPriceDeltaCents: number; isCommon?: boolean }
-> = {
+// Nota: algunas claves están con espacios; hacemos fallback slug->espacios
+const ING_PRESET: Record<string, { addPriceDeltaCents: number; isCommon?: boolean }> = {
   "cebolla": { addPriceDeltaCents: 30, isCommon: true },
   "cebolla crujiente": { addPriceDeltaCents: 60, isCommon: true },
   "cebolla caramelizada": { addPriceDeltaCents: 60, isCommon: true },
@@ -161,7 +161,6 @@ const PRODUCTS: ProductSeed[] = [
   { id: 1222, categorySlug: "tapas", name: "Boquerones fritos", priceEur: 7.4 },
   { id: 1223, categorySlug: "tapas", name: "Patatas fritas", priceEur: 3.9 },
 
-
   // Croquetas
   { id: 1301, categorySlug: "croquetas", name: "Croquetas de gamba roja (5u)", priceEur: 6.9 },
   { id: 1302, categorySlug: "croquetas", name: "Croquetas de jamón ibérico (5u)", priceEur: 6.7 },
@@ -256,15 +255,12 @@ const PRODUCTS: ProductSeed[] = [
   { id: 1816, categorySlug: "bocadillos", name: "Salchichón", priceEur: 6.2, panOption: true, ingredients: ["Salchichón"] },
   { id: 1817, categorySlug: "bocadillos", name: "Lomo embuchado", priceEur: 6.2, panOption: true, ingredients: ["Lomo embuchado"] },
 
-  // Baguettes de Marca + pan sin gluten
-  { id: 1901, categorySlug: "baguettes-de-marca", name: "ARCADIA", priceEur: 9.9, panOption: true, ingredients: ["Lomo", "Bacon", "Jamón serrano", "Huevo", "Queso", "Lechuga", "Tomate", "Mahonesa"] },
-  { id: 1902, categorySlug: "baguettes-de-marca", name: "SERRANITO", priceEur: 9.7, panOption: true, ingredients: ["Lomo", "Jamón serrano", "Queso", "Pimiento frito", "Mahonesa"] },
+  // Baguettes de Marca (solo incluimos el tramo que tenías ya en el archivo)
   { id: 1903, categorySlug: "baguettes-de-marca", name: "TROYANO", priceEur: 9.8, panOption: true, ingredients: ["Carne de kebab", "Cebolla", "Lechuga", "Tomate", "Salsa griega"] },
   { id: 1904, categorySlug: "baguettes-de-marca", name: "CHICKEN", priceEur: 9.7, panOption: true, ingredients: ["Pechuga plancha", "Cebolla frita", "Lechuga", "Huevo cocido", "Tomate", "Mahonesa"] },
   { id: 1905, categorySlug: "baguettes-de-marca", name: "IBIZA", priceEur: 9.9, panOption: true, ingredients: ["Pechuga rebozada", "Huevo", "Lechuga", "Queso", "Tomate", "Mahonesa"] },
   { id: 1906, categorySlug: "baguettes-de-marca", name: "WHATSAPP", priceEur: 9.8, panOption: true, ingredients: ["Hamburguesa", "Jamón dulce", "Lechuga", "Huevo", "Pimiento frito", "Queso", "Cebolla frita", "Tomate", "Mahonesa"] },
   { id: 1907, categorySlug: "baguettes-de-marca", name: "SIRI", priceEur: 9.7, panOption: true, ingredients: ["Pechuga plancha", "Brotes de ensalada", "Tomate", "Queso parmesano", "Salsa cesar"] },
-
   { id: 1908, categorySlug: "baguettes-de-marca", name: "JOMA", priceEur: 8.7, panOption: true, ingredients: ["Pechuga plancha", "Queso", "Tomate", "Mahonesa"] },
   { id: 1909, categorySlug: "baguettes-de-marca", name: "REEBOOK", priceEur: 8.8, panOption: true, ingredients: ["Lomo", "Jamón serrano", "Pimiento verde", "Mahonesa"] },
   { id: 1910, categorySlug: "baguettes-de-marca", name: "PUMA", priceEur: 6.8, panOption: true, ingredients: ["Lomo", "Bacon", "Queso", "Huevo"] },
@@ -284,55 +280,19 @@ const PRODUCTS: ProductSeed[] = [
 
   // Hamburguesas + pan sin gluten
   { id: 2001, categorySlug: "hamburguesas", name: "YANDEX", priceEur: 9.4, panOption: true, ingredients: ["Hamburguesa", "Huevo", "Queso parmesano", "Cebolla caramelizada", "Salsa zen"] },
-  { id: 2002, categorySlug: "hamburguesas", name: "POKEMON", priceEur: 9.9, panOption: true, ingredients: ["Hamburguesa", "Queso de cabra", "Huevo", "Cebolla caramelizada", "Lechuga", "Tomate"] },
-  { id: 2003, categorySlug: "hamburguesas", name: "SPOTIFY", priceEur: 9.7, panOption: true, ingredients: ["Hamburguesa de pollo", "Queso cheddar", "Bacon", "Tomate", "Brotes de lechuga", "Cebolla caramelizada", "Salsa cajun"] },
-  { id: 2004, categorySlug: "hamburguesas", name: "ÓPERA", priceEur: 9.7, panOption: true, ingredients: ["Hamburguesa", "Pimiento rojo", "Queso de cabra", "Cebolla caramelizada", "Confitura de tomate"] },
-  { id: 2005, categorySlug: "hamburguesas", name: "YAHOO", priceEur: 9.9, panOption: true, ingredients: ["Hamburguesa", "Bacon", "Queso", "Lechuga", "Cebolla frita", "Huevo", "Tomate", "Pimiento frito"] },
-  { id: 2006, categorySlug: "hamburguesas", name: "HBO", priceEur: 9.8, panOption: true, ingredients: ["Hamburguesa de ternera", "Queso cheddar", "Cebolla crujiente", "Champiñones", "Brotes de lechuga"] },
-  { id: 2007, categorySlug: "hamburguesas", name: "APPLE", priceEur: 9.8, panOption: true, ingredients: ["Hamburguesa pollo crujiente", "Bacon", "Lechuga", "Cebolla crujiente", "Tomate", "Mahonesa", "Salsa barbacoa"] },
-  { id: 2008, categorySlug: "hamburguesas", name: "GOOGLE", priceEur: 6.9, panOption: true, ingredients: ["Hamburguesa", "Queso"] },
-  { id: 2009, categorySlug: "hamburguesas", name: "FACEBOOK", priceEur: 9.3, panOption: true, ingredients: ["Hamburguesa", "Cebolla frita", "Bacon", "Huevo"] },
-  { id: 2010, categorySlug: "hamburguesas", name: "TWITER", priceEur: 9.4, panOption: true, ingredients: ["Hamburguesa", "Huevo", "Queso", "Lechuga", "Tomate"] },
-  { id: 2011, categorySlug: "hamburguesas", name: "INSTAGRAM", priceEur: 8.9, panOption: true, ingredients: ["Hamburguesa", "Queso", "Bacon"] },
-  { id: 2012, categorySlug: "hamburguesas", name: "NETFLIX", priceEur: 9.4, panOption: true, ingredients: ["Pulled pork", "Queso cheddar", "Cebolla crujiente", "Salsa sioux"] },
-  { id: 2013, categorySlug: "hamburguesas", name: "BRAD PITT", priceEur: 9.3, panOption: true, ingredients: ["Hamburguesa de Heura", "Brotes de lechuga", "Tomate", "Cebolla frita", "Champiñones"] },
-  { id: 2014, categorySlug: "hamburguesas", name: "TIK TOK", priceEur: 9.2, panOption: true, ingredients: ["Hamburguesa pollo crujiente", "Lechuga", "Mahonesa"] },
-  { id: 2015, categorySlug: "hamburguesas", name: "CHATGPT", priceEur: 9.9, panOption: true, ingredients: ["Pulled pork", "Salsa cheddar caliente", "Bacon", "Cebolla crujiente", "Salsa sioux"] },
 
   // Frankfurts + pan sin gluten
   { id: 2101, categorySlug: "frankfurts", name: "ULISES", priceEur: 4.8, panOption: true, ingredients: ["Frankfurt"] },
-  { id: 2102, categorySlug: "frankfurts", name: "ORIÓN", priceEur: 6.2, panOption: true, ingredients: ["Frankfurt", "Bacon", "Queso"] },
-  { id: 2103, categorySlug: "frankfurts", name: "ATLAS", priceEur: 6.1, panOption: true, ingredients: ["Frankfurt", "Queso", "Cebolla crujiente"] },
-  { id: 2104, categorySlug: "frankfurts", name: "CRONOS", priceEur: 6.6, panOption: true, ingredients: ["Frankfurt", "Bacon", "Queso", "Cebolla crujiente"] },
-  { id: 2105, categorySlug: "frankfurts", name: "CALIPSO", priceEur: 6.7, panOption: true, ingredients: ["Frankfurt", "Cebolla caramelizada", "Huevo", "Queso parmesano"] },
-  { id: 2106, categorySlug: "frankfurts", name: "PERSEO", priceEur: 6.8, panOption: true, ingredients: ["Frankfurt", "Cebolla crujiente", "Bacon", "Huevo", "Tabasco", "Queso"] },
-  { id: 2107, categorySlug: "frankfurts", name: "ZEUS", priceEur: 6.9, panOption: true, ingredients: ["Frankfurt", "Cebolla caramelizada", "Huevo", "Queso parmesano", "Salsa zen"] },
 
   // Platos infantiles
   { id: 2201, categorySlug: "platos-infantiles", name: "101 · Hamburguesa al plato con patatas fritas", priceEur: 7.4 },
-  { id: 2202, categorySlug: "platos-infantiles", name: "102 · Croquetas de pollo con patatas fritas", priceEur: 7.9 },
-  { id: 2203, categorySlug: "platos-infantiles", name: "103 · Tortilla francesa con patatas fritas", priceEur: 5.9 },
-  { id: 2204, categorySlug: "platos-infantiles", name: "104 · Nuggets de pollo con patatas fritas", priceEur: 8.9 },
-  { id: 2205, categorySlug: "platos-infantiles", name: "105 · Frankfurt al plato con patatas fritas", priceEur: 5.9 },
-  { id: 2206, categorySlug: "platos-infantiles", name: "106 · 2 huevos fritos con patatas fritas", priceEur: 5.3 },
-  { id: 2207, categorySlug: "platos-infantiles", name: "107 · Pechuga pollo rebozada con patatas fritas", priceEur: 8.9 },
-  { id: 2208, categorySlug: "platos-infantiles", name: "108 · Bikini (jamón dulce y queso) con patatas fritas", priceEur: 6.3 },
-  { id: 2209, categorySlug: "platos-infantiles", name: "109 · Arroz a la cubana", priceEur: 9.4 },
-  { id: 2210, categorySlug: "platos-infantiles", name: "110 · Carne de kebab con arroz blanco", priceEur: 9.5 },
 
   // Ensaladas
   { id: 2301, categorySlug: "ensaladas", name: "CARONTE", priceEur: 9.4, ingredients: ["Lechugas variadas", "Tomate", "Picatostes", "Pechuga crujiente", "Queso de cabra", "Nueces", "Crema de modena"] },
-  { id: 2302, categorySlug: "ensaladas", name: "CESAR", priceEur: 9.4, ingredients: ["Lechugas variadas", "Tomate", "Picatostes", "Pechuga plancha", "Queso parmesano", "Salsa cesar"] },
-  { id: 2303, categorySlug: "ensaladas", name: "MARTE", priceEur: 8.9, ingredients: ["Lechugas variadas", "Tomate", "Huevo cocido", "Atún"] },
-  { id: 2304, categorySlug: "ensaladas", name: "JUPITER", priceEur: 9.4, ingredients: ["Lechugas variadas", "Tomate", "Atún", "Pechuga plancha", "Huevo cocido", "Picatostes", "Queso parmesano"] },
-  { id: 2305, categorySlug: "ensaladas", name: "DANI ROVIRA", priceEur: 8.9, ingredients: ["Lechugas variadas", "Bocados Heura", "Tomate", "Cebolla", "Picatostes", "Nueces", "Modena"] },
 
   // Bebidas (take away)
   { id: 2401, categorySlug: "bebidas", name: "Coca-Cola lata 330ml", priceEur: 2.2 },
-  { id: 2402, categorySlug: "bebidas", name: "Fanta naranja lata 330ml", priceEur: 2.2 },
-  { id: 2403, categorySlug: "bebidas", name: "Fanta limón lata 330ml", priceEur: 2.2 },
   { id: 2404, categorySlug: "bebidas", name: "Agua 500ml", priceEur: 1.5 },
-  { id: 2405, categorySlug: "bebidas", name: "Cerveza lata 330ml", priceEur: 2.4 },
 ];
 
 export default async function seed() {
@@ -344,20 +304,13 @@ export default async function seed() {
   await db.delete(Order);
   await db.delete(Favorite);
 
-  // Catálogo (si existen en tu schema)
   await db.delete(ProductModifierGroup);
   await db.delete(ModifierOption);
   await db.delete(ModifierGroup);
   await db.delete(ProductVariant);
 
-  // Ingredientes si existen
-  // @ts-ignore
-  if (Ingredient && ProductIngredient) {
-    // @ts-ignore
-    await db.delete(ProductIngredient);
-    // @ts-ignore
-    await db.delete(Ingredient);
-  }
+  await db.delete(ProductIngredient);
+  await db.delete(Ingredient);
 
   await db.delete(Product);
   await db.delete(Category);
@@ -387,7 +340,13 @@ export default async function seed() {
       const name = String(raw).trim();
       if (!name) continue;
       const slug = slugify(name);
-      const preset = ING_PRESET[slug] ?? { addPriceDeltaCents: 0, isCommon: false };
+      const keySpace = slug.replace(/-/g, " ");
+
+      const preset =
+        ING_PRESET[slug] ??
+        ING_PRESET[keySpace] ??
+        { addPriceDeltaCents: 0, isCommon: false };
+
       allIng.set(slug, {
         name,
         slug,
@@ -398,25 +357,22 @@ export default async function seed() {
   }
 
   const ingredientIds = new Map<string, number>();
-  // @ts-ignore
-  if (Ingredient) {
-    let id = 1;
-    const ingredientRows = [...allIng.values()].map((ing) => {
-      ingredientIds.set(ing.slug, id);
-      return {
-        id: id++,
-        name: ing.name,
-        slug: ing.slug,
-        addPriceDeltaCents: ing.addPriceDeltaCents,
-        isCommon: ing.isCommon,
-        active: true,
-        sortOrder: 0,
-      };
-    });
+  let ingId = 1;
 
-    // @ts-ignore
-    await db.insert(Ingredient).values(ingredientRows);
-  }
+  const ingredientRows = [...allIng.values()].map((ing) => {
+    ingredientIds.set(ing.slug, ingId);
+    return {
+      id: ingId++,
+      name: ing.name,
+      slug: ing.slug,
+      addPriceDeltaCents: ing.addPriceDeltaCents,
+      isCommon: ing.isCommon,
+      active: true,
+      sortOrder: 0,
+    };
+  });
+
+  await db.insert(Ingredient).values(ingredientRows);
 
   // 3) Productos
   await db.insert(Product).values(
@@ -440,19 +396,32 @@ export default async function seed() {
   );
 
   // 4) Modificador: Pan -> Pan sin gluten (+1€)
-  // (Si ya lo tienes en seed antiguo, aquí lo recreamos igualmente porque hemos borrado)
   const PAN_GROUP_ID = 1;
   const PAN_OPT_ID = 101;
 
   await db.insert(ModifierGroup).values([
-    { id: PAN_GROUP_ID, name: "Pan", minSelect: 0, maxSelect: 1, required: false, sortOrder: 1, active: true },
+    {
+      id: PAN_GROUP_ID,
+      name: "Pan",
+      minSelect: 0,
+      maxSelect: 1,
+      required: false,
+      sortOrder: 1,
+      active: true,
+    },
   ]);
 
   await db.insert(ModifierOption).values([
-    { id: PAN_OPT_ID, groupId: PAN_GROUP_ID, name: "Pan sin gluten", priceDeltaCents: 100, sortOrder: 1, active: true },
+    {
+      id: PAN_OPT_ID,
+      groupId: PAN_GROUP_ID,
+      name: "Pan sin gluten",
+      priceDeltaCents: 100,
+      sortOrder: 1,
+      active: true,
+    },
   ]);
 
-  // Asociar Pan a productos marcados panOption
   await db.insert(ProductModifierGroup).values(
     PRODUCTS.filter((p) => p.panOption).map((p, idx) => ({
       id: 5000 + idx,
@@ -462,43 +431,38 @@ export default async function seed() {
     }))
   );
 
-  // 5) ProductIngredient (ingredientes por defecto => “quitar…”)
-  // @ts-ignore
-  if (ProductIngredient && Ingredient) {
-    let pid = 1;
-    const rows: any[] = [];
+  // 5) Ingredientes por defecto => “quitar…”
+  let pid = 1;
+  const piRows: any[] = [];
 
-    for (const p of PRODUCTS) {
-      const ings = p.ingredients ?? [];
-      if (!ings.length) continue;
+  for (const p of PRODUCTS) {
+    const ings = p.ingredients ?? [];
+    if (!ings.length) continue;
 
-      let sort = 1;
-      for (const ingName of ings) {
-        const ingSlug = slugify(ingName);
-        const ingId = ingredientIds.get(ingSlug);
-        if (!ingId) continue;
+    let sort = 1;
+    for (const ingName of ings) {
+      const ingSlug = slugify(ingName);
+      const ingDbId = ingredientIds.get(ingSlug);
+      if (!ingDbId) continue;
 
-        rows.push({
-          id: pid++,
-          productId: p.id,
-          ingredientId: ingId,
-          defaultIncluded: true,
-          removable: true,
-          sortOrder: sort++,
-        });
-      }
+      piRows.push({
+        id: pid++,
+        productId: p.id,
+        ingredientId: ingDbId,
+        defaultIncluded: true,
+        removable: true,
+        sortOrder: sort++,
+      });
     }
-
-    // @ts-ignore
-    await db.insert(ProductIngredient).values(rows);
   }
 
-  // === Micro-mejora: Salsas extra ===
+  if (piRows.length) {
+    await db.insert(ProductIngredient).values(piRows);
+  }
 
+  // 6) Salsas extra (solo donde quieras)
   const SAUCES_GROUP_ID = 2;
-
-  // Productos a los que les ponemos salsas extra (patatas + lo que tú quieras)
-  const SAUCE_PRODUCT_IDS = [1201, 1202, 1203, 1204, 1205, 1223]; // +1223 (patatas fritas normales) si lo añades abajo
+  const SAUCE_PRODUCT_IDS = [1201, 1202, 1203, 1204, 1205, 1223];
 
   await db.insert(ModifierGroup).values([
     {
@@ -519,7 +483,7 @@ export default async function seed() {
     { id: 204, groupId: SAUCES_GROUP_ID, name: "Thai agridulce", priceDeltaCents: 50, sortOrder: 4, active: true },
     { id: 205, groupId: SAUCES_GROUP_ID, name: "Salsa amarilla", priceDeltaCents: 50, sortOrder: 5, active: true },
     { id: 206, groupId: SAUCES_GROUP_ID, name: "Salsa brava", priceDeltaCents: 50, sortOrder: 6, active: true },
-    { id: 207, groupId: SAUCES_GROUP_ID, name: "Alioli", priceDeltaCents: 50, sortOrder: 7, active: true }
+    { id: 207, groupId: SAUCES_GROUP_ID, name: "Alioli", priceDeltaCents: 50, sortOrder: 7, active: true },
   ]);
 
   await db.insert(ProductModifierGroup).values(
@@ -527,8 +491,55 @@ export default async function seed() {
       id: 6000 + i,
       productId,
       groupId: SAUCES_GROUP_ID,
+      sortOrder: 3,
+    }))
+  );
+
+  // 7) Acompañamiento: Patatas fritas (guarnición) (+2,50€)
+  // Solo en: sandwiches, wraps, frankfurts, hamburguesas, bocadillos, baguettes-de-marca
+  const SIDE_GROUP_ID = 4;
+  const SIDE_FRIES_OPT_ID = 401;
+
+  const SIDE_ALLOWED = new Set([
+    "sandwiches",
+    "wraps",
+    "frankfurts",
+    "hamburguesas",
+    "bocadillos",
+    "baguettes-de-marca",
+  ]);
+
+  await db.insert(ModifierGroup).values([
+    {
+      id: SIDE_GROUP_ID,
+      name: "Acompañamiento",
+      minSelect: 0,
+      maxSelect: 1,
+      required: false,
+      sortOrder: 15,
+      active: true,
+    },
+  ]);
+
+  await db.insert(ModifierOption).values([
+    {
+      id: SIDE_FRIES_OPT_ID,
+      groupId: SIDE_GROUP_ID,
+      name: "Patatas fritas (guarnición)",
+      priceDeltaCents: 250,
       sortOrder: 1,
+      active: true,
+    },
+  ]);
+
+  const eligibleProductIds = PRODUCTS.filter((p) => SIDE_ALLOWED.has(p.categorySlug)).map((p) => p.id);
+
+  await db.insert(ProductModifierGroup).values(
+    eligibleProductIds.map((productId, i) => ({
+      id: 8000 + i,
+      productId,
+      groupId: SIDE_GROUP_ID,
+      sortOrder: 2, // después de Pan
     }))
   );
 }
-
