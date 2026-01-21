@@ -4,6 +4,7 @@ import Header from "@/components/layout/Header.astro";
 import Footer from "@/components/layout/Footer.astro";
 import ProductConfiguratorModal from "@/islands/product/ProductConfiguratorModal";
 import CartDrawer from "@/islands/cart/CartDrawer";
+import UpsellModal from "@/islands/upsell/UpsellModal";
 ---
 
 <!doctype html>
@@ -26,5 +27,6 @@ import CartDrawer from "@/islands/cart/CartDrawer";
     <!-- Isla global del carrito -->
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
+    <UpsellModal client:load />
   </body>
 </html>

@@ -169,6 +169,10 @@ export default function ProductConfiguratorModal() {
       addedIngredientIds: addedIds,
       removedIngredientIds: removedIds,
     });
+    
+    //Llamar a más productos sugeridos
+    window.dispatchEvent(new Event("arcadia:upsell:open"));
+
     // cerrar modal y volver donde estabas
     setOpen(false);
     setProductId(null);
