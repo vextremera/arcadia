@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
-import { set } from "astro:schema";
 
 type Availability = {
   now: string;
@@ -22,9 +21,16 @@ type CartResponse = {
     name: string;
     qty: number;
     lineTotalCents: number;
+
+    baseLineTotalCents: number;
+
+    modifierDetails?: Array<{ id: number; name: string; deltaCents: number }>;
+    addedIngredientDetails?: Array<{ id: number; name: string; deltaCents: number }>;
+
+    removedLines?: string[];
+    variantLabel?: string | null;
   }>;
   subtotalCents: number;
-  count: number;
 };
 
 function money(cents: number) {
@@ -74,7 +80,7 @@ export default function CheckoutForm() {
       setLoading(true);
       try {
         const [c, a, p] = await Promise.all([
-          api<CartResponse>("/api/cart"),
+          api<CartResponse>("/api/cart/summary"),
           api<Availability>("/api/checkout/availability"),
           api<PaymentsSettings>("/api/settings/payments"),
         ]);
@@ -145,8 +151,7 @@ export default function CheckoutForm() {
     // si forzó recogida, avisamos (y seguimos)
     if (data.forcedPickup) {
       alert(
-        `Reparto no disponible ahora. Pedido cambiado a RECOGIDA. ${
-          data.forcedReason ?? ""
+        `Reparto no disponible ahora. Pedido cambiado a RECOGIDA. ${data.forcedReason ?? ""
         }`
       );
     }
@@ -177,11 +182,10 @@ export default function CheckoutForm() {
           <div class="mt-4 flex gap-2">
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                type === "DELIVERY"
-                  ? "bg-zinc-900 text-white"
-                  : "border border-zinc-300"
-              } ${deliveryDisabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${type === "DELIVERY"
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-300"
+                } ${deliveryDisabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setType("DELIVERY")}
               disabled={deliveryDisabled}
             >
@@ -190,11 +194,10 @@ export default function CheckoutForm() {
 
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                type === "PICKUP"
-                  ? "bg-zinc-900 text-white"
-                  : "border border-zinc-300"
-              }`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${type === "PICKUP"
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-300"
+                }`}
               onClick={() => setType("PICKUP")}
             >
               Recogida
@@ -315,11 +318,10 @@ export default function CheckoutForm() {
           <div class="mt-4 flex gap-2">
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                paymentMethod === "CASH"
-                  ? "bg-zinc-900 text-white"
-                  : "border border-zinc-300"
-              } ${!cashEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${paymentMethod === "CASH"
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-300"
+                } ${!cashEnabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setPaymentMethod("CASH")}
               disabled={!cashEnabled}
             >
@@ -328,11 +330,10 @@ export default function CheckoutForm() {
 
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                paymentMethod === "CARD"
-                  ? "bg-zinc-900 text-white"
-                  : "border border-zinc-300"
-              } ${!cardEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${paymentMethod === "CARD"
+                ? "bg-zinc-900 text-white"
+                : "border border-zinc-300"
+                } ${!cardEnabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setPaymentMethod("CARD")}
               disabled={!cardEnabled}
             >
@@ -346,7 +347,7 @@ export default function CheckoutForm() {
                   de pedido. Ajusta los métodos en Admin.
                 </div>
               ) : null)}
-              
+
           </div>
 
           <p class="mt-2 text-xs text-zinc-600">
@@ -377,19 +378,60 @@ export default function CheckoutForm() {
         <div class="rounded-2xl border border-zinc-200 p-5">
           <h2 class="text-lg font-semibold">Resumen</h2>
 
-          <div class="mt-4 space-y-2 text-sm">
-            {cart.items.map((it) => (
-              <div
-                class="flex items-baseline justify-between gap-3"
-                key={it.lineId}
-              >
-                <div class="min-w-0 truncate">
-                  {it.qty}× {it.name}
+          <div class="mt-4 space-y-4 text-sm">
+            {cart.items.map((it) => {
+              const extras = [
+                ...(it.modifierDetails ?? []).map((x) => ({ label: x.name, deltaCents: x.deltaCents })),
+                ...(it.addedIngredientDetails ?? []).map((x) => ({ label: x.name, deltaCents: x.deltaCents })),
+              ];
+
+              return (
+                <div key={it.lineId} class="rounded-2xl border border-zinc-200 p-4">
+                  {/* Producto */}
+                  <div class="flex items-baseline justify-between gap-3">
+                    <div class="min-w-0 truncate font-semibold">
+                      {it.qty}× {it.name}
+                    </div>
+                    <div class="shrink-0 font-semibold">{money(it.baseLineTotalCents)}</div>
+                  </div>
+
+                  {it.variantLabel ? (
+                    <div class="mt-1 text-xs text-zinc-600">{it.variantLabel}</div>
+                  ) : null}
+
+                  {/* Extras con precio a la derecha */}
+                  {extras.length ? (
+                    <div class="mt-2 space-y-1">
+                      {extras.map((e) => (
+                        <div class="flex items-baseline justify-between gap-3 text-xs text-zinc-600">
+                          <div class="min-w-0 truncate">Extras: {e.label}</div>
+                          <div class="shrink-0 font-medium">
+                            +{money((e.deltaCents ?? 0) * (it.qty ?? 1))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Quitados (sin precio) */}
+                  {it.removedLines?.length ? (
+                    <div class="mt-2 space-y-1 text-xs text-zinc-600">
+                      {it.removedLines.map((l) => (
+                        <div>{l}</div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Línea “fantasma” total */}
+                  <div class="mt-3 flex items-baseline justify-between gap-3 border-t border-zinc-100 pt-3">
+                    <div class="text-xs text-zinc-500">Total producto</div>
+                    <div class="font-semibold">{money(it.lineTotalCents)}</div>
+                  </div>
                 </div>
-                <div class="font-semibold">{money(it.lineTotalCents)}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
 
           <div class="mt-4 border-t border-zinc-200 pt-4 flex items-center justify-between text-sm">
             <span class="text-zinc-600">Subtotal</span>
