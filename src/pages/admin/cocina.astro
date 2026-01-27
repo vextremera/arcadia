@@ -1,0 +1,15 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import KitchenBoard from "@/islands/admin/KitchenBoard";
+---
+
+<SiteLayout title="Cocina · Admin · Arcadia">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight">Modo cocina</h1>
+    <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/pedidos">
+      Ver lista completa
+    </a>
+  </div>
+
+  <KitchenBoard client:load />
+</SiteLayout>
