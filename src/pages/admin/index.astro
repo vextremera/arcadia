@@ -13,25 +13,54 @@ const user = Astro.locals.user;
     </div>
 
     <div class="mt-4 flex flex-wrap gap-2">
-      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/categorias">
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/categorias"
+      >
         Gestionar categorías
       </a>
 
-      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/ajustes/pagos">
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/ajustes/pagos"
+      >
         Ajustes de pago
       </a>
 
-      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/cocina">
-      Modo cocina
-    </a>
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/cocina"
+      >
+        Modo cocina
+      </a>
 
-      <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/pedidos">
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/pedidos"
+      >
         Ver pedidos
+      </a>
+
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/upsell"
+      >
+        Gestionar upsell
+      </a>
+
+      <a
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        href="/admin/operativa"
+      >
+        Operativa
       </a>
     </div>
 
     <form class="mt-4" method="post" action="/api/admin/logout">
-      <button class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" type="submit">
+      <button
+        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+        type="submit"
+      >
         Cerrar sesión
       </button>
     </form>

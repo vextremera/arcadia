@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { db, Product, inArray } from "astro:db";
+import { db, Product, UpsellItem, eq, and } from "astro:db";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -7,18 +7,6 @@ function json(data: unknown, status = 200) {
     headers: { "content-type": "application/json; charset=utf-8" },
   });
 }
-
-// IDs de tu seed (ajusta si cambiaste alguno)
-const UPSELL_IDS = [
-  1201, // Bravas
-  1204, // Teja
-  1203, // Loki
-  1202, // Boniato
-  1302, // Croquetas jamón ibérico
-  1207, // Calamares andaluza
-  2401, // Coca-Cola lata
-  2404, // Agua
-];
 
 export const GET: APIRoute = async () => {
   const rows = await db
@@ -31,13 +19,15 @@ export const GET: APIRoute = async () => {
       active: Product.active,
       deliveryEnabled: Product.deliveryEnabled,
       pickupEnabled: Product.pickupEnabled,
+      sortOrder: UpsellItem.sortOrder,
     })
-    .from(Product)
-    .where(inArray(Product.id, UPSELL_IDS));
+    .from(UpsellItem)
+    .innerJoin(Product, eq(UpsellItem.productId, Product.id))
+    .where(and(eq(UpsellItem.active, true), eq(Product.active, true)))
+    .orderBy(UpsellItem.sortOrder);
 
-  // mantener orden del array
-  const map = new Map(rows.map((r) => [r.id, r]));
-  const products = UPSELL_IDS.map((id) => map.get(id)).filter(Boolean);
+  // mantenemos exactamente el shape que tu UpsellModal ya espera
+  const products = rows.map(({ sortOrder, ...p }) => p);
 
   return json({ products });
 };

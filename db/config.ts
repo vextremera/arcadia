@@ -486,6 +486,21 @@ const AuditLog = defineTable({
   indexes: [{ on: "createdAt" }, { on: "actorUserId" }]
 });
 
+const UpsellItem = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    productId: column.number({ references: () => Product.columns.id }),
+    sortOrder: column.number({ default: 0 }),
+    active: column.boolean({ default: true }),
+    createdAt: column.date({ default: NOW }),
+  },
+  indexes: [
+    { on: "active" },
+    { on: ["active", "sortOrder"] },
+    { on: "productId", unique: true },
+  ],
+});
+
 export default defineDb({
   tables: {
     User,
@@ -535,6 +550,8 @@ export default defineDb({
     AppSetting,
     MediaAsset,
 
-    AuditLog
+    AuditLog,
+
+    UpsellItem
   }
 });

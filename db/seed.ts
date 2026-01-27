@@ -19,6 +19,7 @@ import {
   eq,
   and,
   inArray,
+  UpsellItem
 } from "astro:db";
 
 import { hashPassword } from "@/server/auth/password";
@@ -1562,6 +1563,37 @@ export default async function seed() {
       productId,
       groupId: SIDE_GROUP_ID,
       sortOrder: 2, // después de Pan
+    }))
+  );
+
+  // --- UPSELL (configurable) ---
+  const UPSELL_IDS = [
+    1201, // Bravas
+    1204, // Teja
+    1203, // Loki
+    1202, // Boniato
+    1302, // Croquetas jamón ibérico
+    1207, // Calamares andaluza
+    2401, // Coca-Cola lata
+    2404, // Agua
+  ];
+
+  // limpio para que el seed sea idempotente
+  await db.delete(UpsellItem);
+
+  // insertamos solo los que existan (evita FK)
+  const existing = await db
+    .select({ id: Product.id })
+    .from(Product)
+    .where(inArray(Product.id, UPSELL_IDS));
+
+  const ok = new Set(existing.map((x) => x.id));
+
+  await db.insert(UpsellItem).values(
+    UPSELL_IDS.filter((id) => ok.has(id)).map((productId, i) => ({
+      productId,
+      sortOrder: i + 1,
+      active: true,
     }))
   );
 }

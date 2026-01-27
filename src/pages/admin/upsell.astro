@@ -1,0 +1,104 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { db, Product, UpsellItem, eq } from "astro:db";
+
+function money(cents: number) {
+  return `${(cents / 100).toFixed(2)} €`;
+}
+
+const upsellRows = await db
+  .select({
+    id: UpsellItem.id,
+    active: UpsellItem.active,
+    sortOrder: UpsellItem.sortOrder,
+    productId: Product.id,
+    name: Product.name,
+    priceCents: Product.priceCents,
+  })
+  .from(UpsellItem)
+  .innerJoin(Product, eq(UpsellItem.productId, Product.id))
+  .orderBy(UpsellItem.sortOrder);
+
+const products = await db
+  .select({ id: Product.id, name: Product.name, active: Product.active })
+  .from(Product)
+  .orderBy(Product.name);
+---
+
+<SiteLayout title="Upsell · Admin · Arcadia">
+  <h1 class="text-2xl font-semibold tracking-tight">Upsell</h1>
+  <p class="mt-2 text-sm text-zinc-600">
+    Controla qué productos salen en “¿Quieres algo más?” y su orden.
+  </p>
+
+  <div class="mt-6 rounded-2xl border border-zinc-200 p-5">
+    <h2 class="text-lg font-semibold">Añadir producto</h2>
+
+    <form class="mt-4 flex flex-wrap gap-2" method="post" action="/api/admin/upsell/add">
+      <select class="rounded-xl border border-zinc-300 px-3 py-2 text-sm" name="productId" required>
+        {products
+          .filter((p) => p.active)
+          .map((p) => (
+            <option value={p.id}>
+              {p.name} (#{p.id})
+            </option>
+          ))}
+      </select>
+
+      <button class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+        Añadir
+      </button>
+    </form>
+  </div>
+
+  <div class="mt-6 rounded-2xl border border-zinc-200 p-5">
+    <h2 class="text-lg font-semibold">Lista</h2>
+
+    {upsellRows.length === 0 ? (
+      <div class="mt-3 text-sm text-zinc-600">No hay upsell configurado.</div>
+    ) : (
+      <div class="mt-4 space-y-3">
+        {upsellRows.map((u) => (
+          <div class="rounded-2xl border border-zinc-100 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="font-semibold">
+                {u.name} <span class="text-xs text-zinc-500">#{u.productId}</span>
+              </div>
+              <div class="text-sm font-semibold">{money(u.priceCents)}</div>
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <form class="flex flex-wrap items-center gap-2" method="post" action="/api/admin/upsell/update">
+                <input type="hidden" name="id" value={u.id} />
+
+                <label class="text-sm text-zinc-700">Orden</label>
+                <input
+                  class="w-20 rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+                  type="number"
+                  name="sortOrder"
+                  value={u.sortOrder}
+                />
+
+                <label class="ml-2 flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="active" checked={u.active} />
+                  Activo
+                </label>
+
+                <button class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" type="submit">
+                  Guardar
+                </button>
+              </form>
+
+              <form method="post" action="/api/admin/upsell/delete">
+                <input type="hidden" name="id" value={u.id} />
+                <button class="rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-700" type="submit">
+                  Quitar
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</SiteLayout>
