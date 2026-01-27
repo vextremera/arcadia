@@ -1,0 +1,65 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { db, Order } from "astro:db";
+
+function money(cents: number) {
+  return `${(cents / 100).toFixed(2)} €`;
+}
+
+const url = new URL(Astro.request.url);
+const status = (url.searchParams.get("status") ?? "").toUpperCase();
+const type = (url.searchParams.get("type") ?? "").toUpperCase();
+const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+
+// Simple y robusto: cargamos últimos 100 y filtramos en JS (suficiente para mediano)
+const rows = await db.select().from(Order).orderBy(Order.createdAt).limit(100);
+const orders = [...rows].reverse().filter((o) => {
+  if (status && o.status !== status) return false;
+  if (type && o.type !== type) return false;
+  if (q) {
+    const hay = `${o.publicId} ${o.customerName} ${o.customerPhone} ${o.customerEmail ?? ""}`.toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+});
+---
+
+<SiteLayout title="Pedidos · Admin · Arcadia">
+  <h1 class="text-2xl font-semibold tracking-tight">Pedidos</h1>
+
+  <form class="mt-4 flex flex-wrap gap-2" method="get">
+    <input class="rounded-xl border border-zinc-300 px-3 py-2 text-sm" name="q" placeholder="Buscar (ID, nombre, teléfono)" value={q} />
+    <select class="rounded-xl border border-zinc-300 px-3 py-2 text-sm" name="status">
+      <option value="">Estado (todos)</option>
+      <option value="PENDING" selected={status === "PENDING"}>PENDING</option>
+      <option value="ACCEPTED" selected={status === "ACCEPTED"}>ACCEPTED</option>
+      <option value="PREPARING" selected={status === "PREPARING"}>PREPARING</option>
+      <option value="READY" selected={status === "READY"}>READY</option>
+      <option value="OUT_FOR_DELIVERY" selected={status === "OUT_FOR_DELIVERY"}>OUT_FOR_DELIVERY</option>
+      <option value="DELIVERED" selected={status === "DELIVERED"}>DELIVERED</option>
+      <option value="CANCELLED" selected={status === "CANCELLED"}>CANCELLED</option>
+    </select>
+    <select class="rounded-xl border border-zinc-300 px-3 py-2 text-sm" name="type">
+      <option value="">Tipo (todos)</option>
+      <option value="DELIVERY" selected={type === "DELIVERY"}>DELIVERY</option>
+      <option value="PICKUP" selected={type === "PICKUP"}>PICKUP</option>
+    </select>
+    <button class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Filtrar</button>
+  </form>
+
+  <div class="mt-6 space-y-3">
+    {orders.length === 0 ? (
+      <div class="text-sm text-zinc-600">No hay pedidos.</div>
+    ) : orders.map((o) => (
+      <a href={`/admin/pedidos/${o.publicId}`} class="block rounded-2xl border border-zinc-200 p-4 hover:border-zinc-400">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="font-semibold">{o.publicId}</div>
+          <div class="text-sm font-semibold">{money(o.totalCents)}</div>
+        </div>
+        <div class="mt-1 text-sm text-zinc-600">
+          {o.customerName} · {o.customerPhone} · {o.type} · {o.status}
+        </div>
+      </a>
+    ))}
+  </div>
+</SiteLayout>

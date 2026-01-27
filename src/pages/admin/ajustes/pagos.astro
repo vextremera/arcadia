@@ -2,61 +2,49 @@
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, AppSetting, eq } from "astro:db";
 
+const DEFAULT_PAYMENTS = {
+  delivery: { cashEnabled: true, cardEnabled: true },
+  pickup: { cashEnabled: true, cardEnabled: true },
+};
+
 const [row] = await db
   .select({ value: AppSetting.value })
   .from(AppSetting)
   .where(eq(AppSetting.key, "payments"))
   .limit(1);
 
-const payments = (row?.value ?? {
-  delivery: { cashEnabled: true, cardEnabled: true },
-  pickup: { cashEnabled: true, cardEnabled: true },
-}) as any;
+const payments = (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 ---
 
-<SiteLayout title="Ajustes de pago · Admin · Arcadia">
-  <div class="flex items-baseline justify-between gap-4">
-    <h1 class="text-2xl font-semibold tracking-tight">Ajustes de pago</h1>
-    <a class="text-sm text-zinc-600 hover:underline" href="/admin">← Panel</a>
-  </div>
+<SiteLayout title="Pagos · Admin · Arcadia">
+  <h1 class="text-2xl font-semibold tracking-tight">Ajustes de pagos</h1>
 
-  <form class="mt-6 max-w-xl rounded-2xl border border-zinc-200 p-5" method="post" action="/api/admin/settings/payments">
-    <h2 class="text-lg font-semibold">Métodos de pago</h2>
-    <p class="mt-1 text-sm text-zinc-600">
-      Controla qué métodos se muestran en checkout según el tipo de pedido.
-    </p>
-
-    <div class="mt-5 space-y-4">
-      <div class="rounded-2xl border border-zinc-200 p-4">
-        <div class="font-semibold">Delivery</div>
-
-        <label class="mt-3 flex items-center justify-between text-sm">
-          <span>Efectivo</span>
-          <input type="checkbox" name="delivery_cash" checked={!!payments.delivery.cashEnabled} />
-        </label>
-
-        <label class="mt-3 flex items-center justify-between text-sm">
-          <span>Tarjeta</span>
-          <input type="checkbox" name="delivery_card" checked={!!payments.delivery.cardEnabled} />
-        </label>
-      </div>
-
-      <div class="rounded-2xl border border-zinc-200 p-4">
-        <div class="font-semibold">Recogida</div>
-
-        <label class="mt-3 flex items-center justify-between text-sm">
-          <span>Efectivo</span>
-          <input type="checkbox" name="pickup_cash" checked={!!payments.pickup.cashEnabled} />
-        </label>
-
-        <label class="mt-3 flex items-center justify-between text-sm">
-          <span>Tarjeta</span>
-          <input type="checkbox" name="pickup_card" checked={!!payments.pickup.cardEnabled} />
-        </label>
-      </div>
+  <form class="mt-6 space-y-6" method="post" action="/api/admin/settings/payments">
+    <div class="rounded-2xl border border-zinc-200 p-5">
+      <h2 class="text-lg font-semibold">Delivery</h2>
+      <label class="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" name="deliveryCash" checked={payments.delivery.cashEnabled} />
+        Efectivo habilitado
+      </label>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="checkbox" name="deliveryCard" checked={payments.delivery.cardEnabled} />
+        Tarjeta habilitada
+      </label>
     </div>
 
-    <button class="mt-5 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+    <div class="rounded-2xl border border-zinc-200 p-5">
+      <h2 class="text-lg font-semibold">Recogida</h2>
+      <label class="mt-3 flex items-center gap-2 text-sm">
+        <input type="checkbox" name="pickupCash" checked={payments.pickup.cashEnabled} />
+        Efectivo habilitado
+      </label>
+      <label class="mt-2 flex items-center gap-2 text-sm">
+        <input type="checkbox" name="pickupCard" checked={payments.pickup.cardEnabled} />
+        Tarjeta habilitada
+      </label>
+    </div>
+
+    <button class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
       Guardar
     </button>
   </form>

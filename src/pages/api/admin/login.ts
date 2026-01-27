@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { db, User, eq, and } from "astro:db";
+import { verifyPassword } from "@/server/auth/password";
 
 export const POST: APIRoute = async ({ request, session, redirect }) => {
   if (!session) return new Response("Session not available", { status: 500 });
@@ -25,7 +26,7 @@ export const POST: APIRoute = async ({ request, session, redirect }) => {
 
   if (!u) return redirect("/admin/login?error=invalid", 302);
 
-  const ok = u.passwordHash === `dev:${password}`;
+  const ok = await verifyPassword(u.passwordHash, password);
   const allowed = u.role === "ADMIN" || u.role === "STAFF";
 
   if (!ok || !allowed) return redirect("/admin/login?error=invalid", 302);

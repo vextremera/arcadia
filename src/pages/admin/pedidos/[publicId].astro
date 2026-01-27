@@ -1,0 +1,120 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { db, Order, OrderItem, eq } from "astro:db";
+
+function money(cents: number) {
+  return `${(cents / 100).toFixed(2)} €`;
+}
+
+const { publicId } = Astro.params;
+const pid = String(publicId ?? "").trim();
+
+const [order] = await db.select().from(Order).where(eq(Order.publicId, pid)).limit(1);
+if (!order) return new Response("Pedido no encontrado", { status: 404 });
+
+const items = await db.select().from(OrderItem).where(eq(OrderItem.orderId, order.id));
+const meta: any = order.addressSnapshot ?? {};
+const paymentMethod = meta?.paymentMethod ?? null;
+const addr = meta?.address ?? null;
+---
+
+<SiteLayout title={`Pedido ${order.publicId} · Admin · Arcadia`}>
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight">{order.publicId}</h1>
+    <a class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" href="/admin/pedidos">Volver</a>
+  </div>
+
+  <div class="mt-4 grid gap-6 lg:grid-cols-[1fr_420px]">
+    <div class="space-y-6">
+      <div class="rounded-2xl border border-zinc-200 p-5">
+        <div class="text-sm text-zinc-600">Cliente</div>
+        <div class="mt-1 font-semibold">{order.customerName} · {order.customerPhone}</div>
+        {order.customerEmail ? <div class="mt-1 text-sm text-zinc-600">{order.customerEmail}</div> : null}
+        <div class="mt-3 text-sm text-zinc-600">Tipo: <b>{order.type}</b></div>
+        <div class="mt-1 text-sm text-zinc-600">Estado: <b>{order.status}</b></div>
+        <div class="mt-1 text-sm text-zinc-600">Pago: <b>{paymentMethod ?? "—"}</b> · <b>{order.paymentStatus}</b></div>
+
+        {order.type === "DELIVERY" && addr ? (
+          <div class="mt-4 rounded-xl border border-zinc-200 p-4 text-sm">
+            <div class="font-semibold">Dirección</div>
+            <div class="mt-1">{addr.line1}</div>
+            {addr.line2 ? <div>{addr.line2}</div> : null}
+            <div>{addr.postalCode} · {addr.city}</div>
+            {addr.notes ? <div class="mt-2 text-zinc-600">Notas: {addr.notes}</div> : null}
+          </div>
+        ) : null}
+
+        {order.notes ? <div class="mt-4 text-sm text-zinc-600"><b>Comentarios:</b> {order.notes}</div> : null}
+      </div>
+
+      <div class="rounded-2xl border border-zinc-200 p-5">
+        <h2 class="text-lg font-semibold">Items</h2>
+        <div class="mt-4 space-y-4">
+          {items.map((it: any) => {
+            const m = it.modifiers ?? {};
+            const opts = m.modifierOptions ?? [];
+            const adds = m.ingredientsAdded ?? [];
+            const rems = m.ingredientsRemoved ?? [];
+            return (
+              <div class="rounded-2xl border border-zinc-100 p-4">
+                <div class="flex items-baseline justify-between gap-3">
+                  <div class="font-semibold">{it.qty}× {it.nameSnapshot}</div>
+                  <div class="font-semibold">{money(it.lineTotalCents)}</div>
+                </div>
+                {it.variantSnapshot ? <div class="mt-1 text-sm text-zinc-600">{it.variantSnapshot}</div> : null}
+                {opts.length ? <div class="mt-2 text-sm text-zinc-600">Extras: {opts.map((o:any)=>`${o.name} (+${money(o.priceDeltaCents)})`).join(", ")}</div> : null}
+                {adds.length ? <div class="mt-1 text-sm text-zinc-600">Añadidos: {adds.map((a:any)=>`${a.name} (+${money(a.priceDeltaCents)})`).join(", ")}</div> : null}
+                {rems.length ? <div class="mt-1 text-sm text-zinc-600">Quitados: {rems.map((r:any)=>r.name).join(", ")}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+
+        <div class="mt-6 border-t border-zinc-200 pt-4 text-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-zinc-600">Subtotal</span>
+            <span class="font-semibold">{money(order.subtotalCents)}</span>
+          </div>
+          {order.deliveryFeeCents ? (
+            <div class="mt-2 flex items-center justify-between">
+              <span class="text-zinc-600">Delivery</span>
+              <span class="font-semibold">{money(order.deliveryFeeCents)}</span>
+            </div>
+          ) : null}
+          <div class="mt-3 flex items-center justify-between text-base font-semibold">
+            <span>Total</span>
+            <span>{money(order.totalCents)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="lg:sticky lg:top-4 lg:h-fit space-y-3">
+      <div class="rounded-2xl border border-zinc-200 p-5">
+        <h2 class="text-lg font-semibold">Acciones</h2>
+
+        <div class="mt-4 grid gap-2">
+          {["PENDING","ACCEPTED","PREPARING","READY","OUT_FOR_DELIVERY","DELIVERED","CANCELLED"].map((st) => (
+            <form method="post" action={`/api/admin/orders/${order.publicId}/update`}>
+              <input type="hidden" name="status" value={st} />
+              <button class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" type="submit">
+                Cambiar a {st}
+              </button>
+            </form>
+          ))}
+        </div>
+
+        <div class="mt-4 border-t border-zinc-200 pt-4 grid gap-2">
+          {["UNPAID","PAID","FAILED","REFUNDED","PARTIALLY_REFUNDED"].map((ps) => (
+            <form method="post" action={`/api/admin/orders/${order.publicId}/update`}>
+              <input type="hidden" name="paymentStatus" value={ps} />
+              <button class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold" type="submit">
+                Pago: {ps}
+              </button>
+            </form>
+          ))}
+        </div>
+      </div>
+    </aside>
+  </div>
+</SiteLayout>

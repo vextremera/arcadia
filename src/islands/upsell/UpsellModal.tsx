@@ -66,6 +66,7 @@ export default function UpsellModal() {
 
       // refrescar UI del carrito
       window.dispatchEvent(new Event("arcadia:cart:updated"));
+      setOpen(false);
     } finally {
       setBusyId(null);
     }
@@ -82,7 +83,7 @@ export default function UpsellModal() {
         type="button"
       />
 
-      <div class="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl rounded-t-3xl bg-white p-5 shadow-2xl">
+      <div class="relative mx-auto mt-24 w-[min(92vw,720px)] rounded-3xl bg-white p-5 shadow-2xl">
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-xl font-semibold tracking-tight">¿Quieres algo más?</div>
