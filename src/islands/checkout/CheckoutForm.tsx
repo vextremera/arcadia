@@ -61,6 +61,17 @@ export default function CheckoutForm() {
 
   const deliveryDisabled = useMemo(() => !avail?.deliveryAvailable, [avail]);
 
+  const deliveryFeeCents = useMemo(() => {
+    if (type !== "DELIVERY") return 0;
+    return avail?.deliveryFeeCents ?? 0;
+  }, [type, avail]);
+
+  const totalCents = useMemo(() => {
+    if (!cart) return 0;
+    return cart.subtotalCents + deliveryFeeCents;
+  }, [cart, deliveryFeeCents]);
+
+
   const cashEnabled = useMemo(() => {
     if (!payments) return true;
     return type === "DELIVERY"
@@ -438,13 +449,28 @@ export default function CheckoutForm() {
             <span class="font-semibold">{money(cart.subtotalCents)}</span>
           </div>
 
+          {type === "DELIVERY" ? (
+            <div class="mt-2 flex items-center justify-between text-sm">
+              <span class="text-zinc-600">Delivery</span>
+              <span class="font-semibold">{money(deliveryFeeCents)}</span>
+            </div>
+          ) : null}
+
+          <div class="mt-3 flex items-center justify-between text-sm">
+            <span class="text-zinc-600">Total</span>
+            <span class="text-base font-semibold">{money(totalCents)}</span>
+          </div>
+
           <button
-            class="mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${avail?.pauseOrders ? "opacity-60 pointer-events-none" : ""
+              }`}
             type="button"
             onClick={submit}
+            disabled={!!avail?.pauseOrders}
           >
             Confirmar pedido
           </button>
+
         </div>
       </aside>
     </div>

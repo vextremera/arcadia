@@ -9,5 +9,7 @@ function json(data: unknown, status = 200) {
 }
 
 export const GET: APIRoute = async () => {
-  return json(getArcadiaAvailability());
+  const availability = await getArcadiaAvailability();
+
+  return json(availability);
 };

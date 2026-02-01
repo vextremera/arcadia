@@ -75,7 +75,14 @@ async function getFeesSettings() {
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
 
-  const availability = getArcadiaAvailability();
+  const availability = await getArcadiaAvailability();
+  if (availability.pauseOrders) {
+    return json(
+      { error: "PAUSED", message: "Pedidos pausados temporalmente. Inténtalo más tarde." },
+      400
+    );
+  }
+
   if (!availability.isOpen) {
     return json(
       { error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` },
@@ -222,43 +229,43 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const variants = variantIds.length
     ? await db
-        .select({
-          id: ProductVariant.id,
-          productId: ProductVariant.productId,
-          name: ProductVariant.name,
-          priceDeltaCents: ProductVariant.priceDeltaCents,
-          active: ProductVariant.active,
-        })
-        .from(ProductVariant)
-        .where(inArray(ProductVariant.id, variantIds))
+      .select({
+        id: ProductVariant.id,
+        productId: ProductVariant.productId,
+        name: ProductVariant.name,
+        priceDeltaCents: ProductVariant.priceDeltaCents,
+        active: ProductVariant.active,
+      })
+      .from(ProductVariant)
+      .where(inArray(ProductVariant.id, variantIds))
     : [];
 
   const variantById = new Map(variants.map((v) => [v.id, v]));
 
   const options = optionIds.length
     ? await db
-        .select({
-          id: ModifierOption.id,
-          name: ModifierOption.name,
-          priceDeltaCents: ModifierOption.priceDeltaCents,
-          active: ModifierOption.active,
-        })
-        .from(ModifierOption)
-        .where(inArray(ModifierOption.id, optionIds))
+      .select({
+        id: ModifierOption.id,
+        name: ModifierOption.name,
+        priceDeltaCents: ModifierOption.priceDeltaCents,
+        active: ModifierOption.active,
+      })
+      .from(ModifierOption)
+      .where(inArray(ModifierOption.id, optionIds))
     : [];
 
   const optionById = new Map(options.map((o) => [o.id, o]));
 
   const ingredients = ingredientIds.length
     ? await db
-        .select({
-          id: Ingredient.id,
-          name: Ingredient.name,
-          addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-          active: Ingredient.active,
-        })
-        .from(Ingredient)
-        .where(inArray(Ingredient.id, ingredientIds))
+      .select({
+        id: Ingredient.id,
+        name: Ingredient.name,
+        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+        active: Ingredient.active,
+      })
+      .from(Ingredient)
+      .where(inArray(Ingredient.id, ingredientIds))
     : [];
 
   const ingredientById = new Map(ingredients.map((x) => [x.id, x]));
@@ -342,7 +349,8 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   // Fee fijo (solo delivery)
-  const deliveryFeeCents = type === "DELIVERY" ? Math.max(0, fees.deliveryFeeCents ?? 0) : 0;
+  const deliveryFeeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
+
 
   const discountCents = 0;
   const taxCents = 0;
