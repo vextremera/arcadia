@@ -3,11 +3,24 @@ import { api } from "@/islands/_shared/http";
 
 type Availability = {
   now: string;
+
+  // operativa
+  pauseOrders: boolean;
+  forcePickup: boolean;
+  deliveryFeeCents: number;
+
+  // estado actual
   isOpen: boolean;
   kitchenOpen: boolean;
   deliveryAvailable: boolean;
-  windows: { delivery: { start: string; end: string } };
+
+  windows: {
+    open: { start: string; end: string };
+    kitchen: { start: string; end: string };
+    delivery: { start: string; end: string };
+  };
 };
+
 
 type PaymentsSettings = {
   delivery: { cashEnabled: boolean; cardEnabled: boolean };
