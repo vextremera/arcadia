@@ -6,13 +6,13 @@ type KitchenOrder = {
   createdAt: string;
   type: "DELIVERY" | "PICKUP";
   status:
-    | "PENDING"
-    | "ACCEPTED"
-    | "PREPARING"
-    | "READY"
-    | "OUT_FOR_DELIVERY"
-    | "DELIVERED"
-    | "CANCELLED";
+  | "PENDING"
+  | "ACCEPTED"
+  | "PREPARING"
+  | "READY"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "CANCELLED";
   paymentStatus: string;
   customerName: string;
   customerPhone: string;
@@ -68,7 +68,7 @@ function beep() {
       o.stop();
       ctx.close?.();
     }, 140);
-  } catch {}
+  } catch { }
 }
 
 export default function KitchenBoard() {
@@ -260,12 +260,24 @@ function OrderCard(props: {
           ) : null}
         </div>
 
-        <a
-          class="rounded-xl border border-zinc-300 px-3 py-2 text-xs font-semibold"
-          href={`/admin/pedidos/${o.publicId}`}
-        >
-          Ver
-        </a>
+        <div class="flex gap-2">
+          <a
+            class="rounded-xl border border-zinc-300 px-3 py-2 text-xs font-semibold"
+            href={`/admin/pedidos/ticket/${o.publicId}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ticket
+          </a>
+
+          <a
+            class="rounded-xl border border-zinc-300 px-3 py-2 text-xs font-semibold"
+            href={`/admin/pedidos/${o.publicId}`}
+          >
+            Ver
+          </a>
+        </div>
+
       </div>
 
       <div class="mt-3 space-y-2 text-sm">

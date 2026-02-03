@@ -1,0 +1,259 @@
+---
+import { db, Order, OrderItem, eq } from "astro:db";
+
+const publicId = String(Astro.params.publicId ?? "").trim();
+if (!publicId) return new Response("Missing publicId", { status: 400 });
+
+const [order] = await db
+    .select()
+    .from(Order)
+    .where(eq(Order.publicId, publicId))
+    .limit(1);
+
+if (!order) return new Response("Pedido no encontrado", { status: 404 });
+
+const items = await db
+    .select()
+    .from(OrderItem)
+    .where(eq(OrderItem.orderId, order.id))
+    .orderBy(OrderItem.id);
+
+function money(cents: number) {
+    return `${(cents / 100).toFixed(2)} €`;
+}
+
+function fmtDate(d: any) {
+    const date = new Date(d);
+    return new Intl.DateTimeFormat("es-ES", {
+        timeZone: "Europe/Madrid",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+    }).format(date);
+}
+
+const meta: any = (order as any).addressSnapshot ?? {};
+const paymentMethod = meta?.paymentMethod ?? null; // CASH | CARD
+const forcedPickup = !!meta?.forcedPickup;
+const forcedReason = meta?.forcedReason ?? null;
+const address = meta?.address ?? null;
+
+const isDelivery = order.type === "DELIVERY";
+const deliveryFeeCents = Number(order.deliveryFeeCents ?? 0);
+---
+
+<html lang="es">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Ticket {order.publicId}</title>
+        <style>
+            @media print {
+                .no-print {
+                    display: none !important;
+                }
+                html,
+                body {
+                    margin: 0;
+                    padding: 0;
+                }
+            }
+        </style>
+    </head>
+
+    <body class="bg-zinc-100 text-zinc-900">
+        {/* Barra superior solo pantalla */}
+        <div
+            class="no-print sticky top-0 z-10 border-b border-zinc-200 bg-white"
+        >
+            <div
+                class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3"
+            >
+                <a
+                    class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+                    href={`/admin/pedidos/${order.publicId}`}
+                >
+                    ← Volver al pedido
+                </a>
+                <button
+                    class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+                    type="button"
+                    onclick="window.print()"
+                >
+                    Imprimir
+                </button>
+            </div>
+        </div>
+
+        {/* Ticket 80mm */}
+        <main
+            class="mx-auto mt-6 w-[min(92vw,320px)] rounded-2xl bg-white p-4 shadow-sm print:mt-0 print:w-[320px] print:rounded-none print:shadow-none"
+        >
+            <div class="text-center">
+                <div class="text-lg font-black tracking-tight">ARCADIA</div>
+                <div class="mt-1 text-xs text-zinc-600">Lloret de Mar</div>
+            </div>
+
+            <div class="mt-4 border-t border-zinc-200 pt-3 text-sm">
+                <div class="flex items-baseline justify-between">
+                    <div class="font-semibold">Pedido</div>
+                    <div class="font-mono font-black">{order.publicId}</div>
+                </div>
+
+                <div
+                    class="mt-1 flex items-baseline justify-between text-xs text-zinc-700"
+                >
+                    <div>{fmtDate(order.createdAt)}</div>
+                    <div class="font-semibold">{order.type}</div>
+                </div>
+
+                <div
+                    class="mt-1 flex items-baseline justify-between text-xs text-zinc-700"
+                >
+                    <div>Pago</div>
+                    <div class="font-semibold">{paymentMethod ?? "—"}</div>
+                </div>
+
+                {
+                    forcedPickup ? (
+                        <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                            <b>Forzado a RECOGIDA:</b> {forcedReason ?? ""}
+                        </div>
+                    ) : null
+                }
+            </div>
+
+            <div class="mt-3 border-t border-zinc-200 pt-3 text-sm">
+                <div class="font-semibold">Cliente</div>
+                <div class="mt-1 text-xs text-zinc-700">
+                    {(order as any).customerName} · {
+                        (order as any).customerPhone
+                    }
+                </div>
+
+                {
+                    isDelivery && address ? (
+                        <div class="mt-2 text-xs text-zinc-700">
+                            <div class="font-semibold">Dirección</div>
+                            <div class="mt-1">
+                                {address.line1}
+                                {address.line2 ? `, ${address.line2}` : ""}
+                                <br />
+                                {address.postalCode} {address.city}
+                                <br />
+                                {address.notes ? (
+                                    <span>Notas: {address.notes}</span>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null
+                }
+            </div>
+
+            <div class="mt-3 border-t border-zinc-200 pt-3">
+                <div class="text-sm font-semibold">Items</div>
+
+                <div class="mt-2 space-y-3">
+                    {
+                        items.map((it) => {
+                            const m: any = (it as any).modifiers ?? {};
+                            const opts = m.modifierOptions ?? [];
+                            const adds = m.ingredientsAdded ?? [];
+                            const rems = m.ingredientsRemoved ?? [];
+
+                            return (
+                                <div class="border-b border-zinc-100 pb-3">
+                                    <div class="flex items-baseline justify-between gap-3">
+                                        <div class="min-w-0 text-sm font-semibold">
+                                            {it.qty}× {it.nameSnapshot}
+                                            {it.variantSnapshot ? (
+                                                <span class="ml-1 text-xs font-normal text-zinc-600">
+                                                    ({it.variantSnapshot})
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <div class="text-sm font-bold">
+                                            {money(it.lineTotalCents)}
+                                        </div>
+                                    </div>
+
+                                    {opts.length ? (
+                                        <div class="mt-1 text-xs text-zinc-700">
+                                            <b>Extras:</b>{" "}
+                                            {opts
+                                                .map((x: any) => x.name)
+                                                .join(", ")}
+                                        </div>
+                                    ) : null}
+
+                                    {adds.length ? (
+                                        <div class="mt-1 text-xs text-zinc-700">
+                                            <b>Añadir:</b>{" "}
+                                            {adds
+                                                .map((x: any) => x.name)
+                                                .join(", ")}
+                                        </div>
+                                    ) : null}
+
+                                    {rems.length ? (
+                                        <div class="mt-1 text-xs text-zinc-700">
+                                            <b>Quitar:</b>{" "}
+                                            {rems
+                                                .map((x: any) => x.name)
+                                                .join(", ")}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            );
+                        })
+                    }
+                </div>
+            </div>
+
+            {
+                (order as any).notes ? (
+                    <div class="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs">
+                        <div class="font-semibold">Notas</div>
+                        <div class="mt-1 text-zinc-800">
+                            {(order as any).notes}
+                        </div>
+                    </div>
+                ) : null
+            }
+
+            <div class="mt-3 border-t border-zinc-200 pt-3 text-sm">
+                <div class="flex items-baseline justify-between">
+                    <div class="text-zinc-700">Subtotal</div>
+                    <div class="font-semibold">
+                        {money((order as any).subtotalCents)}
+                    </div>
+                </div>
+
+                {
+                    isDelivery ? (
+                        <div class="mt-1 flex items-baseline justify-between">
+                            <div class="text-zinc-700">Delivery</div>
+                            <div class="font-semibold">
+                                {money(deliveryFeeCents)}
+                            </div>
+                        </div>
+                    ) : null
+                }
+
+                <div class="mt-2 flex items-baseline justify-between text-base">
+                    <div class="font-black">TOTAL</div>
+                    <div class="font-black">
+                        {money((order as any).totalCents)}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 text-center text-[10px] text-zinc-500">
+                Gracias por tu pedido ❤️
+            </div>
+        </main>
+    </body>
+</html>
