@@ -55,7 +55,7 @@ export default function FavoritesCount() {
   if (count <= 0) return null;
 
   return (
-    <span class="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-black text-white">
+    <span class="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-black text-white">
       {count}
     </span>
   );
