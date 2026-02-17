@@ -5,6 +5,15 @@ import Footer from "@/components/layout/Footer.astro";
 import ProductConfiguratorModal from "@/islands/product/ProductConfiguratorModal";
 import CartDrawer from "@/islands/cart/CartDrawer";
 import UpsellModal from "@/islands/upsell/UpsellModal";
+
+const { title, fullWidth } = Astro.props as {
+  title?: string;
+  fullWidth?: boolean;
+};
+
+const mainClass = fullWidth
+  ? "w-full px-3 sm:px-4 lg:px-6 py-4"
+  : "mx-auto w-full max-w-6xl px-4 py-8";
 ---
 
 <!doctype html>
@@ -13,18 +22,18 @@ import UpsellModal from "@/islands/upsell/UpsellModal";
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <title>{Astro.props?.title ?? "Arcadia"}</title>
+    <title>{title ?? "Arcadia"}</title>
   </head>
   <body class="min-h-dvh bg-white text-zinc-900">
     <Header />
 
-    <main class="mx-auto w-full max-w-6xl px-4 py-8">
+    <main class={mainClass}>
       <slot />
     </main>
 
     <Footer />
 
-    <!-- Isla global del carrito -->
+    <!-- Islas globales -->
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
     <UpsellModal client:load />

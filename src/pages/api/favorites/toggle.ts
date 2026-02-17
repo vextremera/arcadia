@@ -8,35 +8,42 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function parseJSON(request: Request) {
-  try {
-    return await request.json();
-  } catch {
-    return null;
+export const POST: APIRoute = async ({ request, session }) => {
+  if (!session) return json({ error: "NO_SESSION" }, 401);
+
+  const user = (await session.get("user")) as
+    | { id: number; role: "ADMIN" | "STAFF" | "CUSTOMER" }
+    | undefined;
+
+  if (!user || user.role !== "CUSTOMER") {
+    return json({ error: "UNAUTHORIZED" }, 401);
   }
-}
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const user = locals.user;
-  if (!user) return json({ error: "UNAUTHORIZED" }, 401);
+  const body = await request.json().catch(() => null);
+  const productId = Number(body?.productId);
 
-  const body = await parseJSON(request);
-  if (!body) return json({ error: "INVALID_JSON" }, 400);
+  if (!Number.isFinite(productId)) {
+    return json({ error: "INVALID_PRODUCT_ID" }, 400);
+  }
 
-  const productId = Number(body.productId);
-  if (!Number.isFinite(productId)) return json({ error: "INVALID_PRODUCT_ID" }, 400);
-
-  const existing = await db
+  const [existing] = await db
     .select({ id: Favorite.id })
     .from(Favorite)
     .where(and(eq(Favorite.userId, user.id), eq(Favorite.productId, productId)))
     .limit(1);
 
-  if (existing.length) {
-    await db.delete(Favorite).where(and(eq(Favorite.userId, user.id), eq(Favorite.productId, productId)));
-    return json({ favorited: false });
+  if (existing) {
+    await db
+      .delete(Favorite)
+      .where(and(eq(Favorite.userId, user.id), eq(Favorite.productId, productId)));
+
+    return json({ ok: true, favorited: false });
   }
 
-  await db.insert(Favorite).values({ userId: user.id, productId });
-  return json({ favorited: true });
+  await db.insert(Favorite).values({
+    userId: user.id,
+    productId,
+  });
+
+  return json({ ok: true, favorited: true });
 };

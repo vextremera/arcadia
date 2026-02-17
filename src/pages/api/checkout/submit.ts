@@ -24,6 +24,13 @@ type CartItemSession = {
   removedIngredientIds?: number[];
 };
 
+type SessionUser = {
+  id: number;
+  email: string;
+  name?: string | null;
+  role: "ADMIN" | "STAFF" | "CUSTOMER";
+};
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -48,10 +55,6 @@ const DEFAULT_PAYMENTS = {
   pickup: { cashEnabled: true, cardEnabled: true },
 };
 
-const DEFAULT_FEES = {
-  deliveryFeeCents: 250, // <-- cambia aquí si quieres por defecto
-};
-
 async function getPaymentsSettings() {
   const [row] = await db
     .select({ value: AppSetting.value })
@@ -62,18 +65,11 @@ async function getPaymentsSettings() {
   return (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 }
 
-async function getFeesSettings() {
-  const [row] = await db
-    .select({ value: AppSetting.value })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, "fees"))
-    .limit(1);
-
-  return (row?.value ?? DEFAULT_FEES) as typeof DEFAULT_FEES;
-}
-
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
+
+  // ✅ U2: si hay usuario logueado, lo vinculamos al pedido (solo CUSTOMER)
+  const authUser = (await session.get("user")) as SessionUser | undefined;
 
   const availability = await getArcadiaAvailability();
   if (availability.pauseOrders) {
@@ -102,7 +98,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: "INVALID_JSON" }, 400);
 
-  const [payments, fees] = await Promise.all([getPaymentsSettings(), getFeesSettings()]);
+  const payments = await getPaymentsSettings();
 
   const requestedType = safeStr(body.type).toUpperCase(); // DELIVERY | PICKUP
   const paymentMethod = safeStr(body.paymentMethod).toUpperCase(); // CASH | CARD
@@ -127,8 +123,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   if (cart.length === 0) return json({ error: "EMPTY_CART" }, 400);
 
   // Forzar recogida si fuera de horario delivery
-  let type: "DELIVERY" | "PICKUP" =
-    requestedType === "DELIVERY" ? "DELIVERY" : "PICKUP";
+  let type: "DELIVERY" | "PICKUP" = requestedType === "DELIVERY" ? "DELIVERY" : "PICKUP";
   let forcedPickup = false;
   let forcedReason: string | null = null;
 
@@ -140,10 +135,8 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const pm: "CARD" | "CASH" = paymentMethod === "CARD" ? "CARD" : "CASH";
 
-  const allowedCash =
-    type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-  const allowedCard =
-    type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
+  const allowedCash = type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
+  const allowedCard = type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
 
   if (!allowedCash && !allowedCard) {
     return json(
@@ -191,7 +184,9 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   // Cargar productos/variantes/opciones/ingredientes necesarios
   const productIds = [...new Set(cart.map((i) => i.productId))];
-  const variantIds = [...new Set(cart.map((i) => i.variantId).filter((x): x is number => Number.isFinite(x)))];
+  const variantIds = [
+    ...new Set(cart.map((i) => i.variantId).filter((x): x is number => Number.isFinite(x))),
+  ];
   const optionIds = [...new Set(cart.flatMap((i) => i.modifierOptionIds ?? []))];
   const ingredientIds = [
     ...new Set(cart.flatMap((i) => [...(i.addedIngredientIds ?? []), ...(i.removedIngredientIds ?? [])])),
@@ -229,43 +224,43 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const variants = variantIds.length
     ? await db
-      .select({
-        id: ProductVariant.id,
-        productId: ProductVariant.productId,
-        name: ProductVariant.name,
-        priceDeltaCents: ProductVariant.priceDeltaCents,
-        active: ProductVariant.active,
-      })
-      .from(ProductVariant)
-      .where(inArray(ProductVariant.id, variantIds))
+        .select({
+          id: ProductVariant.id,
+          productId: ProductVariant.productId,
+          name: ProductVariant.name,
+          priceDeltaCents: ProductVariant.priceDeltaCents,
+          active: ProductVariant.active,
+        })
+        .from(ProductVariant)
+        .where(inArray(ProductVariant.id, variantIds))
     : [];
 
   const variantById = new Map(variants.map((v) => [v.id, v]));
 
   const options = optionIds.length
     ? await db
-      .select({
-        id: ModifierOption.id,
-        name: ModifierOption.name,
-        priceDeltaCents: ModifierOption.priceDeltaCents,
-        active: ModifierOption.active,
-      })
-      .from(ModifierOption)
-      .where(inArray(ModifierOption.id, optionIds))
+        .select({
+          id: ModifierOption.id,
+          name: ModifierOption.name,
+          priceDeltaCents: ModifierOption.priceDeltaCents,
+          active: ModifierOption.active,
+        })
+        .from(ModifierOption)
+        .where(inArray(ModifierOption.id, optionIds))
     : [];
 
   const optionById = new Map(options.map((o) => [o.id, o]));
 
   const ingredients = ingredientIds.length
     ? await db
-      .select({
-        id: Ingredient.id,
-        name: Ingredient.name,
-        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-        active: Ingredient.active,
-      })
-      .from(Ingredient)
-      .where(inArray(Ingredient.id, ingredientIds))
+        .select({
+          id: Ingredient.id,
+          name: Ingredient.name,
+          addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+          active: Ingredient.active,
+        })
+        .from(Ingredient)
+        .where(inArray(Ingredient.id, ingredientIds))
     : [];
 
   const ingredientById = new Map(ingredients.map((x) => [x.id, x]));
@@ -348,19 +343,20 @@ export const POST: APIRoute = async ({ request, session }) => {
     });
   }
 
-  // Fee fijo (solo delivery)
-  const deliveryFeeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
-
+  // Fee fijo (solo delivery): viene de operativa (availability)
+  const feeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
 
   const discountCents = 0;
   const taxCents = 0;
-  const totalCents = subtotalCents + deliveryFeeCents - discountCents + taxCents;
+  const totalCents = subtotalCents + feeCents - discountCents + taxCents;
 
   const publicId = makePublicId();
 
   await db.insert(Order).values({
     publicId,
-    userId: null,
+
+    // ✅ U2: vincular pedido al CUSTOMER si existe
+    userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
 
     type,
     status: "PENDING",
@@ -368,7 +364,7 @@ export const POST: APIRoute = async ({ request, session }) => {
 
     currency: "EUR",
     subtotalCents,
-    deliveryFeeCents,
+    deliveryFeeCents: feeCents,
     discountCents,
     taxCents,
     totalCents,

@@ -1,17 +1,58 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
+import FavoritesCount from "@/islands/favorites/FavoritesCount";
+
+const user = Astro.locals.user;
+const pathname = Astro.url.pathname;
+const next = encodeURIComponent(pathname);
+
+function isActive(href: string) {
+  return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
+
+function linkClass(href: string) {
+  const active = isActive(href);
+  return `rounded-xl px-3 py-2 text-sm font-semibold transition ${
+    active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
+  }`;
+}
 ---
 
-<header class="border-b border-zinc-200">
-  <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4">
-    <a href="/" class="text-lg font-semibold tracking-tight">Arcadia</a>
+<header class="sticky top-0 z-40 border-b border-zinc-200 bg-white/80 backdrop-blur">
+  <div class="flex w-full items-center justify-between gap-3 px-3 sm:px-4 lg:px-6 py-3">
+    {/* Brand */}
+    <a href="/" class="flex items-center gap-2">
+      <div class="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-900 text-white font-black">
+        A
+      </div>
+      <div class="leading-tight">
+        <div class="text-sm font-black tracking-tight">ARCADIA</div>
+        <div class="text-[11px] text-zinc-500">Lloret de Mar</div>
+      </div>
+    </a>
 
-    <nav class="flex items-center gap-4">
-      <a class="text-sm hover:underline" href="/carta">Carta</a>
-      <a class="text-sm hover:underline" href="/checkout">Checkout</a>
-      <a class="text-sm hover:underline" href="/admin">Admin</a>
+    {/* Nav */}
+    <nav class="flex items-center gap-1">
+      <a class={linkClass("/pedir")} href="/pedir">Pedir</a>
 
-      <CartBadge client:load />
+      <a class={linkClass("/cuenta/favoritos")} href="/cuenta/favoritos">
+        Favoritos
+        <FavoritesCount client:load />
+      </a>
+
+      {user ? (
+        <a class={linkClass("/cuenta")} href="/cuenta">Cuenta</a>
+      ) : (
+        <a class={linkClass("/login")} href={`/login?next=${next}`}>Entrar</a>
+      )}
+
+      {(user?.role === "ADMIN" || user?.role === "STAFF") ? (
+        <a class={linkClass("/admin")} href="/admin">Admin</a>
+      ) : null}
+
+      <div class="ml-1">
+        <CartBadge client:load />
+      </div>
     </nav>
   </div>
 </header>

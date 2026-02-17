@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
+import FavoriteButton from "@/islands/favorites/FavoriteButton";
 
 type Category = { id: number; name: string; slug: string; sortOrder: number };
+
 type Product = {
   id: number;
   name: string;
@@ -10,6 +12,7 @@ type Product = {
   priceCents: number;
   deliveryEnabled: boolean;
   pickupEnabled: boolean;
+  ingredients?: string[]; // <-- nuevo
 };
 
 function money(cents: number) {
@@ -24,7 +27,6 @@ export default function CartaKiosk() {
   const [loadingCats, setLoadingCats] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
-  // cargar categorías
   useEffect(() => {
     setLoadingCats(true);
     api<{ categories: Category[] }>("/api/catalog/categories")
@@ -36,7 +38,6 @@ export default function CartaKiosk() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // cargar productos de categoría
   useEffect(() => {
     if (!categoryId) return;
     setLoadingProducts(true);
@@ -45,17 +46,20 @@ export default function CartaKiosk() {
       .finally(() => setLoadingProducts(false));
   }, [categoryId]);
 
-  const selected = useMemo(() => categories.find((c) => c.id === categoryId) ?? null, [categories, categoryId]);
+  const selected = useMemo(
+    () => categories.find((c) => c.id === categoryId) ?? null,
+    [categories, categoryId]
+  );
 
   function openProduct(productId: number) {
     window.dispatchEvent(new CustomEvent("arcadia:product:open", { detail: { productId } }));
   }
 
   return (
-    <div class="mt-6 grid gap-4 lg:grid-cols-[280px_1fr]">
+    <div class="grid gap-6 lg:grid-cols-[320px_1fr]">
       {/* Aside categorías */}
-      <aside class="lg:sticky lg:top-4 lg:h-[calc(100dvh-120px)] lg:overflow-y-auto">
-        <div class="rounded-2xl border border-zinc-200 p-4">
+      <aside class="lg:sticky lg:top-4 lg:h-[calc(100dvh-110px)] lg:overflow-y-auto">
+        <div class="rounded-3xl border border-zinc-200 bg-white p-4">
           <div class="text-sm font-semibold">Categorías</div>
 
           {loadingCats ? (
@@ -67,8 +71,8 @@ export default function CartaKiosk() {
                 return (
                   <button
                     type="button"
-                    class={`w-full rounded-xl px-3 py-2 text-left text-sm font-semibold ${
-                      active ? "bg-zinc-900 text-white" : "hover:bg-zinc-50"
+                    class={`w-full rounded-2xl px-3 py-2 text-left text-sm font-semibold transition ${
+                      active ? "bg-zinc-900 text-white" : "hover:bg-zinc-50 text-zinc-800"
                     }`}
                     onClick={() => setCategoryId(c.id)}
                   >
@@ -83,13 +87,13 @@ export default function CartaKiosk() {
 
       {/* Main productos */}
       <main class="min-w-0">
-        <div class="flex items-baseline justify-between gap-4">
-          <h1 class="text-2xl font-semibold tracking-tight">
+        <div class="flex items-center justify-between gap-4">
+          <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">
             {selected ? selected.name : "Carta"}
           </h1>
 
           <button
-            class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+            class="rounded-2xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
             type="button"
             onClick={() => window.dispatchEvent(new Event("arcadia:cart:open"))}
           >
@@ -102,34 +106,69 @@ export default function CartaKiosk() {
         ) : products.length === 0 ? (
           <div class="mt-6 text-sm text-zinc-600">No hay productos en esta categoría.</div>
         ) : (
-          <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {products.map((p) => (
-              <article class="rounded-2xl border border-zinc-200 p-4">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-semibold">{p.name}</div>
-                    {p.description ? (
-                      <div class="mt-1 line-clamp-2 text-xs text-zinc-600">{p.description}</div>
-                    ) : null}
-                    <div class="mt-2 text-sm font-semibold">{money(p.priceCents)}</div>
+          <div class="mt-6 grid gap-4 md:grid-cols-2">
+            {products.map((p) => {
+              const ing = p.ingredients ?? [];
+              const ingredientsText =
+                ing.length > 0 ? ing.join(", ") : (p.description ?? "");
+
+              return (
+                <article class="relative rounded-3xl border border-zinc-200 bg-white p-4 sm:p-5">
+                  {/* Favorito (overlay) */}
+                  <div class="absolute right-4 top-4 z-10">
+                    <FavoriteButton productId={p.id} />
                   </div>
 
-                  {p.imageUrl ? (
-                    <img class="h-16 w-16 rounded-xl object-cover" src={p.imageUrl} alt={p.name} />
-                  ) : (
-                    <div class="h-16 w-16 rounded-xl bg-zinc-100" />
-                  )}
-                </div>
+                  <div class="flex gap-4">
+                    <div class="min-w-0 flex-1">
+                      <h3 class="text-base sm:text-lg font-semibold leading-snug">
+                        {p.name}
+                      </h3>
 
-                <button
-                  class="mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
-                  type="button"
-                  onClick={() => openProduct(p.id)}
-                >
-                  Personalizar
-                </button>
-              </article>
-            ))}
+                      {ingredientsText ? (
+                        <p class="mt-2 text-sm text-zinc-600 line-clamp-3">
+                          {ingredientsText}
+                        </p>
+                      ) : (
+                        <p class="mt-2 text-sm text-zinc-500">
+                          (Sin descripción)
+                        </p>
+                      )}
+
+                      <div class="mt-3 flex items-baseline justify-between gap-3">
+                        <div class="text-lg sm:text-xl font-black">
+                          {money(p.priceCents)}
+                        </div>
+                        <div class="text-xs text-zinc-500">
+                          {p.deliveryEnabled ? "Delivery" : "Sin delivery"} ·{" "}
+                          {p.pickupEnabled ? "Recogida" : "Sin recogida"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Imagen grande */}
+                    {p.imageUrl ? (
+                      <img
+                        class="h-28 w-28 sm:h-32 sm:w-32 rounded-2xl object-cover border border-zinc-200 bg-zinc-100"
+                        src={p.imageUrl}
+                        alt={p.name}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div class="h-28 w-28 sm:h-32 sm:w-32 rounded-2xl border border-zinc-200 bg-zinc-100" />
+                    )}
+                  </div>
+
+                  <button
+                    class="mt-4 w-full rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:opacity-95"
+                    type="button"
+                    onClick={() => openProduct(p.id)}
+                  >
+                    Personalizar
+                  </button>
+                </article>
+              );
+            })}
           </div>
         )}
       </main>

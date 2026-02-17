@@ -5,34 +5,34 @@ const publicId = String(Astro.params.publicId ?? "").trim();
 if (!publicId) return new Response("Missing publicId", { status: 400 });
 
 const [order] = await db
-    .select()
-    .from(Order)
-    .where(eq(Order.publicId, publicId))
-    .limit(1);
+  .select()
+  .from(Order)
+  .where(eq(Order.publicId, publicId))
+  .limit(1);
 
 if (!order) return new Response("Pedido no encontrado", { status: 404 });
 
 const items = await db
-    .select()
-    .from(OrderItem)
-    .where(eq(OrderItem.orderId, order.id))
-    .orderBy(OrderItem.id);
+  .select()
+  .from(OrderItem)
+  .where(eq(OrderItem.orderId, order.id))
+  .orderBy(OrderItem.id);
 
 function money(cents: number) {
-    return `${(cents / 100).toFixed(2)} €`;
+  return `${(cents / 100).toFixed(2)} €`;
 }
 
 function fmtDate(d: any) {
-    const date = new Date(d);
-    return new Intl.DateTimeFormat("es-ES", {
-        timeZone: "Europe/Madrid",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-    }).format(date);
+  const date = new Date(d);
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 const meta: any = (order as any).addressSnapshot ?? {};
@@ -43,217 +43,349 @@ const address = meta?.address ?? null;
 
 const isDelivery = order.type === "DELIVERY";
 const deliveryFeeCents = Number(order.deliveryFeeCents ?? 0);
+
+const url = new URL(Astro.request.url);
+const autoPrint = url.searchParams.get("print") === "1";
 ---
 
 <html lang="es">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Ticket {order.publicId}</title>
-        <style>
-            @media print {
-                .no-print {
-                    display: none !important;
-                }
-                html,
-                body {
-                    margin: 0;
-                    padding: 0;
-                }
-            }
-        </style>
-    </head>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ticket {order.publicId}</title>
 
-    <body class="bg-zinc-100 text-zinc-900">
-        {/* Barra superior solo pantalla */}
-        <div
-            class="no-print sticky top-0 z-10 border-b border-zinc-200 bg-white"
-        >
-            <div
-                class="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3"
-            >
-                <a
-                    class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
-                    href={`/admin/pedidos/${order.publicId}`}
-                >
-                    ← Volver al pedido
-                </a>
-                <button
-                    class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
-                    type="button"
-                    onclick="window.print()"
-                >
-                    Imprimir
-                </button>
-            </div>
+    <style>
+      :root {
+        --receipt-w: 80mm;
+      }
+
+      /* Impresión tipo ticket 80mm */
+      @page {
+        size: var(--receipt-w) auto;
+        margin: 4mm;
+      }
+
+      html,
+      body {
+        padding: 0;
+        margin: 0;
+      }
+
+      body {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-variant-numeric: tabular-nums;
+        background: #f4f4f5; /* zinc-100 */
+        color: #000;
+      }
+
+      .no-print {
+        background: #fff;
+        border-bottom: 1px solid #e4e4e7;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .topbar {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .btn {
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 700;
+        border: 1px solid #d4d4d8;
+        background: #fff;
+        color: #111;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .btnPrimary {
+        background: #111;
+        border-color: #111;
+        color: #fff;
+      }
+
+      .receiptWrap {
+        padding: 16px 0 32px;
+      }
+
+      .receipt {
+        width: var(--receipt-w);
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
+        padding: 12px;
+      }
+
+      .center {
+        text-align: center;
+      }
+
+      .title {
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: 0.2px;
+      }
+
+      .sub {
+        font-size: 11px;
+        color: #333;
+        margin-top: 2px;
+      }
+
+      .sep {
+        border-top: 1px dashed #000;
+        margin: 10px 0;
+      }
+
+      .row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .muted {
+        color: #333;
+      }
+
+      .xs {
+        font-size: 10px;
+      }
+
+      .sm {
+        font-size: 11px;
+      }
+
+      .b {
+        font-weight: 700;
+      }
+
+      .bb {
+        font-weight: 900;
+      }
+
+      .wrap {
+        word-break: break-word;
+      }
+
+      .indent {
+        padding-left: 10px;
+      }
+
+      .badge {
+        display: inline-block;
+        border: 1px solid #000;
+        border-radius: 6px;
+        padding: 1px 6px;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .noteBox {
+        border: 1px dashed #000;
+        border-radius: 10px;
+        padding: 8px;
+        margin-top: 10px;
+        font-size: 11px;
+      }
+
+      .bigTotal {
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      /* Print: sin sombras, sin fondo, sin redondeo */
+      @media print {
+        body {
+          background: #fff;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .receiptWrap {
+          padding: 0;
+        }
+        .receipt {
+          border-radius: 0;
+          box-shadow: none;
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    {/* Barra superior solo pantalla */}
+    <div class="no-print">
+      <div class="topbar">
+        <a class="btn" href={`/admin/pedidos/${order.publicId}`}>← Volver al pedido</a>
+        <button class="btn btnPrimary" type="button" onclick="window.print()">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="receiptWrap">
+      <main class="receipt">
+        {/* Header */}
+        <div class="center">
+          <div class="title">ARCADIA</div>
+          <div class="sub">Lloret de Mar</div>
         </div>
 
-        {/* Ticket 80mm */}
-        <main
-            class="mx-auto mt-6 w-[min(92vw,320px)] rounded-2xl bg-white p-4 shadow-sm print:mt-0 print:w-[320px] print:rounded-none print:shadow-none"
-        >
-            <div class="text-center">
-                <div class="text-lg font-black tracking-tight">ARCADIA</div>
-                <div class="mt-1 text-xs text-zinc-600">Lloret de Mar</div>
+        <div class="sep"></div>
+
+        {/* Meta pedido */}
+        <div class="row">
+          <div class="b">Pedido</div>
+          <div class="bb">{order.publicId}</div>
+        </div>
+
+        <div class="row sm muted" style="margin-top: 4px;">
+          <div>{fmtDate(order.createdAt)}</div>
+          <div class="badge">{order.type}</div>
+        </div>
+
+        <div class="row sm muted" style="margin-top: 4px;">
+          <div>Pago</div>
+          <div class="b">{paymentMethod ?? "—"}</div>
+        </div>
+
+        {forcedPickup ? (
+          <div class="noteBox">
+            <div class="b">Forzado a RECOGIDA</div>
+            <div class="sm muted">{forcedReason ?? ""}</div>
+          </div>
+        ) : null}
+
+        <div class="sep"></div>
+
+        {/* Cliente */}
+        <div class="b">Cliente</div>
+        <div class="sm muted" style="margin-top: 4px;">
+          {(order as any).customerName} · {(order as any).customerPhone}
+        </div>
+
+        {isDelivery && address ? (
+          <div style="margin-top: 8px;">
+            <div class="b">Dirección</div>
+            <div class="sm muted wrap" style="margin-top: 4px;">
+              {address.line1}{address.line2 ? `, ${address.line2}` : ""}<br />
+              {address.postalCode} {address.city}
+              {address.notes ? (
+                <>
+                  <br />
+                  <span class="b">Notas:</span> {address.notes}
+                </>
+              ) : null}
             </div>
+          </div>
+        ) : null}
 
-            <div class="mt-4 border-t border-zinc-200 pt-3 text-sm">
-                <div class="flex items-baseline justify-between">
-                    <div class="font-semibold">Pedido</div>
-                    <div class="font-mono font-black">{order.publicId}</div>
+        <div class="sep"></div>
+
+        {/* Items */}
+        <div class="b">Items</div>
+
+        <div style="margin-top: 8px;">
+          {items.map((it) => {
+            const m: any = (it as any).modifiers ?? {};
+            const opts = m.modifierOptions ?? [];
+            const adds = m.ingredientsAdded ?? [];
+            const rems = m.ingredientsRemoved ?? [];
+
+            return (
+              <div style="margin-bottom: 10px;">
+                <div class="row">
+                  <div class="b wrap" style="flex: 1;">
+                    {it.qty}× {it.nameSnapshot}
+                    {it.variantSnapshot ? (
+                      <span class="sm muted"> ({it.variantSnapshot})</span>
+                    ) : null}
+                  </div>
+                  <div class="b">{money(it.lineTotalCents)}</div>
                 </div>
 
-                <div
-                    class="mt-1 flex items-baseline justify-between text-xs text-zinc-700"
-                >
-                    <div>{fmtDate(order.createdAt)}</div>
-                    <div class="font-semibold">{order.type}</div>
-                </div>
+                {opts.length ? (
+                  <div class="sm muted indent wrap" style="margin-top: 4px;">
+                    + Extras: {opts.map((x: any) => x.name).join(", ")}
+                  </div>
+                ) : null}
 
-                <div
-                    class="mt-1 flex items-baseline justify-between text-xs text-zinc-700"
-                >
-                    <div>Pago</div>
-                    <div class="font-semibold">{paymentMethod ?? "—"}</div>
-                </div>
+                {adds.length ? (
+                  <div class="sm muted indent wrap" style="margin-top: 3px;">
+                    + Añadir: {adds.map((x: any) => x.name).join(", ")}
+                  </div>
+                ) : null}
 
-                {
-                    forcedPickup ? (
-                        <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                            <b>Forzado a RECOGIDA:</b> {forcedReason ?? ""}
-                        </div>
-                    ) : null
-                }
+                {rems.length ? (
+                  <div class="sm muted indent wrap" style="margin-top: 3px;">
+                    - Quitar: {rems.map((x: any) => x.name).join(", ")}
+                  </div>
+                ) : null}
+
+                <div class="sep" style="margin: 8px 0 0;"></div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Notas pedido */}
+        {(order as any).notes ? (
+          <div class="noteBox">
+            <div class="b">NOTAS</div>
+            <div class="sm wrap" style="margin-top: 4px;">
+              {(order as any).notes}
             </div>
+          </div>
+        ) : null}
 
-            <div class="mt-3 border-t border-zinc-200 pt-3 text-sm">
-                <div class="font-semibold">Cliente</div>
-                <div class="mt-1 text-xs text-zinc-700">
-                    {(order as any).customerName} · {
-                        (order as any).customerPhone
-                    }
-                </div>
+        <div class="sep"></div>
 
-                {
-                    isDelivery && address ? (
-                        <div class="mt-2 text-xs text-zinc-700">
-                            <div class="font-semibold">Dirección</div>
-                            <div class="mt-1">
-                                {address.line1}
-                                {address.line2 ? `, ${address.line2}` : ""}
-                                <br />
-                                {address.postalCode} {address.city}
-                                <br />
-                                {address.notes ? (
-                                    <span>Notas: {address.notes}</span>
-                                ) : null}
-                            </div>
-                        </div>
-                    ) : null
-                }
-            </div>
+        {/* Totales */}
+        <div class="row">
+          <div class="muted">Subtotal</div>
+          <div class="b">{money((order as any).subtotalCents)}</div>
+        </div>
 
-            <div class="mt-3 border-t border-zinc-200 pt-3">
-                <div class="text-sm font-semibold">Items</div>
+        {isDelivery ? (
+          <div class="row" style="margin-top: 4px;">
+            <div class="muted">Delivery</div>
+            <div class="b">{money(deliveryFeeCents)}</div>
+          </div>
+        ) : null}
 
-                <div class="mt-2 space-y-3">
-                    {
-                        items.map((it) => {
-                            const m: any = (it as any).modifiers ?? {};
-                            const opts = m.modifierOptions ?? [];
-                            const adds = m.ingredientsAdded ?? [];
-                            const rems = m.ingredientsRemoved ?? [];
+        <div class="row" style="margin-top: 8px;">
+          <div class="bb bigTotal">TOTAL</div>
+          <div class="bb bigTotal">{money((order as any).totalCents)}</div>
+        </div>
 
-                            return (
-                                <div class="border-b border-zinc-100 pb-3">
-                                    <div class="flex items-baseline justify-between gap-3">
-                                        <div class="min-w-0 text-sm font-semibold">
-                                            {it.qty}× {it.nameSnapshot}
-                                            {it.variantSnapshot ? (
-                                                <span class="ml-1 text-xs font-normal text-zinc-600">
-                                                    ({it.variantSnapshot})
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        <div class="text-sm font-bold">
-                                            {money(it.lineTotalCents)}
-                                        </div>
-                                    </div>
+        <div class="sep"></div>
 
-                                    {opts.length ? (
-                                        <div class="mt-1 text-xs text-zinc-700">
-                                            <b>Extras:</b>{" "}
-                                            {opts
-                                                .map((x: any) => x.name)
-                                                .join(", ")}
-                                        </div>
-                                    ) : null}
+        <div class="center xs muted">
+          Gracias por tu pedido ❤️
+        </div>
+      </main>
+    </div>
 
-                                    {adds.length ? (
-                                        <div class="mt-1 text-xs text-zinc-700">
-                                            <b>Añadir:</b>{" "}
-                                            {adds
-                                                .map((x: any) => x.name)
-                                                .join(", ")}
-                                        </div>
-                                    ) : null}
-
-                                    {rems.length ? (
-                                        <div class="mt-1 text-xs text-zinc-700">
-                                            <b>Quitar:</b>{" "}
-                                            {rems
-                                                .map((x: any) => x.name)
-                                                .join(", ")}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            );
-                        })
-                    }
-                </div>
-            </div>
-
-            {
-                (order as any).notes ? (
-                    <div class="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs">
-                        <div class="font-semibold">Notas</div>
-                        <div class="mt-1 text-zinc-800">
-                            {(order as any).notes}
-                        </div>
-                    </div>
-                ) : null
-            }
-
-            <div class="mt-3 border-t border-zinc-200 pt-3 text-sm">
-                <div class="flex items-baseline justify-between">
-                    <div class="text-zinc-700">Subtotal</div>
-                    <div class="font-semibold">
-                        {money((order as any).subtotalCents)}
-                    </div>
-                </div>
-
-                {
-                    isDelivery ? (
-                        <div class="mt-1 flex items-baseline justify-between">
-                            <div class="text-zinc-700">Delivery</div>
-                            <div class="font-semibold">
-                                {money(deliveryFeeCents)}
-                            </div>
-                        </div>
-                    ) : null
-                }
-
-                <div class="mt-2 flex items-baseline justify-between text-base">
-                    <div class="font-black">TOTAL</div>
-                    <div class="font-black">
-                        {money((order as any).totalCents)}
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-4 text-center text-[10px] text-zinc-500">
-                Gracias por tu pedido ❤️
-            </div>
-        </main>
-    </body>
+    {autoPrint ? (
+      <script is:inline>
+        {`
+          window.addEventListener("load", () => {
+            setTimeout(() => window.print(), 50);
+          });
+        `}
+      </script>
+    ) : null}
+  </body>
 </html>
