@@ -12,7 +12,7 @@ const { title, fullWidth } = Astro.props as {
 };
 
 const mainClass = fullWidth
-  ? "w-full px-3 sm:px-4 lg:px-6 py-4"
+  ? "flex-1 w-full px-3 sm:px-4 lg:px-6 py-4"
   : "mx-auto w-full max-w-6xl px-4 py-8";
 ---
 
@@ -24,18 +24,33 @@ const mainClass = fullWidth
     <meta name="generator" content={Astro.generator} />
     <title>{title ?? "Arcadia"}</title>
   </head>
-  <body class="min-h-dvh bg-white text-zinc-900">
+
+  
+  <body class={fullWidth ? "min-h-dvh bg-white text-zinc-900 flex flex-col" : "min-h-dvh bg-white text-zinc-900"}>
     <Header />
 
     <main class={mainClass}>
       <slot />
     </main>
 
-    <Footer />
+    {!fullWidth ? <Footer /> : null}
 
     <!-- Islas globales -->
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
     <UpsellModal client:load />
+
+    {fullWidth ? (
+    <script is:inline>
+      const setHeaderH = () => {
+        const el = document.getElementById("app-header");
+        const h = el ? Math.ceil(el.getBoundingClientRect().height) : 94;
+        document.documentElement.style.setProperty("--app-header-h", `${h}px`);
+      };
+      setHeaderH();
+      window.addEventListener("resize", setHeaderH);
+    </script>
+    ) : null}
+
   </body>
 </html>
