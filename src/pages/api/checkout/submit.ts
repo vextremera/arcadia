@@ -9,6 +9,8 @@ import {
   Ingredient,
   AppSetting,
   Address,
+  User,
+  UserProfile,
   eq,
   and,
   inArray,
@@ -125,6 +127,10 @@ export const POST: APIRoute = async ({ request, session }) => {
   // ✅ Nuevo: flag guardar dirección
   const saveAddress = !!body.saveAddress;
   const saveAddressDefault = !!body.saveAddressDefault;
+  const saveAddressLabel = typeof body.saveAddressLabel === "string" ? body.saveAddressLabel.trim() : "";
+
+  // ✅ Nuevo: flag guardar perfil (best-effort)
+  const saveProfile = !!body.saveProfile;
 
   // carrito desde sesión
   const cart = ((await session.get("cart")) as CartItemSession[] | undefined) ?? [];
@@ -375,6 +381,8 @@ export const POST: APIRoute = async ({ request, session }) => {
     }))
   );
 
+  let savedAddressId: number | null = null;
+
   // ✅ Guardar dirección si procede (no rompe nada si falla: lo tratamos como best-effort)
   if (saveAddress && type === "DELIVERY" && authUser?.role === "CUSTOMER") {
     try {
@@ -388,7 +396,7 @@ export const POST: APIRoute = async ({ request, session }) => {
         .limit(1);
 
       const patch = {
-        label: undefined as string | undefined,
+        label: saveAddressLabel ? saveAddressLabel.slice(0, 60) : undefined,
         contactName: address.contactName,
         phone: address.phone,
         line1: address.line1,
@@ -401,6 +409,8 @@ export const POST: APIRoute = async ({ request, session }) => {
       };
 
       let addressId: number | null = null;
+
+      savedAddressId = addressId;
 
       if (existing.length) {
         addressId = existing[0].id;
@@ -441,6 +451,42 @@ export const POST: APIRoute = async ({ request, session }) => {
     }
   }
 
+  // ✅ Guardar PERFIL (best-effort): si está logueado, guardamos nombre/teléfono usados
+  if (saveProfile && authUser?.role === "CUSTOMER") {
+    try {
+      const userId = authUser.id;
+
+      // Nombre (User.name)
+      if (customerName && customerName.length <= 120) {
+        await db.update(User).set({ name: customerName }).where(eq(User.id, userId));
+      }
+
+      // Asegurar UserProfile (lazy create)
+      const existingProfile = await db
+        .select({ userId: UserProfile.userId })
+        .from(UserProfile)
+        .where(eq(UserProfile.userId, userId))
+        .limit(1);
+
+      if (!existingProfile.length) {
+        await db.insert(UserProfile).values({
+          userId,
+          phone: undefined,
+          birthday: undefined,
+          pointsBalance: 0,
+          tierId: undefined,
+        });
+      }
+
+      // Teléfono (UserProfile.phone)
+      if (customerPhone && customerPhone.length <= 40) {
+        await db.update(UserProfile).set({ phone: customerPhone }).where(eq(UserProfile.userId, userId));
+      }
+    } catch {
+      // best-effort: no bloqueamos el pedido si falla el guardado del perfil
+    }
+  }
+
   await session.delete("cart");
 
   return json({
@@ -449,5 +495,6 @@ export const POST: APIRoute = async ({ request, session }) => {
     type,
     forcedPickup,
     forcedReason,
+    savedAddressId,
   });
 };

@@ -46,7 +46,12 @@ type CartResponse = {
 type ProfileResponse = {
   ok: boolean;
   user?: { id: number; email: string; name: string | null; role: string };
-  profile?: { phone: string | null; birthday: string | null; pointsBalance: number; tierId: number | null };
+  profile?: {
+    phone: string | null;
+    birthday: string | null;
+    pointsBalance: number;
+    tierId: number | null;
+  };
   error?: string;
 };
 
@@ -87,6 +92,8 @@ function normalizeOptionalString(v: string) {
   return t ? t : undefined;
 }
 
+const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
+
 export default function CheckoutForm() {
   const [cart, setCart] = useState<CartResponse | null>(null);
   const [avail, setAvail] = useState<Availability | null>(null);
@@ -100,6 +107,13 @@ export default function CheckoutForm() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+
+  const [nameDirty, setNameDirty] = useState(false);
+  const [phoneDirty, setPhoneDirty] = useState(false);
+
+  // para micro-mejora saveProfile
+  const [initialProfileName, setInitialProfileName] = useState("");
+  const [initialProfilePhone, setInitialProfilePhone] = useState("");
 
   const [line1, setLine1] = useState("");
   const [line2, setLine2] = useState("");
@@ -148,9 +162,9 @@ export default function CheckoutForm() {
     setPostalCode(a.postalCode ?? "");
     setAddressNotes(a.notes ?? "");
 
-    // Si el checkout está vacío, autoprefill
-    if (!customerName.trim()) setCustomerName(a.contactName ?? "");
-    if (!customerPhone.trim()) setCustomerPhone(a.phone ?? "");
+    // Si el usuario no ha tocado los inputs, usamos contacto/teléfono de esa dirección
+    if (!nameDirty) setCustomerName(a.contactName ?? "");
+    if (!phoneDirty) setCustomerPhone(a.phone ?? "");
 
     // Si escoges una guardada, no tiene sentido “guardar”
     setSaveThisAddress(false);
@@ -178,18 +192,32 @@ export default function CheckoutForm() {
         const prof = await safeJson<ProfileResponse>("/api/account/profile");
         if (prof?.ok && prof.user?.role === "CUSTOMER") {
           setIsLoggedIn(true);
-          if (prof.user.name) setCustomerName(prof.user.name);
+
+          const initName = prof.user.name ?? "";
+          const initPhone = prof.profile?.phone ?? "";
+
+          setInitialProfileName(initName);
+          setInitialProfilePhone(initPhone);
+
+          if (initName) setCustomerName(initName);
           if (prof.user.email) setCustomerEmail(prof.user.email);
-          if (prof.profile?.phone) setCustomerPhone(prof.profile.phone);
+          if (initPhone) setCustomerPhone(initPhone);
 
           const addr = await safeJson<AddressesResponse>("/api/account/addresses");
           const list = addr?.ok ? addr.addresses ?? [] : [];
           setSavedAddresses(list);
 
-          const def = list.find((x) => x.isDefault) ?? list[0];
-          if (def) {
-            setSelectedAddressId(def.id);
-            applyAddress(def);
+          const lastIdRaw =
+            typeof window !== "undefined" ? window.localStorage.getItem(LAST_ADDRESS_KEY) : null;
+          const lastId = lastIdRaw ? Number(lastIdRaw) : NaN;
+
+          const last = Number.isFinite(lastId) ? list.find((x) => x.id === lastId) : undefined;
+          const def = list.find((x) => x.isDefault);
+          const chosen = last ?? def ?? list[0];
+
+          if (chosen) {
+            setSelectedAddressId(chosen.id);
+            applyAddress(chosen);
           } else {
             // si estás logueado y no tienes direcciones, sugerimos guardarla
             setSaveThisAddress(true);
@@ -223,8 +251,43 @@ export default function CheckoutForm() {
     }
   }, [type]);
 
+  async function makeDefaultFromCheckout() {
+    if (!isLoggedIn) return;
+    if (!selectedAddressId) return;
+
+    try {
+      const res = await api<any>("/api/account/addresses", {
+        method: "POST",
+        body: JSON.stringify({ id: selectedAddressId, isDefault: true }),
+      });
+      if (!res?.ok) throw new Error(res?.error || "No se pudo marcar como default.");
+
+      // guardar como “última”
+      try {
+        window.localStorage.setItem(LAST_ADDRESS_KEY, String(selectedAddressId));
+      } catch { }
+
+      // refrescar lista local
+      const addr = await safeJson<AddressesResponse>("/api/account/addresses");
+      const list = addr?.ok ? addr.addresses ?? [] : [];
+      setSavedAddresses(list);
+
+      alert("Dirección marcada como default.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo marcar como default.");
+    }
+  }
+
   async function submit() {
     if (!cart || cart.items.length === 0) return;
+
+    const currentName = customerName.trim();
+    const currentPhone = customerPhone.trim();
+
+    const shouldSaveProfile =
+      isLoggedIn &&
+      ((currentName && currentName !== initialProfileName) ||
+        (currentPhone && currentPhone !== initialProfilePhone));
 
     const payload = {
       type,
@@ -242,10 +305,18 @@ export default function CheckoutForm() {
         postalCode,
         notes: addressNotes,
       },
-      // ✅ Nuevo: guardar dirección
+
+      // ✅ guardar perfil (best-effort) solo si hay cambios
+      saveProfile: shouldSaveProfile,
+
+      // ✅ guardar dirección (si es nueva)
       saveAddress: isLoggedIn && type === "DELIVERY" && saveThisAddress && !selectedAddressId,
       saveAddressDefault:
         isLoggedIn && type === "DELIVERY" && saveThisAddress && saveAsDefault && !selectedAddressId,
+      saveAddressLabel:
+        isLoggedIn && type === "DELIVERY" && saveThisAddress && !selectedAddressId
+          ? saveAddressLabel.trim()
+          : undefined,
     };
 
     const res = await fetch("/api/checkout/submit", {
@@ -258,6 +329,13 @@ export default function CheckoutForm() {
     if (!res.ok) {
       alert(data?.message || data?.error || "Error al crear el pedido");
       return;
+    }
+
+    // ✅ si el backend guardó/actualizó una address desde checkout, la recordamos como última
+    if (data?.savedAddressId) {
+      try {
+        window.localStorage.setItem(LAST_ADDRESS_KEY, String(data.savedAddressId));
+      } catch { }
     }
 
     if (data.forcedPickup) {
@@ -316,7 +394,10 @@ export default function CheckoutForm() {
               <input
                 class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
                 value={customerName}
-                onInput={(e) => setCustomerName((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  setNameDirty(true);
+                  setCustomerName((e.target as HTMLInputElement).value);
+                }}
               />
             </div>
 
@@ -325,7 +406,10 @@ export default function CheckoutForm() {
               <input
                 class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
                 value={customerPhone}
-                onInput={(e) => setCustomerPhone((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  setPhoneDirty(true);
+                  setCustomerPhone((e.target as HTMLInputElement).value);
+                }}
               />
             </div>
 
@@ -359,30 +443,48 @@ export default function CheckoutForm() {
             {isLoggedIn && savedAddresses.length ? (
               <div class="mt-3">
                 <label class="text-sm font-medium">Usar dirección guardada</label>
-                <select
-                  class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-                  value={selectedAddressId}
-                  onChange={(e) => {
-                    const v = (e.target as HTMLSelectElement).value;
-                    const id = v ? Number(v) : "";
-                    setSelectedAddressId(id);
-                    const a = savedAddresses.find((x) => x.id === id);
-                    if (a) applyAddress(a);
-                  }}
-                >
-                  <option value="">— Introducir nueva —</option>
-                  {savedAddresses.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {(a.label ? `${a.label} · ` : "")}
-                      {a.line1} · {a.postalCode} {a.city}
-                      {a.isDefault ? " (default)" : ""}
-                    </option>
-                  ))}
-                </select>
 
-                <div class="mt-2 text-xs text-zinc-600">
-                  Si eliges una guardada, no se volverá a guardar.
+                <div class="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <select
+                    class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+                    value={selectedAddressId}
+                    onChange={(e) => {
+                      const v = (e.target as HTMLSelectElement).value;
+                      const id = v ? Number(v) : "";
+                      setSelectedAddressId(id);
+
+                      if (id) {
+                        try {
+                          window.localStorage.setItem(LAST_ADDRESS_KEY, String(id));
+                        } catch { }
+                      }
+
+                      const a = savedAddresses.find((x) => x.id === id);
+                      if (a) applyAddress(a);
+                    }}
+                  >
+                    <option value="">— Introducir nueva —</option>
+                    {savedAddresses.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {(a.label ? `${a.label} · ` : "")}
+                        {a.line1} · {a.postalCode} {a.city}
+                        {a.isDefault ? " (default)" : ""}
+                      </option>
+                    ))}
+                  </select>
+
+                  {selectedAddressId ? (
+                    <button
+                      type="button"
+                      class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+                      onClick={makeDefaultFromCheckout}
+                    >
+                      Hacer default
+                    </button>
+                  ) : null}
                 </div>
+
+                <div class="mt-2 text-xs text-zinc-600">Si eliges una guardada, no se volverá a guardar.</div>
               </div>
             ) : null}
 
@@ -394,7 +496,6 @@ export default function CheckoutForm() {
                   value={line1}
                   onInput={(e) => {
                     setLine1((e.target as HTMLInputElement).value);
-                    // si editas manualmente, consideramos “nueva”
                     if (selectedAddressId) setSelectedAddressId("");
                   }}
                 />
@@ -449,7 +550,7 @@ export default function CheckoutForm() {
               </div>
             </div>
 
-            {/* ✅ Guardar dirección */}
+            {/* Guardar dirección */}
             {isLoggedIn && !selectedAddressId ? (
               <label class="mt-4 flex items-center gap-2 text-sm text-zinc-700">
                 <input
@@ -459,6 +560,18 @@ export default function CheckoutForm() {
                 />
                 Guardar esta dirección en mi cuenta
               </label>
+            ) : null}
+
+            {isLoggedIn && !selectedAddressId && saveThisAddress ? (
+              <div class="mt-3">
+                <label class="text-sm font-medium">Etiqueta (opcional)</label>
+                <input
+                  class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+                  value={saveAddressLabel}
+                  onInput={(e) => setSaveAddressLabel((e.target as HTMLInputElement).value)}
+                  placeholder="Casa / Trabajo / Suegros…"
+                />
+              </div>
             ) : null}
 
             {isLoggedIn && !selectedAddressId && saveThisAddress ? (
