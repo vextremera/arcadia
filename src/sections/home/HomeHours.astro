@@ -1,69 +1,110 @@
 ---
-const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const days = [
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+  "Domingo",
+];
 
-// Por ahora lo dejamos como en tu lógica actual.
-// Luego lo conectamos a OpeningHour/SpecialDate cuando quieras.
 const local = {
   label: "LOCAL",
-  times: ["07:30 - 00:00", "07:30 - 00:00", "07:30 - 00:00", "07:30 - 00:00", "07:30 - 00:00", "07:30 - 00:00", "07:30 - 00:00"],
+  times: [
+    "07:30 - 00:00",
+    "07:00 - 00:00",
+    "07:30 - 00:00",
+    "07:30 - 00:00",
+    "07:30 - 00:00",
+    "07:30 - 00:00",
+    "07:30 - 00:00",
+  ],
 };
+
 const delivery = {
   label: "A DOMICILIO",
-  times: ["20:00 - 22:50", "20:00 - 22:50", "20:00 - 22:50", "20:00 - 22:50", "20:00 - 22:50", "20:00 - 22:50", "20:00 - 22:50"],
+  times: [
+    "19:30 - 00:00",
+    "19:30 - 00:00",
+    "19:30 - 00:00",
+    "19:30 - 00:00",
+    "19:30 - 00:00",
+    "Descanso",
+    "19:30 - 00:00",
+  ],
 };
 ---
 
-<section id="horarios" class="mt-16">
-  <div class="rounded-[28px] border border-zinc-200 bg-white/70 p-10 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-    <div class="text-center">
-      <h2 class="text-3xl font-black tracking-tight">HORARIOS</h2>
-      <div class="mt-2 text-sm italic text-zinc-500">- Organízate sin dudas -</div>
-    </div>
-
-    <div class="mt-10 grid gap-10 lg:grid-cols-2">
-      {/* LOCAL */}
-      <div>
-        <div class="text-center text-sm font-black tracking-widest">{local.label}</div>
-
-        <div class="mt-6 grid grid-cols-[1fr_auto] gap-x-8 gap-y-4 text-sm">
-          {days.map((d, idx) => (
-            <>
-              <div class="text-zinc-700">{d}</div>
-              <div class="font-semibold">{local.times[idx]}</div>
-            </>
-          ))}
+<section id="horarios" class="scroll-mt-24">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+    <div
+      class="rounded-[28px] border border-zinc-300 bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.08)] sm:p-10"
+    >
+      <div class="text-center">
+        <h2 class="text-3xl font-black tracking-tight">HORARIOS</h2>
+        <div class="mt-2 text-sm italic text-zinc-500">
+          - Organízate sin dudas -
         </div>
       </div>
 
-      {/* DELIVERY */}
-      <div>
-        <div class="text-center text-sm font-black tracking-widest">{delivery.label}</div>
+      <div class="mt-10 grid gap-10 lg:grid-cols-2">
+        <div>
+          <div class="text-center text-sm font-black tracking-widest">
+            {local.label}
+          </div>
+          <div class="mt-6 grid grid-cols-[1fr_auto] gap-x-10 gap-y-4 text-sm">
+            {
+              days.map((d, idx) => (
+                <>
+                  <div class="text-zinc-700">{d}</div>
+                  <div class="font-semibold">{local.times[idx]}</div>
+                </>
+              ))
+            }
+          </div>
+        </div>
 
-        <div class="mt-6 grid grid-cols-[1fr_auto] gap-x-8 gap-y-4 text-sm">
-          {days.map((d, idx) => (
-            <>
-              <div class="text-zinc-700">{d}</div>
-              <div class="font-semibold">{delivery.times[idx]}</div>
-            </>
-          ))}
+        <div>
+          <div class="text-center text-sm font-black tracking-widest">
+            {delivery.label}
+          </div>
+          <div class="mt-6 grid grid-cols-[1fr_auto] gap-x-10 gap-y-4 text-sm">
+            {
+              days.map((d, idx) => (
+                <>
+                  <div class="text-zinc-700">{d}</div>
+                  <div
+                    class={
+                      delivery.times[idx] === "Descanso"
+                        ? "font-semibold text-zinc-500"
+                        : "font-semibold"
+                    }
+                  >
+                    {delivery.times[idx]}
+                  </div>
+                </>
+              ))
+            }
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
-      <a
-        href="/#reservas"
-        class="rounded-full border border-zinc-300 bg-white px-6 py-2 text-sm font-semibold hover:bg-zinc-50"
-      >
-        Reservar mesa
-      </a>
+      <div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+        <a
+          href="/#reservas"
+          class="rounded-full border border-zinc-300 bg-white px-6 py-2 text-sm font-semibold hover:bg-zinc-50"
+        >
+          Reservar mesa
+        </a>
 
-      <a
-        href="/pedir"
-        class="rounded-full bg-[#7b1f1f] px-6 py-2 text-sm font-semibold text-white hover:bg-[#6a1919]"
-      >
-        Pedir ahora
-      </a>
+        <a
+          href="/pedir"
+          class="rounded-full bg-[#7b1f1f] px-6 py-2 text-sm font-semibold text-white hover:bg-[#6a1919]"
+        >
+          Pedir ahora
+        </a>
+      </div>
     </div>
   </div>
 </section>

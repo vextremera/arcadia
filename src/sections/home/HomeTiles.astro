@@ -1,38 +1,55 @@
-<section class="bg-[#FBFAF7]">
-  <div class="mx-auto w-full max-w-6xl px-4 pb-10 lg:pb-12">
-    <div class="grid gap-4 sm:grid-cols-2">
+---
+const BOOK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="44" viewBox="0 -960 960 960" width="44" fill="#fff"><path d="M160-120v-640q0-33 23.5-56.5T240-840h520v80H240v520h520v80H240q-33 0-56.5-23.5T160-120Zm160-120v-560h560v560H320Zm80-80h400v-400H400v400Zm0 0v-400 400Z"/></svg>`;
+
+const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="44" viewBox="0 -960 960 960" width="44" fill="#fff"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm120-120h320v-80H320v80Zm0-160h320v-80H320v80Zm0-160h320v-80H320v80Zm-120 440v-560 560Z"/></svg>`;
+---
+
+<section class="w-full">
+  <div class="mx-auto w-full max-w-6xl px-6 pb-10 lg:pb-14">
+    <div
+      class="grid overflow-hidden rounded-[28px] border border-zinc-200 lg:grid-cols-2"
+    >
       <a
-        href="/carta"
-        class="group relative overflow-hidden rounded-[28px] border border-zinc-200 bg-white p-6 shadow-sm hover:shadow-md"
+        href="/pedir"
+        class="group relative grid min-h-55 place-items-center bg-zinc-800 text-white"
       >
-        <div class="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#7E1E1E]/10" />
-        <div class="relative">
-          <div class="text-sm font-black tracking-tight text-[#7E1E1E]">Carta</div>
-          <div class="mt-2 text-2xl font-black tracking-tight">Tapas & Bocatas</div>
-          <p class="mt-2 text-sm text-zinc-600">
-            Elige categoría, personaliza y añade al carrito.
-          </p>
-          <div class="mt-4 inline-flex items-center gap-2 rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-bold text-white">
-            Ver carta <span class="transition-transform group-hover:translate-x-0.5">→</span>
-          </div>
+        <div
+          class="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,.12),transparent_45%)]"
+        >
         </div>
+        <div
+          class="absolute inset-0 opacity-30 bg-[linear-gradient(120deg,rgba(0,0,0,.55),transparent_60%)]"
+        >
+        </div>
+
+        <div class="relative text-center">
+          <div
+            class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10"
+            set:html={BOOK_SVG}
+          />
+          <div class="mt-3 text-xl font-black tracking-wide">CARTA</div>
+        </div>
+
+        <span class="sr-only">Ir a la carta</span>
       </a>
 
       <a
-        href="/menu"
-        class="group relative overflow-hidden rounded-[28px] border border-zinc-200 bg-white p-6 shadow-sm hover:shadow-md"
+        href="/pedir"
+        class="group relative grid min-h-55 place-items-center bg-[#7b1f1f]"
       >
-        <div class="absolute -left-20 -bottom-24 h-64 w-64 rounded-full bg-zinc-900/5" />
-        <div class="relative">
-          <div class="text-sm font-black tracking-tight text-[#7E1E1E]">Menú</div>
-          <div class="mt-2 text-2xl font-black tracking-tight">Mediodía</div>
-          <p class="mt-2 text-sm text-zinc-600">
-            Entre semana y festivo (lo dejamos bonito después).
-          </p>
-          <div class="mt-4 inline-flex items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-4 py-2 text-sm font-bold text-zinc-900 hover:bg-zinc-50">
-            Ver menú <span class="transition-transform group-hover:translate-x-0.5">→</span>
+        <div
+          class="relative grid h-42.5 w-[80%] max-w-[320px] place-items-center bg-zinc-800"
+        >
+          <div
+            class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white/10"
+            set:html={MENU_SVG}
+          />
+          <div class="mt-3 text-xl font-black tracking-wide text-white">
+            MENÚ
           </div>
         </div>
+
+        <span class="sr-only">Ver menús</span>
       </a>
     </div>
   </div>

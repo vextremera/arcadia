@@ -1,43 +1,21 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
 
-// Header lo pinta el SiteLayout (si lo tienes ahí). Si NO, me lo dices y lo metemos aquí.
-
-// Secciones (ajusta nombres/rutas si alguna no coincide)
 import HomeHero from "@/sections/home/HomeHero.astro";
 import HomeAbout from "@/sections/home/HomeAbout.astro";
+import HomeTiles from "@/sections/home/HomeTiles.astro";
 import HomeHours from "@/sections/home/HomeHours.astro";
-import HomeFeatured from "@/sections/home/HomeFeatured.astro";
 import HomeLocation from "@/sections/home/HomeLocation.astro";
 import HomeReviews from "@/sections/home/HomeReviews.astro";
 import HomeNewsletter from "@/sections/home/HomeNewsletter.astro";
-import HomeTiles from "@/sections/home/HomeTiles.astro";
 ---
 
-<SiteLayout title="Arcadia · Lloret de Mar">
-  {/* HERO */}
+<SiteLayout title="Arcadia · Lloret de Mar" variant="landing">
   <HomeHero />
-
-  {/* ABOUT */}
   <HomeAbout />
-
-  {/* CARTA / MENÚ */}
   <HomeTiles />
-
-  {/* HORARIOS */}
   <HomeHours />
-
-  {/* LOS DE SIEMPRE */}
-  <HomeFeatured />
-
-  {/* UBICACIÓN */}
   <HomeLocation />
-
-  {/* RESEÑAS */}
   <HomeReviews />
-
-  {/* NEWSLETTER */}
   <HomeNewsletter />
-
-  {/* FOOTER lo pinta el SiteLayout (si lo tienes ahí) */}
 </SiteLayout>

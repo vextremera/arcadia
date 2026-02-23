@@ -2,19 +2,23 @@
 import NewsletterForm from "@/islands/home/NewsletterForm";
 ---
 
-<section id="newsletter" class="mt-16">
-  <div class="rounded-[28px] bg-[#7b1f1f] p-10 text-white shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
-    <div class="grid gap-6 lg:grid-cols-[1fr_520px] lg:items-center">
-      <div>
-        <h2 class="text-4xl font-black leading-none tracking-tight">
-          ¿TE APETECE<br />ARCADIA HOY?
-        </h2>
-        <p class="mt-4 text-white/80">
-          Regístrate a nuestras ofertas y novedades.
-        </p>
-      </div>
+<section id="newsletter" class="scroll-mt-24">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:py-16">
+    <div
+      class="rounded-[28px] bg-[#7b1f1f] p-10 text-white shadow-[0_20px_50px_rgba(0,0,0,0.25)]"
+    >
+      <div class="grid gap-6 lg:grid-cols-[1fr_520px] lg:items-center">
+        <div>
+          <h2 class="text-4xl font-black leading-none tracking-tight">
+            ¿TE APETECE<br />ARCADIA HOY?
+          </h2>
+          <p class="mt-4 text-white/80">
+            Regístrate a nuestras ofertas y novedades
+          </p>
+        </div>
 
-      <NewsletterForm client:load />
+        <NewsletterForm client:load />
+      </div>
     </div>
   </div>
 </section>
