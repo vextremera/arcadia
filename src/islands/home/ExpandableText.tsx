@@ -7,7 +7,10 @@ type Props = {
 
 function splitParagraphs(text: string) {
   const clean = String(text ?? "").replace(/\r\n/g, "\n").trim();
-  const parts = clean.split(/\n\s*\n+/g).map((p) => p.trim()).filter(Boolean);
+  const parts = clean
+    .split(/\n\s*\n+/g)
+    .map((p) => p.trim())
+    .filter(Boolean);
   return parts;
 }
 
@@ -17,12 +20,12 @@ export default function ExpandableText({ text, collapsedChars = 260 }: Props) {
   const { head, tail } = useMemo(() => {
     const paras = splitParagraphs(text);
 
-    // Si hay 2+ párrafos, mostramos el 1º y el resto con toggle
+    // 1º párrafo visible; resto toggle
     if (paras.length >= 2) {
       return { head: paras[0], tail: paras.slice(1).join("\n\n") };
     }
 
-    // fallback: modo por caracteres
+    // fallback por caracteres
     const clean = String(text ?? "").trim();
     if (clean.length <= collapsedChars) return { head: clean, tail: "" };
     return {
@@ -31,22 +34,23 @@ export default function ExpandableText({ text, collapsedChars = 260 }: Props) {
     };
   }, [text, collapsedChars]);
 
+  const pClass =
+    "text-base leading-relaxed text-zinc-700 sm:text-lg lg:text-xl lg:leading-[1.75] whitespace-pre-line";
+
   if (!tail) {
-    return <p class="text-sm leading-relaxed text-zinc-700 sm:text-base">{head}</p>;
+    return <p class={pClass}>{head}</p>;
   }
 
   return (
     <div class="relative">
-      <p class="text-sm leading-relaxed text-zinc-700 sm:text-base whitespace-pre-line">
-        {open ? `${head}\n\n${tail}` : head}
-      </p>
+      <p class={pClass}>{open ? `${head}\n\n${tail}` : head}</p>
 
       {!open ? (
         <>
-          <div class="pointer-events-none absolute inset-x-0 bottom-10 h-10 bg-linear-to-t from-[#fbfaf7] to-transparent" />
+          <div class="pointer-events-none absolute inset-x-0 bottom-10 h-12 bg-linear-to-t from-[#fbfaf7] to-transparent" />
           <button
             type="button"
-            class="mt-4 rounded-full border border-zinc-300 bg-white px-6 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+            class="mt-5 rounded-full border border-zinc-300 bg-white px-7 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
             onClick={() => setOpen(true)}
           >
             Ver más
@@ -55,7 +59,7 @@ export default function ExpandableText({ text, collapsedChars = 260 }: Props) {
       ) : (
         <button
           type="button"
-          class="mt-4 rounded-full border border-zinc-300 bg-white px-6 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+          class="mt-5 rounded-full border border-zinc-300 bg-white px-7 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
           onClick={() => setOpen(false)}
         >
           Ver menos
