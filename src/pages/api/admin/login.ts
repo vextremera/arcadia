@@ -26,7 +26,7 @@ export const POST: APIRoute = async ({ request, session, redirect }) => {
 
   if (!u) return redirect("/admin/login?error=invalid", 302);
 
-  const ok = await verifyPassword(u.passwordHash, password);
+  const ok = verifyPassword(password, u.passwordHash);
   const allowed = u.role === "ADMIN" || u.role === "STAFF";
 
   if (!ok || !allowed) return redirect("/admin/login?error=invalid", 302);

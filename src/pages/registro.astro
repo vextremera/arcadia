@@ -1,64 +1,15 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
+import RegisterCard from "@/islands/auth/RegisterCard";
 
 const next = Astro.url.searchParams.get("next") ?? "";
 const error = Astro.url.searchParams.get("error") ?? "";
 ---
 
-<SiteLayout title="Registro · Arcadia">
-  <h1 class="text-2xl font-semibold tracking-tight">Crear cuenta</h1>
-
-  {error ? (
-    <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-      {error}
+<SiteLayout title="Registro · Arcadia" variant="landing">
+  <div class="mx-auto w-full max-w-6xl px-6 py-10">
+    <div class="grid place-items-center">
+      <RegisterCard client:load next={next || "/cuenta"} error={error} />
     </div>
-  ) : null}
-
-  <form class="mt-6 max-w-md space-y-4" method="post" action="/api/auth/register">
-    <input type="hidden" name="next" value={next || "/cuenta"} />
-
-    <div>
-      <label class="text-sm font-medium">Nombre (opcional)</label>
-      <input
-        class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-        name="name"
-        autocomplete="name"
-      />
-    </div>
-
-    <div>
-      <label class="text-sm font-medium">Email</label>
-      <input
-        class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-        type="email"
-        name="email"
-        required
-        autocomplete="email"
-      />
-    </div>
-
-    <div>
-      <label class="text-sm font-medium">Contraseña</label>
-      <input
-        class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
-        type="password"
-        name="password"
-        required
-        minlength="8"
-        autocomplete="new-password"
-      />
-      <div class="mt-1 text-xs text-zinc-600">Mínimo 8 caracteres.</div>
-    </div>
-
-    <button class="w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
-      Crear cuenta
-    </button>
-
-    <div class="text-sm text-zinc-600">
-      ¿Ya tienes cuenta?{" "}
-      <a class="font-semibold underline" href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`}>
-        Entrar
-      </a>
-    </div>
-  </form>
+  </div>
 </SiteLayout>

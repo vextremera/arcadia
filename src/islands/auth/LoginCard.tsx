@@ -1,0 +1,186 @@
+import { useEffect, useMemo, useState } from "preact/hooks";
+
+type Props = {
+    next?: string;
+    error?: string;
+    siteKey?: string;
+};
+
+const EYE_OPEN = (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
+const EYE_CLOSED = (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-7.94" />
+        <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.9 21.9 0 0 1-3.17 4.62" />
+        <path d="M14.12 14.12a3 3 0 0 1-4.24-4.24" />
+        <path d="M1 1l22 22" />
+    </svg>
+);
+
+function errorMessage(code: string) {
+    if (!code) return "";
+    if (code === "invalid") return "Usuario o contraseña incorrectos.";
+    if (code === "captcha") return "Verifica el captcha para continuar.";
+    return code;
+}
+
+export default function LoginCard({ next = "", error = "", siteKey = "" }: Props) {
+    const [showPwd, setShowPwd] = useState(false);
+    const [fakeCaptchaOk, setFakeCaptchaOk] = useState(false);
+
+    const hasRecaptcha = !!siteKey;
+    const errText = useMemo(() => errorMessage(error), [error]);
+
+    useEffect(() => {
+        if (!hasRecaptcha) return;
+        const id = "recaptcha-v2";
+        if (document.getElementById(id)) return;
+
+        const s = document.createElement("script");
+        s.id = id;
+        s.src = "https://www.google.com/recaptcha/api.js";
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
+    }, [hasRecaptcha]);
+
+    return (
+        <div class="w-full max-w-md lg:max-w-112.5">
+            <div class="rounded-[22px] border border-zinc-300 bg-white p-7 shadow-[0_14px_40px_rgba(0,0,0,0.08)]">
+                <div class="text-center">
+                    <h1 class="text-xl font-black tracking-wide">INICIA SESION</h1>
+                </div>
+
+                {errText ? (
+                    <div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900">{errText}</div>
+                ) : null}
+
+                <form
+                    class="mt-6 grid gap-4"
+                    method="post"
+                    action="/api/auth/login"
+                    onSubmit={(e) => {
+                        if (!hasRecaptcha && !fakeCaptchaOk) {
+                            e.preventDefault();
+                            alert("Marca 'I'm not a robot' para continuar.");
+                        }
+                    }}
+                >
+                    <input type="hidden" name="next" value={next} />
+
+                    <label class="grid gap-2">
+                        <span class="text-sm font-medium">Usuario o correo</span>
+                        <input
+                            class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                            name="email"
+                            type="text"
+                            required
+                            autoComplete="username"
+                            placeholder="example@gmail.com"
+                        />
+                    </label>
+
+                    <label class="grid gap-2">
+                        <span class="text-sm font-medium">Contraseña</span>
+                        <div class="relative">
+                            <input
+                                class="h-11 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500"
+                                name="password"
+                                type={showPwd ? "text" : "password"}
+                                required
+                                autoComplete="current-password"
+                                placeholder="Tu contraseña"
+                            />
+                            <button
+                                type="button"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-900"
+                                onClick={() => setShowPwd((v) => !v)}
+                                aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                title={showPwd ? "Ocultar" : "Mostrar"}
+                            >
+                                {showPwd ? EYE_CLOSED : EYE_OPEN}
+                            </button>
+                        </div>
+                    </label>
+
+                    <label class="flex items-center gap-3 text-sm text-zinc-600">
+                        <input name="remember" type="checkbox" class="h-4 w-4 rounded border-zinc-300" />
+                        Remember me
+                    </label>
+
+                    <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                        {hasRecaptcha ? (
+                            <div class="g-recaptcha" data-sitekey={siteKey} />
+                        ) : (
+                            <label class="flex items-center gap-3 text-sm text-zinc-700">
+                                <input
+                                    type="checkbox"
+                                    class="h-5 w-5 rounded border-zinc-300"
+                                    checked={fakeCaptchaOk}
+                                    onChange={(e) => setFakeCaptchaOk((e.target as HTMLInputElement).checked)}
+                                />
+                                I'm not a robot
+                            </label>
+                        )}
+                    </div>
+
+                    <a class="text-sm text-indigo-700 underline" href="#" onClick={(e) => e.preventDefault()}>
+                        Forgot your password?
+                    </a>
+
+                    <button class="mt-1 h-11 w-full rounded-xl bg-[#7b1f1f] text-sm font-semibold text-white hover:bg-[#6a1919]" type="submit">
+                        Entrar
+                    </button>
+
+                    <div class="my-2 flex items-center gap-3 text-sm text-zinc-500">
+                        <div class="h-px flex-1 bg-zinc-200" />
+                        <span>O bien</span>
+                        <div class="h-px flex-1 bg-zinc-200" />
+                    </div>
+
+                    <button
+                        type="button"
+                        class="h-11 w-full rounded-xl border border-zinc-300 bg-white text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                        onClick={() => alert("Google OAuth se integrará más adelante.")}
+                    >
+                        <span class="inline-flex items-center justify-center gap-3">
+                            <span class="grid h-6 w-6 place-items-center rounded-full bg-white">
+                                <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+                                    <path
+                                        fill="#FFC107"
+                                        d="M43.611 20.083H42V20H24v8h11.303C33.803 32.657 29.304 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.869 6.053 29.691 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917Z"
+                                    />
+                                    <path
+                                        fill="#FF3D00"
+                                        d="M6.306 14.691 12.87 19.5C14.65 15.098 18.956 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.869 6.053 29.691 4 24 4 16.318 4 9.656 8.337 6.306 14.691Z"
+                                    />
+                                    <path
+                                        fill="#4CAF50"
+                                        d="M24 44c5.186 0 10.129-1.986 13.78-5.205l-6.36-5.385C29.355 35.091 26.816 36 24 36c-5.284 0-9.77-3.319-11.287-7.946l-6.49 5.002C9.537 39.556 16.227 44 24 44Z"
+                                    />
+                                    <path
+                                        fill="#1976D2"
+                                        d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.223 5.41l.003-.002 6.36 5.385C36.992 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917Z"
+                                    />
+                                </svg>
+                            </span>
+                            Inicia sesión con Google
+                        </span>
+                    </button>
+
+                    <div class="pt-2 text-center text-sm text-zinc-600">
+                        ¿No tienes cuenta?{" "}
+                        <a class="font-semibold text-indigo-700 underline" href={`/registro${next ? `?next=${encodeURIComponent(next)}` : ""}`}>
+                            Crear cuenta
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
