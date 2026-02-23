@@ -1,58 +1,54 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
-import FavoritesCount from "@/islands/favorites/FavoritesCount";
-
 const user = Astro.locals.user;
 const pathname = Astro.url.pathname;
 const next = encodeURIComponent(pathname);
-
-function isActive(href: string) {
-  return pathname === href || (href !== "/" && pathname.startsWith(href));
-}
-
-function linkClass(href: string) {
-  const active = isActive(href);
-  return `rounded-xl px-3 py-2 text-sm font-semibold transition ${
-    active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
-  }`;
-}
 ---
 
-<header id="app-header" class="sticky top-0 z-40 border-b border-zinc-200 bg-white/80 backdrop-blur">
-  <div class="flex w-full items-center justify-between gap-3 px-3 sm:px-4 lg:px-6 py-3">
-    {/* Brand */}
-    <a href="/" class="flex items-center gap-2">
-      <div class="grid h-9 w-9 place-items-center rounded-2xl bg-zinc-900 text-white font-black">
-        A
-      </div>
-      <div class="leading-tight">
-        <div class="text-sm font-black tracking-tight">ARCADIA</div>
-        <div class="text-[11px] text-zinc-500">Lloret de Mar</div>
-      </div>
+<header class="sticky top-0 z-40 border-b border-zinc-200 bg-[#f7f5f0]/80 backdrop-blur">
+  <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+    {/* Logo */}
+    <a href="/" class="text-xl font-black tracking-[0.28em]">
+      ARCADIA
     </a>
 
-    {/* Nav */}
-    <nav class="flex items-center gap-1">
-      <a class={linkClass("/pedir")} href="/pedir">Pedir</a>
+    {/* Nav centro */}
+    <nav class="hidden items-center gap-10 text-sm font-semibold text-zinc-700 lg:flex">
+      <a class="hover:text-zinc-900" href="/#sobre">Sobre Nosotros</a>
+      <a class="hover:text-zinc-900" href="/pedir">Carta</a>
+      <a class="hover:text-zinc-900" href="/#reservas">Reservas</a>
+    </nav>
 
-      <a class={linkClass("/cuenta/favoritos")} href="/cuenta/favoritos">
-        Favoritos
-        <FavoritesCount client:load />
+    {/* Acciones */}
+    <div class="flex items-center gap-3">
+      <a
+        href="/pedir"
+        class="rounded-full bg-[#7b1f1f] px-5 py-2 text-sm font-semibold text-white hover:bg-[#6a1919]"
+      >
+        A Domicilio
       </a>
 
+      <CartBadge client:load />
+
       {user ? (
-        <a class={linkClass("/cuenta")} href="/cuenta">Cuenta</a>
+        <a
+          class="grid h-10 w-10 place-items-center rounded-full border border-zinc-300 bg-white hover:bg-zinc-50"
+          href="/cuenta"
+          aria-label="Cuenta"
+          title="Cuenta"
+        >
+          <span class="text-sm">👤</span>
+        </a>
       ) : (
-        <a class={linkClass("/login")} href={`/login?next=${next}`}>Entrar</a>
+        <a
+          class="grid h-10 w-10 place-items-center rounded-full border border-zinc-300 bg-white hover:bg-zinc-50"
+          href={`/login?next=${next}`}
+          aria-label="Entrar"
+          title="Entrar"
+        >
+          <span class="text-sm">👤</span>
+        </a>
       )}
-
-      {(user?.role === "ADMIN" || user?.role === "STAFF") ? (
-        <a class={linkClass("/admin")} href="/admin">Admin</a>
-      ) : null}
-
-      <div class="ml-1">
-        <CartBadge client:load />
-      </div>
-    </nav>
+    </div>
   </div>
 </header>

@@ -1,0 +1,71 @@
+---
+import LazyMap from "@/islands/home/LazyMap";
+
+const addressLines = [
+  "C/ Maria Aurelia Campmany i Farnés, nº 2",
+  "17310 Lloret de Mar (Girona)",
+  "España",
+];
+
+const phone = "+34 600 00 00 00";
+const email = "info@bararcadia.com";
+const instagram = "@bararcadia";
+
+// Placeholder hasta conectar APIs
+const ratings = {
+  tripadvisor: { label: "Tripadvisor", rating: 4.6, count: 240 },
+  google: { label: "Google", rating: 4.7, count: 540 },
+};
+
+const mapQuery =
+  "BAR ARCADIA, Carrer Maria Aurelia Campmany i Farnés 2, 17310 Lloret de Mar, Girona, España";
+---
+
+<section id="ubicacion" class="mt-16">
+  <div class="grid gap-6 lg:grid-cols-2">
+    {/* Card izquierda */}
+    <div class="rounded-[28px] border border-zinc-200 bg-white/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
+      <h2 class="text-2xl font-black tracking-tight">UBICACIÓN</h2>
+
+      <div class="mt-4 text-sm text-zinc-700">
+        {addressLines.map((l) => (
+          <div>{l}</div>
+        ))}
+      </div>
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <div class="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm">
+          <span class="font-semibold text-emerald-800">{ratings.tripadvisor.label}</span>
+          <span class="text-emerald-800">★ {ratings.tripadvisor.rating.toFixed(1)}</span>
+          <span class="text-emerald-700/70">({ratings.tripadvisor.count})</span>
+        </div>
+
+        <div class="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm">
+          <span class="font-semibold text-emerald-800">{ratings.google.label}</span>
+          <span class="text-emerald-800">★ {ratings.google.rating.toFixed(1)}</span>
+          <span class="text-emerald-700/70">({ratings.google.count})</span>
+        </div>
+      </div>
+
+      <div class="mt-8 space-y-2 text-sm text-zinc-800">
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-zinc-600">Teléfono:</span>
+          <span class="font-semibold">{phone}</span>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-zinc-600">Correo:</span>
+          <span class="font-semibold">{email}</span>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-zinc-600">Instagram:</span>
+          <span class="font-semibold">{instagram}</span>
+        </div>
+      </div>
+    </div>
+
+    {/* Mapa derecha */}
+    <div class="rounded-[28px] border border-zinc-200 bg-white/70 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
+      <LazyMap client:load query={mapQuery} title="Mapa · Arcadia" />
+    </div>
+  </div>
+</section>

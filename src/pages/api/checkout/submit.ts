@@ -8,7 +8,9 @@ import {
   ModifierOption,
   Ingredient,
   AppSetting,
+  Address,
   eq,
+  and,
   inArray,
 } from "astro:db";
 import { getArcadiaAvailability } from "@/server/time/madrid";
@@ -46,6 +48,11 @@ function safePhone(v: unknown) {
   return safeStr(v).replace(/\s+/g, " ");
 }
 
+function opt(v: unknown): string | undefined {
+  const t = safeStr(v);
+  return t ? t : undefined;
+}
+
 function makePublicId() {
   return `A-${randomUUID().slice(0, 8).toUpperCase()}`;
 }
@@ -68,7 +75,7 @@ async function getPaymentsSettings() {
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
 
-  // ✅ U2: si hay usuario logueado, lo vinculamos al pedido (solo CUSTOMER)
+  // ✅ si hay usuario logueado, lo vinculamos al pedido (solo CUSTOMER)
   const authUser = (await session.get("user")) as SessionUser | undefined;
 
   const availability = await getArcadiaAvailability();
@@ -80,10 +87,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!availability.isOpen) {
-    return json(
-      { error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` },
-      400
-    );
+    return json({ error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` }, 400);
   }
   if (!availability.kitchenOpen) {
     return json(
@@ -117,6 +121,10 @@ export const POST: APIRoute = async ({ request, session }) => {
     postalCode: safeStr(body.address?.postalCode),
     notes: safeStr(body.address?.notes),
   };
+
+  // ✅ Nuevo: flag guardar dirección
+  const saveAddress = !!body.saveAddress;
+  const saveAddressDefault = !!body.saveAddressDefault;
 
   // carrito desde sesión
   const cart = ((await session.get("cart")) as CartItemSession[] | undefined) ?? [];
@@ -198,135 +206,104 @@ export const POST: APIRoute = async ({ request, session }) => {
       name: Product.name,
       priceCents: Product.priceCents,
       active: Product.active,
-      deliveryEnabled: Product.deliveryEnabled,
-      pickupEnabled: Product.pickupEnabled,
     })
     .from(Product)
     .where(inArray(Product.id, productIds));
 
-  const productById = new Map(products.map((p) => [p.id, p]));
-
-  // Si piden DELIVERY, todos los items deben permitir delivery; si no, forzamos PICKUP
-  if (type === "DELIVERY") {
-    const blocked = cart.find((i) => !productById.get(i.productId)?.deliveryEnabled);
-    if (blocked) {
-      type = "PICKUP";
-      forcedPickup = true;
-      forcedReason = "Tu carrito contiene productos no disponibles para delivery.";
-    }
-  }
-
-  // Si forzamos PICKUP y hay productos que NO permiten pickup -> error
-  if (type === "PICKUP") {
-    const blocked = cart.find((i) => !productById.get(i.productId)?.pickupEnabled);
-    if (blocked) return json({ error: "PICKUP_NOT_AVAILABLE_FOR_ITEM" }, 400);
-  }
-
   const variants = variantIds.length
     ? await db
-        .select({
-          id: ProductVariant.id,
-          productId: ProductVariant.productId,
-          name: ProductVariant.name,
-          priceDeltaCents: ProductVariant.priceDeltaCents,
-          active: ProductVariant.active,
-        })
-        .from(ProductVariant)
-        .where(inArray(ProductVariant.id, variantIds))
+      .select({
+        id: ProductVariant.id,
+        productId: ProductVariant.productId,
+        priceDeltaCents: ProductVariant.priceDeltaCents,
+        active: ProductVariant.active,
+      })
+      .from(ProductVariant)
+      .where(inArray(ProductVariant.id, variantIds))
     : [];
-
-  const variantById = new Map(variants.map((v) => [v.id, v]));
 
   const options = optionIds.length
     ? await db
-        .select({
-          id: ModifierOption.id,
-          name: ModifierOption.name,
-          priceDeltaCents: ModifierOption.priceDeltaCents,
-          active: ModifierOption.active,
-        })
-        .from(ModifierOption)
-        .where(inArray(ModifierOption.id, optionIds))
+      .select({
+        id: ModifierOption.id,
+        name: ModifierOption.name,
+        priceDeltaCents: ModifierOption.priceDeltaCents,
+        active: ModifierOption.active,
+      })
+      .from(ModifierOption)
+      .where(inArray(ModifierOption.id, optionIds))
     : [];
-
-  const optionById = new Map(options.map((o) => [o.id, o]));
 
   const ingredients = ingredientIds.length
     ? await db
-        .select({
-          id: Ingredient.id,
-          name: Ingredient.name,
-          addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-          active: Ingredient.active,
-        })
-        .from(Ingredient)
-        .where(inArray(Ingredient.id, ingredientIds))
+      .select({
+        id: Ingredient.id,
+        name: Ingredient.name,
+        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+        active: Ingredient.active,
+      })
+      .from(Ingredient)
+      .where(inArray(Ingredient.id, ingredientIds))
     : [];
 
-  const ingredientById = new Map(ingredients.map((x) => [x.id, x]));
+  const productById = new Map(products.map((p) => [p.id, p]));
+  const variantById = new Map(variants.map((v) => [v.id, v]));
+  const optionById = new Map(options.map((o) => [o.id, o]));
+  const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
 
-  // Construir líneas + totales
+  // Construir items snapshot
   let subtotalCents = 0;
 
-  const itemsToInsert: Array<{
-    orderId: number;
-    productId?: number;
-    variantId?: number;
-    nameSnapshot: string;
-    variantSnapshot?: string | null;
-    unitPriceCents: number;
-    qty: number;
-    modifiers?: any;
-    lineTotalCents: number;
-    notes?: string | null;
-  }> = [];
+  const itemsToInsert: Array<any> = [];
 
   for (const line of cart) {
     const p = productById.get(line.productId);
-    if (!p || !p.active) return json({ error: "ITEM_NOT_AVAILABLE" }, 400);
-
-    const qty = Math.max(1, line.qty);
+    if (!p || !p.active) return json({ error: "PRODUCT_INACTIVE" }, 400);
 
     const v = line.variantId ? variantById.get(line.variantId) : null;
-    const variantDelta = v && v.active ? v.priceDeltaCents : 0;
-    const variantName = v && v.active ? v.name : null;
+    if (line.variantId && (!v || !v.active)) return json({ error: "VARIANT_INACTIVE" }, 400);
 
-    const selectedOptions = (line.modifierOptionIds ?? [])
+    const chosenOptions = (line.modifierOptionIds ?? [])
       .map((id) => optionById.get(id))
-      .filter((o): o is NonNullable<typeof o> => !!o && o.active);
+      .filter((x): x is NonNullable<typeof x> => !!x);
 
-    const optionsDelta = selectedOptions.reduce((acc, o) => acc + (o.priceDeltaCents ?? 0), 0);
+    if (chosenOptions.some((o) => !o.active)) return json({ error: "OPTION_INACTIVE" }, 400);
 
     const added = (line.addedIngredientIds ?? [])
       .map((id) => ingredientById.get(id))
-      .filter((ing): ing is NonNullable<typeof ing> => !!ing && ing.active);
+      .filter((x): x is NonNullable<typeof x> => !!x);
 
     const removed = (line.removedIngredientIds ?? [])
       .map((id) => ingredientById.get(id))
-      .filter((ing): ing is NonNullable<typeof ing> => !!ing && ing.active);
+      .filter((x): x is NonNullable<typeof x> => !!x);
 
-    const addedDelta = added.reduce((acc, a) => acc + (a.addPriceDeltaCents ?? 0), 0);
+    if (added.some((i) => !i.active)) return json({ error: "INGREDIENT_INACTIVE" }, 400);
 
-    const baseUnitCents = p.priceCents + variantDelta;
-    const unitPriceCents = baseUnitCents + optionsDelta + addedDelta;
+    const baseUnit = (p.priceCents ?? 0) + (v?.priceDeltaCents ?? 0);
+    const optionDelta = chosenOptions.reduce((acc, o) => acc + (o.priceDeltaCents ?? 0), 0);
+    const addedDelta = added.reduce((acc, i) => acc + (i.addPriceDeltaCents ?? 0), 0);
 
-    const baseLineTotalCents = baseUnitCents * qty;
-    const lineTotalCents = unitPriceCents * qty;
+    const unitCents = baseUnit + optionDelta + addedDelta;
+    const lineTotalCents = unitCents * (line.qty ?? 1);
 
     subtotalCents += lineTotalCents;
 
     itemsToInsert.push({
-      orderId: -1,
       productId: p.id,
-      variantId: v?.id,
-      nameSnapshot: p.name,
-      variantSnapshot: variantName,
-      unitPriceCents,
-      qty,
-      modifiers: {
-        baseUnitCents,
-        baseLineTotalCents,
-        modifierOptions: selectedOptions.map((o) => ({
+      variantId: v?.id ?? null,
+      qty: line.qty,
+      unitPriceCents: unitCents,
+      lineTotalCents,
+      snapshot: {
+        product: {
+          id: p.id,
+          name: p.name,
+          priceCents: p.priceCents,
+        },
+        variant: v
+          ? { id: v.id, priceDeltaCents: v.priceDeltaCents ?? 0 }
+          : null,
+        options: chosenOptions.map((o) => ({
           id: o.id,
           name: o.name,
           priceDeltaCents: o.priceDeltaCents ?? 0,
@@ -338,12 +315,11 @@ export const POST: APIRoute = async ({ request, session }) => {
         })),
         ingredientsRemoved: removed.map((r) => ({ id: r.id, name: r.name })),
       },
-      lineTotalCents,
       notes: null,
     });
   }
 
-  // Fee fijo (solo delivery): viene de operativa (availability)
+  // Fee fijo (solo delivery)
   const feeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
 
   const discountCents = 0;
@@ -355,7 +331,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   await db.insert(Order).values({
     publicId,
 
-    // ✅ U2: vincular pedido al CUSTOMER si existe
+    // ✅ vincular pedido al CUSTOMER si existe
     userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
 
     type,
@@ -398,6 +374,72 @@ export const POST: APIRoute = async ({ request, session }) => {
       orderId: created.id,
     }))
   );
+
+  // ✅ Guardar dirección si procede (no rompe nada si falla: lo tratamos como best-effort)
+  if (saveAddress && type === "DELIVERY" && authUser?.role === "CUSTOMER") {
+    try {
+      const userId = authUser.id;
+
+      // “match” simple para evitar duplicados
+      const existing = await db
+        .select({ id: Address.id, isDefault: Address.isDefault })
+        .from(Address)
+        .where(and(eq(Address.userId, userId), eq(Address.line1, address.line1), eq(Address.postalCode, address.postalCode)))
+        .limit(1);
+
+      const patch = {
+        label: undefined as string | undefined,
+        contactName: address.contactName,
+        phone: address.phone,
+        line1: address.line1,
+        line2: opt(address.line2),
+        city: address.city,
+        postalCode: address.postalCode,
+        notes: opt(address.notes),
+        lat: undefined as number | undefined,
+        lng: undefined as number | undefined,
+      };
+
+      let addressId: number | null = null;
+
+      if (existing.length) {
+        addressId = existing[0].id;
+        await db.update(Address).set(patch).where(eq(Address.id, addressId));
+      } else {
+        const any = await db.select({ id: Address.id }).from(Address).where(eq(Address.userId, userId)).limit(1);
+        const isDefault = any.length === 0; // primera dirección => default
+
+        const inserted = await db
+          .insert(Address)
+          .values({
+            userId,
+            label: patch.label,
+            contactName: patch.contactName,
+            phone: patch.phone,
+            line1: patch.line1,
+            line2: patch.line2,
+            city: patch.city,
+            postalCode: patch.postalCode,
+            notes: patch.notes,
+            lat: patch.lat,
+            lng: patch.lng,
+            isDefault,
+          })
+          .returning();
+
+        addressId = inserted[0]?.id ?? null;
+      }
+
+      // ✅ Si el usuario pidió “guardar como default”, lo aplicamos
+      // (y también si es la primera dirección, ya queda default por isDefault=true)
+      if (saveAddressDefault && addressId) {
+        await db.update(Address).set({ isDefault: false }).where(eq(Address.userId, userId));
+        await db.update(Address).set({ isDefault: true }).where(and(eq(Address.userId, userId), eq(Address.id, addressId)));
+      }
+    } catch {
+      // best-effort: no bloqueamos el pedido por fallo al guardar dirección
+    }
+  }
 
   await session.delete("cart");
 

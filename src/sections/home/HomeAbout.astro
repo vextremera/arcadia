@@ -1,0 +1,58 @@
+---
+import ExpandableText from "@/islands/home/ExpandableText";
+---
+
+<section class="bg-[#FBFAF7]">
+  <div class="mx-auto w-full max-w-6xl px-4 py-10 lg:py-12">
+    <div class="grid gap-6 lg:grid-cols-[1fr_.9fr] lg:items-start">
+      <div>
+        <h2 class="text-2xl font-black tracking-tight sm:text-3xl">
+          Sobre <span class="text-[#7E1E1E]">nosotros</span>
+        </h2>
+
+        <div class="mt-4">
+          <ExpandableText
+            client:load
+            collapsedChars={320}
+            text={`Arcadia es un bar restaurante en Lloret de Mar donde hacemos tapas, bocadillos, hamburguesas, frankfurts y menús al mediodía. Nos gusta que puedas pedir como en las grandes cadenas: eliges tu producto, lo personalizas con extras o quitando ingredientes, y lo añades al carrito. 
+Cuidamos el tema sin gluten en la mayoría de productos viables (pan sin gluten en bocatas y hamburguesas, freidora separada para fritos caseros) y nos gusta que la experiencia sea rápida, clara y cómoda: tanto para probar sin registrarte como para crear cuenta, guardar tus favoritos y hacer comunidad.`}
+          />
+        </div>
+      </div>
+
+      <div class="rounded-[28px] border border-zinc-200 bg-white p-6 shadow-sm">
+        <div class="text-sm font-black tracking-tight">Lo que vas a encontrar</div>
+
+        <ul class="mt-4 space-y-3 text-sm text-zinc-700">
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-[#7E1E1E]/10 text-[#7E1E1E]">✓</span>
+            <span>Personalización rápida (quitar/añadir ingredientes y extras).</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-[#7E1E1E]/10 text-[#7E1E1E]">✓</span>
+            <span>Opción anónima o con cuenta (favoritos e historial).</span>
+          </li>
+          <li class="flex gap-3">
+            <span class="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-[#7E1E1E]/10 text-[#7E1E1E]">✓</span>
+            <span>Delivery en horario y recogida siempre.</span>
+          </li>
+        </ul>
+
+        <div class="mt-6 flex flex-wrap gap-2">
+          <a
+            href="/carta"
+            class="rounded-2xl bg-[#7E1E1E] px-5 py-3 text-sm font-bold text-white hover:opacity-95"
+          >
+            Ver carta
+          </a>
+          <a
+            href="/checkout"
+            class="rounded-2xl border border-zinc-300 bg-white px-5 py-3 text-sm font-bold text-zinc-900 hover:bg-zinc-50"
+          >
+            Ir al carrito
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

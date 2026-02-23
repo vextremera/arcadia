@@ -1,0 +1,46 @@
+---
+import ReviewsCarousel, { type Review } from "@/islands/home/ReviewsCarousel";
+
+const reviews: Review[] = [
+  {
+    name: "Pepito Fuentes",
+    totalReviews: 248,
+    source: "Google",
+    rating: 4.8,
+    text:
+      "Fui a cenar y la experiencia estuvo maravillosa. Comida muy buena y a muy buen precio.",
+    avatarUrl: null,
+  },
+  {
+    name: "Laura M.",
+    totalReviews: 112,
+    source: "Tripadvisor",
+    rating: 4.7,
+    text:
+      "Tapas muy ricas y bocatas enormes. Servicio rápido y ambiente de barrio, de los de siempre.",
+    avatarUrl: null,
+  },
+  {
+    name: "David R.",
+    totalReviews: 89,
+    source: "Google",
+    rating: 4.6,
+    text:
+      "Buen producto y cocina honesta. Pedimos a domicilio y llegó caliente, perfecto.",
+    avatarUrl: null,
+  },
+];
+---
+
+<section class="py-14">
+  <div class="mx-auto w-full max-w-6xl px-4">
+    <h2 class="text-center text-2xl font-black tracking-tight">RESEÑAS</h2>
+    <p class="mt-2 text-center text-sm text-zinc-600">
+      Opiniones reales de clientes (más adelante lo conectamos con Google/Tripadvisor).
+    </p>
+
+    <div class="mt-10">
+      <ReviewsCarousel client:load reviews={reviews} />
+    </div>
+  </div>
+</section>

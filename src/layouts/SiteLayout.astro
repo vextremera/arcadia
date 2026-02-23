@@ -6,13 +6,20 @@ import ProductConfiguratorModal from "@/islands/product/ProductConfiguratorModal
 import CartDrawer from "@/islands/cart/CartDrawer";
 import UpsellModal from "@/islands/upsell/UpsellModal";
 
-const { title, fullWidth } = Astro.props as {
+type Props = {
   title?: string;
-  fullWidth?: boolean;
+  variant?: "default" | "landing";
 };
 
-const mainClass = fullWidth
-  ? "flex-1 w-full px-3 sm:px-4 lg:px-6 py-4"
+const { title = "Arcadia", variant = "default" } = Astro.props as Props;
+const isLanding = variant === "landing";
+
+const bodyClass = isLanding
+  ? "min-h-dvh bg-[#fbfaf7] text-zinc-900"
+  : "min-h-dvh bg-white text-zinc-900";
+
+const mainClass = isLanding
+  ? "w-full"
   : "mx-auto w-full max-w-6xl px-4 py-8";
 ---
 
@@ -22,35 +29,21 @@ const mainClass = fullWidth
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
-    <title>{title ?? "Arcadia"}</title>
+    <title>{title}</title>
   </head>
 
-  
-  <body class={fullWidth ? "min-h-dvh bg-white text-zinc-900 flex flex-col" : "min-h-dvh bg-white text-zinc-900"}>
+  <body class={bodyClass}>
     <Header />
 
     <main class={mainClass}>
       <slot />
     </main>
 
-    {!fullWidth ? <Footer /> : null}
+    <Footer />
 
     <!-- Islas globales -->
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
     <UpsellModal client:load />
-
-    {fullWidth ? (
-    <script is:inline>
-      const setHeaderH = () => {
-        const el = document.getElementById("app-header");
-        const h = el ? Math.ceil(el.getBoundingClientRect().height) : 94;
-        document.documentElement.style.setProperty("--app-header-h", `${h}px`);
-      };
-      setHeaderH();
-      window.addEventListener("resize", setHeaderH);
-    </script>
-    ) : null}
-
   </body>
 </html>
