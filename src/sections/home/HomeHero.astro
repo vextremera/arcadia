@@ -1,76 +1,65 @@
 ---
-const heroBg = `background-image:url('/images/landing/hero.jpg');`;
+/**
+ * HERO minimal: imagen B/N + degradados hacia crema (#fbfaf7) SIN corte visible.
+ * Clave: un "cream fade" inferior largo y con base sólida (último tramo 100% crema).
+ */
+const bgUrl =
+  "https://images.unsplash.com/photo-1668699837445-62972bed634c?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=70&w=2600";
 ---
 
-<section class="relative">
-  <!-- decor suave -->
-  <div class="pointer-events-none absolute inset-0">
+<section
+  class="relative w-full overflow-hidden min-h-[calc(100svh-84px)] bg-[#fbfaf7]"
+>
+  <!-- Fondo -->
+  <div class="absolute inset-0" aria-hidden="true">
+    <!-- Imagen base B/N -->
     <div
-      class="absolute -top-24 left-1/2 h-130 w-130 -translate-x-1/2 rounded-full bg-[#7b1f1f]/10 blur-3xl"
+      class="h-full w-full bg-cover bg-center"
+      style={`background-image:url('${bgUrl}'); filter: grayscale(100%);`}
     >
     </div>
+
+    <!-- Arriba: casar con header -->
     <div
-      class="absolute -bottom-40 -right-30 h-130 w-130 rounded-full bg-zinc-900/5 blur-3xl"
+      class="absolute inset-0 bg-[linear-gradient(180deg,rgba(251,250,247,0.92)_0%,rgba(251,250,247,0.60)_28%,rgba(251,250,247,0.18)_60%,rgba(251,250,247,0.00)_84%)]"
+    >
+    </div>
+
+    <!-- Izquierda: limpiar zona del texto -->
+    <div
+      class="absolute inset-0 bg-[linear-gradient(90deg,rgba(251,250,247,0.98)_0%,rgba(251,250,247,0.90)_34%,rgba(251,250,247,0.55)_62%,rgba(251,250,247,0.18)_82%,rgba(251,250,247,0.00)_94%)]"
+    >
+    </div>
+
+    <!-- Derecha: toque suave crema -->
+    <div
+      class="absolute inset-0 bg-[linear-gradient(270deg,rgba(251,250,247,0.40)_0%,rgba(251,250,247,0.12)_28%,rgba(251,250,247,0.00)_56%)]"
+    >
+    </div>
+
+    <!-- Viñeta suave (no afecta al final porque el fade inferior va encima) -->
+    <div
+      class="absolute inset-0 bg-[radial-gradient(circle_at_72%_38%,rgba(0,0,0,0.14),transparent_58%)]"
+    >
+    </div>
+
+    <!-- ✅ FUSIÓN SIN CORTE: tramo inferior largo + base sólida crema
+         - Importante: va el último para “aplastar” cualquier sombra/imagen al final -->
+    <div
+      class="absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(0deg,#fbfaf7_0%,#fbfaf7_42%,rgba(251,250,247,0.0)_100%)]"
     >
     </div>
   </div>
 
+  <!-- Contenido: SOLO “ARCADIA” abajo -->
   <div
-    class="mx-auto grid w-full max-w-6xl gap-10 px-6 py-14 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:py-20"
+    class="relative mx-auto flex w-full max-w-6xl px-6 min-h-[calc(100svh-84px)] items-end"
   >
-    <div>
-      <h1
-        class="text-4xl font-black leading-[0.95] tracking-tight sm:text-5xl lg:text-6xl"
-      >
-        AMIGOS, BEBIDA<br />
-        Y BUENA COCINA...
-      </h1>
-
-      <p class="mt-5 max-w-xl text-base text-zinc-700 sm:text-lg">
-        Platos de barrio, producto local y compañía. Ven o pídelo en 2 clics.
-      </p>
-
-      <div class="mt-8 flex flex-wrap items-center gap-3">
-        <a
-          href="/#reservas"
-          class="rounded-full border border-zinc-300 bg-white px-7 py-3 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
-        >
-          Hacer reserva
-        </a>
-        <a
-          href="/pedir"
-          class="rounded-full bg-[#7b1f1f] px-7 py-3 text-sm font-semibold text-white hover:bg-[#6a1919]"
-        >
-          Pedir para llevar
-        </a>
-      </div>
-
-      <div class="mt-7 flex flex-wrap gap-2 text-xs text-zinc-600">
-        <span class="rounded-full border border-zinc-200 bg-white px-3 py-1"
-          >Sin registro obligatorio</span
-        >
-        <span class="rounded-full border border-zinc-200 bg-white px-3 py-1"
-          >Favoritos + historial</span
-        >
-        <span class="rounded-full border border-zinc-200 bg-white px-3 py-1"
-          >Delivery con horario</span
-        >
-      </div>
-    </div>
-
-    <div class="relative">
+    <div class="pb-12 sm:pb-14 lg:pb-16">
       <div
-        class="aspect-16/10 w-full overflow-hidden rounded-[28px] border border-zinc-300 bg-zinc-200 shadow-[0_18px_50px_rgba(0,0,0,0.12)]"
-        style={heroBg}
+        class="select-none text-[56px] font-black leading-none tracking-[0.35em] text-zinc-900 sm:text-[72px] lg:text-[92px]"
       >
-        <div
-          class="h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.35),transparent_55%)]"
-        >
-        </div>
-        <div
-          class="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.22),transparent_55%)]"
-        >
-        </div>
+        ARCADIA
       </div>
     </div>
   </div>

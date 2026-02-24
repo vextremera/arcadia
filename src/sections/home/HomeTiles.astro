@@ -2,7 +2,9 @@
 const BOOK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="52" viewBox="0 -960 960 960" width="52" fill="#fff"><path d="M160-120v-640q0-33 23.5-56.5T240-840h520v80H240v520h520v80H240q-33 0-56.5-23.5T160-120Zm160-120v-560h560v560H320Zm80-80h400v-400H400v400Zm0 0v-400 400Z"/></svg>`;
 const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="52" viewBox="0 -960 960 960" width="52" fill="#fff"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm120-120h320v-80H320v80Zm0-160h320v-80H320v80Zm0-160h320v-80H320v80Zm-120 440v-560 560Z"/></svg>`;
 
-const cartaBg = `background-image:url('/images/landing/carta.jpg');`;
+// Imagen real online para "CARTA"
+const cartaBg =
+  "background-image:url('https://images.unsplash.com/photo-1708388064660-40e29379e7c6?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=70&w=2200');";
 ---
 
 <section class="w-full">
@@ -14,11 +16,11 @@ const cartaBg = `background-image:url('/images/landing/carta.jpg');`;
       style={cartaBg}
     >
       <div
-        class="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.55),rgba(0,0,0,0.25))]"
+        class="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.60),rgba(0,0,0,0.25))]"
       >
       </div>
       <div
-        class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.20),transparent_50%)]"
+        class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_55%)]"
       >
       </div>
 
@@ -37,7 +39,7 @@ const cartaBg = `background-image:url('/images/landing/carta.jpg');`;
     <a href="/pedir" class="relative aspect-square w-full bg-[#7b1f1f]">
       <div class="relative grid h-full w-full place-items-center">
         <div
-          class="grid w-[70%] max-w-105 place-items-center bg-zinc-800 aspect-square"
+          class="grid w-[70%] max-w-[420px] place-items-center bg-zinc-800 aspect-square"
         >
           <div class="text-center">
             <div
