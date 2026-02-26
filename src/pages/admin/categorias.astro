@@ -1,0 +1,67 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { db, Category, Product } from "astro:db";
+
+const categories = await db.select().from(Category).orderBy(Category.sortOrder);
+const products = await db
+    .select({
+        id: Product.id,
+        categoryId: Product.categoryId,
+        active: Product.active,
+    })
+    .from(Product);
+
+const counts = new Map<number, { total: number; active: number }>();
+for (const p of products) {
+    const curr = counts.get(p.categoryId) ?? { total: 0, active: 0 };
+    curr.total += 1;
+    if (p.active) curr.active += 1;
+    counts.set(p.categoryId, curr);
+}
+---
+
+<SiteLayout title="Categorías · Admin · Arcadia">
+    <h1 class="text-2xl font-semibold tracking-tight">Categorías</h1>
+    <p class="mt-2 text-sm text-zinc-600">
+        Vista de solo lectura (por ahora). Sirve para evitar la ruta fantasma de
+        <code class="rounded bg-zinc-100 px-1">/admin/categorias</code> y para tener
+        un punto de partida para el CRUD.
+    </p>
+
+    <div class="mt-6 space-y-3">
+        {
+            categories.length === 0 ? (
+                <div class="text-sm text-zinc-600">No hay categorías.</div>
+            ) : (
+                categories.map((c) => {
+                    const cts = counts.get(c.id) ?? { total: 0, active: 0 };
+                    return (
+                        <div class="rounded-2xl border border-zinc-200 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="font-semibold">{c.name}</div>
+                                <div class="text-sm text-zinc-600">
+                                    {cts.active}/{cts.total} productos activos
+                                </div>
+                            </div>
+                            <div class="mt-1 text-sm text-zinc-600">
+                                <span class="font-semibold">Slug:</span>{" "}
+                                {c.slug} ·{" "}
+                                <span class="font-semibold">Orden:</span>{" "}
+                                {c.sortOrder} ·{" "}
+                                <span class="font-semibold">Activa:</span>{" "}
+                                {c.active ? "Sí" : "No"}
+                            </div>
+                        </div>
+                    );
+                })
+            )
+        }
+    </div>
+
+    <div
+        class="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700"
+    >
+        Próximo paso (cuando toque): añadir acciones para <b>crear/editar</b> categorías
+        y reordenar <b>sortOrder</b> sin tocar el catálogo.
+    </div>
+</SiteLayout>

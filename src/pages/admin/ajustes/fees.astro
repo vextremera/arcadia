@@ -2,29 +2,67 @@
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, AppSetting, eq } from "astro:db";
 
-const DEFAULT_FEES = { deliveryFeeCents: 250 };
+// ⚠️ Nota: el checkout usa la key "deliveryFee" (value: { cents }).
+// Esta pantalla existía con key "fees" (value: { deliveryFeeCents }).
+// Leemos ambas para compatibilidad, pero el guardado se unifica a "deliveryFee".
 
-const [row] = await db
+const DEFAULT_DELIVERY_FEE = { cents: 250 };
+
+const [rowDelivery] = await db
+  .select({ value: AppSetting.value })
+  .from(AppSetting)
+  .where(eq(AppSetting.key, "deliveryFee"))
+  .limit(1);
+
+const [rowLegacy] = await db
   .select({ value: AppSetting.value })
   .from(AppSetting)
   .where(eq(AppSetting.key, "fees"))
   .limit(1);
 
-const fees = (row?.value ?? DEFAULT_FEES) as typeof DEFAULT_FEES;
-const deliveryFeeEur = ((fees.deliveryFeeCents ?? 0) / 100).toFixed(2);
+const deliveryFee = (rowDelivery?.value ??
+  (rowLegacy?.value &&
+  typeof (rowLegacy.value as any)?.deliveryFeeCents === "number"
+    ? { cents: Number((rowLegacy.value as any).deliveryFeeCents) }
+    : DEFAULT_DELIVERY_FEE)) as typeof DEFAULT_DELIVERY_FEE;
+
+const deliveryFeeEur = ((deliveryFee.cents ?? 0) / 100).toFixed(2);
 ---
 
 <SiteLayout title="Tarifas · Admin · Arcadia">
   <h1 class="text-2xl font-semibold tracking-tight">Tarifas</h1>
 
-  <form class="mt-6 space-y-4 rounded-2xl border border-zinc-200 p-5" method="post" action="/api/admin/settings/fees">
+  <form
+    class="mt-6 space-y-4 rounded-2xl border border-zinc-200 p-5"
+    method="post"
+    action="/api/admin/settings/fees"
+  >
     <div>
       <label class="text-sm font-medium">Delivery fee (EUR)</label>
-      <input class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm" name="deliveryFeeEur" value={deliveryFeeEur} />
-      <p class="mt-1 text-xs text-zinc-600">Se aplica solo a pedidos DELIVERY.</p>
+      <input
+        class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
+        name="deliveryFeeEur"
+        value={deliveryFeeEur}
+      />
+      <p class="mt-1 text-xs text-zinc-600">
+        Se aplica solo a pedidos DELIVERY.
+      </p>
+      {
+        rowLegacy && !rowDelivery ? (
+          <p class="mt-2 text-xs text-amber-800">
+            Detectado ajuste antiguo (
+            <code class="rounded bg-amber-50 px-1">fees</code>). Al guardar, se
+            migrará al ajuste nuevo (
+            <code class="rounded bg-amber-50 px-1">deliveryFee</code>).
+          </p>
+        ) : null
+      }
     </div>
 
-    <button class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+    <button
+      class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+      type="submit"
+    >
       Guardar
     </button>
   </form>

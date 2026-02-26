@@ -15,18 +15,33 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
   const deliveryFeeEur = String(form.get("deliveryFeeEur") ?? "0");
-  const value = { deliveryFeeCents: parseEurToCents(deliveryFeeEur) };
+  const cents = parseEurToCents(deliveryFeeEur);
+  const value = { cents };
 
   const [existing] = await db
+    .select({ key: AppSetting.key })
+    .from(AppSetting)
+    .where(eq(AppSetting.key, "deliveryFee"))
+    .limit(1);
+
+  if (existing) {
+    await db.update(AppSetting).set({ value }).where(eq(AppSetting.key, "deliveryFee"));
+  } else {
+    await db.insert(AppSetting).values({ key: "deliveryFee", value });
+  }
+
+  // Compatibilidad: si existe el ajuste antiguo "fees", lo mantenemos sincronizado.
+  const [legacy] = await db
     .select({ key: AppSetting.key })
     .from(AppSetting)
     .where(eq(AppSetting.key, "fees"))
     .limit(1);
 
-  if (existing) {
-    await db.update(AppSetting).set({ value }).where(eq(AppSetting.key, "fees"));
-  } else {
-    await db.insert(AppSetting).values({ key: "fees", value });
+  if (legacy) {
+    await db
+      .update(AppSetting)
+      .set({ value: { deliveryFeeCents: cents } })
+      .where(eq(AppSetting.key, "fees"));
   }
 
   return context.redirect("/admin/ajustes/fees");

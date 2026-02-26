@@ -1,58 +1,37 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-
-type CartLine = {
-  lineId: string;
-  productId: number;
-  name: string;
-  imageUrl?: string | null;
-
-  variantId?: number;
-  variantName?: string | null;
-
-  qty: number;
-
-  unitPriceCents: number;
-  lineTotalCents: number;
-
-  modifiers: Array<{ id: number; name: string; priceDeltaCents: number }>;
-  ingredientsAdded: Array<{ id: number; name: string; priceDeltaCents: number }>;
-  ingredientsRemoved: Array<{ id: number; name: string }>;
-};
-
-type CartResponse = {
-  currency: "EUR";
-  items: CartLine[];
-  subtotalCents: number;
-  count: number;
-};
+import type { CartResponse } from "./types";
+import {
+  clearCart as clearCartServer,
+  getCartSnapshot,
+  refreshCart,
+  removeLine as removeLineServer,
+  setQty as setQtyServer,
+  subscribeCart,
+} from "./cartClient";
 
 function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "content-type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<T>;
-}
-
 export default function CartDrawer() {
   const [open, setOpen] = useState(false);
-  const [cart, setCart] = useState<CartResponse | null>(null);
+  const [cart, setCart] = useState<CartResponse | null>(getCartSnapshot());
   const [loading, setLoading] = useState(false);
 
   async function loadCart() {
     setLoading(true);
     try {
-      const data = await api<CartResponse>("/api/cart");
+      const data = await refreshCart();
       setCart(data);
     } finally {
       setLoading(false);
     }
   }
+
+  // Mantener el drawer sincronizado con el snapshot global del carrito.
+  useEffect(() => {
+    return subscribeCart(() => setCart(getCartSnapshot()));
+  }, []);
 
   // Eventos globales para abrir/cerrar (útil para header button)
   useEffect(() => {
@@ -83,21 +62,15 @@ export default function CartDrawer() {
 
   async function setQty(lineId: string, qty: number) {
     const safeQty = Math.max(1, Math.min(99, qty));
-    await api("/api/cart/set-qty", {
-      method: "POST",
-      body: JSON.stringify({ lineId, qty: safeQty }),
-    });
-    await loadCart();
+    await setQtyServer(lineId, safeQty);
   }
 
   async function removeLine(lineId: string) {
-    await api("/api/cart/remove", { method: "POST", body: JSON.stringify({ lineId }) });
-    await loadCart();
+    await removeLineServer(lineId);
   }
 
   async function clearCart() {
-    await api("/api/cart/clear", { method: "POST" });
-    await loadCart();
+    await clearCartServer();
   }
 
   if (!open) return null;
@@ -136,15 +109,10 @@ export default function CartDrawer() {
 
                     <div class="min-w-0 flex-1">
                       <div class="truncate text-sm font-semibold">{it.name}</div>
-                      {it.variantName ? (
-                        <div class="text-xs text-zinc-600">{it.variantName}</div>
-                      ) : null}
+                      {it.variantName ? <div class="text-xs text-zinc-600">{it.variantName}</div> : null}
 
-                      <div class="mt-1 text-xs text-zinc-600">
-                        {money(it.unitPriceCents)} / ud
-                      </div>
+                      <div class="mt-1 text-xs text-zinc-600">{money(it.unitPriceCents)} / ud</div>
 
-                      {/* Modificadores (extras tipo pan/salsas) */}
                       {it.modifiers?.length ? (
                         <div class="mt-2 text-xs text-zinc-600">
                           <span class="font-semibold">Extras:</span>{" "}
@@ -154,7 +122,6 @@ export default function CartDrawer() {
                         </div>
                       ) : null}
 
-                      {/* Ingredientes quitados */}
                       {it.ingredientsRemoved?.length ? (
                         <div class="mt-2 text-xs text-zinc-600">
                           <span class="font-semibold">Sin:</span>{" "}
@@ -162,7 +129,6 @@ export default function CartDrawer() {
                         </div>
                       ) : null}
 
-                      {/* Ingredientes añadidos */}
                       {it.ingredientsAdded?.length ? (
                         <div class="mt-1 text-xs text-zinc-600">
                           <span class="font-semibold">Añadido:</span>{" "}
@@ -171,6 +137,8 @@ export default function CartDrawer() {
                             .join(", ")}
                         </div>
                       ) : null}
+
+                      {it.notes ? <div class="mt-2 text-xs text-zinc-600">Nota: {it.notes}</div> : null}
                     </div>
                   </div>
 
@@ -230,9 +198,8 @@ export default function CartDrawer() {
             </button>
 
             <a
-              class={`flex-1 rounded-xl px-4 py-2 text-center text-sm font-semibold text-white ${
-                items.length === 0 ? "bg-zinc-400 pointer-events-none" : "bg-zinc-900"
-              }`}
+              class={`flex-1 rounded-xl px-4 py-2 text-center text-sm font-semibold text-white ${items.length === 0 ? "bg-zinc-400 pointer-events-none" : "bg-zinc-900"
+                }`}
               href="/checkout"
             >
               Finalizar

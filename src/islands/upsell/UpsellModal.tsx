@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
+import { addToCart } from "@/islands/cart/cartClient";
 
 type UpsellProduct = {
   id: number;
@@ -45,28 +46,17 @@ export default function UpsellModal() {
   async function quickAdd(productId: number) {
     setBusyId(productId);
     try {
-      const res = await fetch("/api/cart/add", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          productId,
-          qty: 1,
-          // sin personalización:
-          modifierOptionIds: [],
-          addedIngredientIds: [],
-          removedIngredientIds: [],
-        }),
+      // Añadido “rápido”: sin personalización
+      await addToCart({
+        productId,
+        qty: 1,
+        modifierOptionIds: [],
+        addedIngredientIds: [],
+        removedIngredientIds: [],
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(data?.message || data?.error || "No se pudo añadir");
-        return;
-      }
-
-      // refrescar UI del carrito
-      window.dispatchEvent(new Event("arcadia:cart:updated"));
       setOpen(false);
+    } catch (err) {
+      alert((err as any)?.message || "No se pudo añadir");
     } finally {
       setBusyId(null);
     }
@@ -87,9 +77,7 @@ export default function UpsellModal() {
         <div class="flex items-start justify-between gap-3">
           <div>
             <div class="text-xl font-semibold tracking-tight">¿Quieres algo más?</div>
-            <div class="mt-1 text-sm text-zinc-600">
-              Añade algo rápido al carrito.
-            </div>
+            <div class="mt-1 text-sm text-zinc-600">Añade algo rápido al carrito.</div>
           </div>
 
           <button
@@ -127,9 +115,8 @@ export default function UpsellModal() {
                   </div>
 
                   <button
-                    class={`mt-3 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${
-                      busyId === p.id ? "opacity-60 pointer-events-none" : ""
-                    }`}
+                    class={`mt-3 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${busyId === p.id ? "opacity-60 pointer-events-none" : ""
+                      }`}
                     type="button"
                     onClick={() => quickAdd(p.id)}
                   >
