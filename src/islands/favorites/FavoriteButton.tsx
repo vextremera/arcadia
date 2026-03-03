@@ -25,11 +25,15 @@ async function loadFavIds(): Promise<Set<number>> {
 
 type Props = {
   productId: number;
-  // opcional por si quieres hidratar desde server más adelante
   initial?: boolean;
+  /**
+   * "button" = estilo cuadrado con borde
+   * "icon"   = corazón pequeño inline (para tarjetas /pedir)
+   */
+  variant?: "button" | "icon";
 };
 
-export default function FavoriteButton({ productId, initial }: Props) {
+export default function FavoriteButton({ productId, initial, variant = "button" }: Props) {
   const [ready, setReady] = useState(false);
   const [fav, setFav] = useState<boolean>(!!initial);
   const [busy, setBusy] = useState(false);
@@ -57,7 +61,6 @@ export default function FavoriteButton({ productId, initial }: Props) {
       });
 
       if (!res.ok) {
-        // Si no está logueado como CUSTOMER, mostramos mensaje simple
         if (res.status === 401) {
           window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
           return;
@@ -71,30 +74,53 @@ export default function FavoriteButton({ productId, initial }: Props) {
       const nextFav = !!data?.favorited;
       setFav(nextFav);
 
-      // actualizar cache global
       const set = await loadFavIds();
       if (nextFav) set.add(productId);
       else set.delete(productId);
 
-      // por si otras partes quieren reaccionar (ej: /cuenta/favoritos)
-      window.dispatchEvent(new CustomEvent("arcadia:favorites:updated"));
+      window.dispatchEvent(
+        new CustomEvent("arcadia:favorites:updated", {
+          detail: { productId, favorited: nextFav },
+        })
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  // Si no está ready, lo mostramos igual pero “apagado”
+  const common = `${busy ? "opacity-60 pointer-events-none" : ""} ${!ready ? "opacity-80" : ""}`;
+
+  if (variant === "icon") {
+    // ❤️ más grande, manteniendo área táctil cómoda
+    return (
+      <button
+        type="button"
+        aria-label={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
+        title={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
+        onClick={(e) => {
+          e.stopPropagation();
+          void toggle();
+        }}
+        class={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${common} ${fav ? "text-pink-500 hover:text-pink-600" : "text-zinc-400 hover:text-zinc-600"
+          }`}
+      >
+        <span class="text-2xl leading-none">{fav ? "♥" : "♡"}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       aria-label={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
       title={fav ? "Quitar de favoritos" : "Añadir a favoritos"}
-      onClick={toggle}
-      class={`grid h-10 w-10 place-items-center rounded-xl border ${
-        fav ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-900"
-      } ${busy ? "opacity-60 pointer-events-none" : ""} ${!ready ? "opacity-80" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        void toggle();
+      }}
+      class={`grid h-10 w-10 place-items-center rounded-xl border ${fav ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-900"
+        } ${common}`}
     >
-      {/* corazón simple (sin librerías) */}
       <span class="text-base leading-none">{fav ? "♥" : "♡"}</span>
     </button>
   );

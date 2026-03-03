@@ -2,6 +2,7 @@
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, UserProfile, LoyaltyTier, eq } from "astro:db";
 import AccountPanel from "@/islands/account/AccountPanel";
+import FavoritesCount from "@/islands/favorites/FavoritesCount";
 
 const user = Astro.locals.user;
 
@@ -10,7 +11,10 @@ let tierName: string | null = null;
 
 if (user) {
   const [profile] = await db
-    .select({ pointsBalance: UserProfile.pointsBalance, tierId: UserProfile.tierId })
+    .select({
+      pointsBalance: UserProfile.pointsBalance,
+      tierId: UserProfile.tierId,
+    })
     .from(UserProfile)
     .where(eq(UserProfile.userId, user.id))
     .limit(1);
@@ -42,7 +46,9 @@ if (user) {
       <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
         <div class="text-xs font-semibold text-zinc-600">Puntos</div>
         <div class="mt-1 text-2xl font-black">{points}</div>
-        <div class="mt-1 text-xs text-zinc-600">Se suman al pagar/entregar.</div>
+        <div class="mt-1 text-xs text-zinc-600">
+          Se suman al pagar/entregar.
+        </div>
       </div>
 
       <div class="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
@@ -64,10 +70,11 @@ if (user) {
         </a>
 
         <a
-          class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+          class="inline-flex items-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
           href="/cuenta/favoritos"
         >
-          Favoritos
+          <span>Favoritos</span>
+          <FavoritesCount client:load />
         </a>
       </div>
     </div>
