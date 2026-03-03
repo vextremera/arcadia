@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
-import FavoriteButton from "@/islands/favorites/FavoriteButton";
+import FavoriteHoverButton from "@/islands/favorites/FavoriteHoverButton";
 
 type MenuProduct = {
   id: number;
@@ -186,7 +186,6 @@ export default function CartaKiosk() {
                                     {displayName}
                                   </h3>
 
-                                  <FavoriteButton productId={p.id} variant="icon" />
                                 </div>
 
                                 {ingredientsText ? (
@@ -215,6 +214,8 @@ export default function CartaKiosk() {
                                 ) : (
                                   <div class="h-7" />
                                 )}
+
+                                <FavoriteHoverButton productId={p.id} variant="icon" />
                               </div>
                             </div>
 
