@@ -1,33 +1,30 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
+import NegativeLogo from "public/assets/Arcadia_Logo_Only_x500.jpg";
 const user = Astro.locals.user;
 const pathname = Astro.url.pathname;
 const next = encodeURIComponent(pathname);
-const isHome = pathname === "/";
 ---
 
-<header
-  id="site-header"
-  data-solid={isHome ? "false" : "true"}
-  class="sticky top-0 z-40"
->
+<header id="site-header" class="sticky top-0 z-40">
   <div
-    class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4"
+    class="mx-auto flex w-full max-w-340 items-center justify-between px-2 py-4"
   >
-    <a href="/" class="text-xl font-black tracking-[0.28em]">ARCADIA</a>
+    <a href="/" class="text-xl font-black tracking-[0.28em]">
+      <img src={NegativeLogo.src} alt="Arcadia Logo" class="h-9" />
+    </a>
 
     <nav
       class="hidden items-center gap-10 text-sm font-semibold text-zinc-700 lg:flex"
     >
       <a class="hover:text-zinc-900" href="/#sobre">Sobre Nosotros</a>
       <a class="hover:text-zinc-900" href="/pedir">Carta</a>
-      <a class="hover:text-zinc-900" href="/#reservas">Reservas</a>
     </nav>
 
     <div class="flex items-center gap-3">
       <a
         href="/pedir"
-        class="rounded-full bg-[#7b1f1f] px-5 py-2 text-sm font-semibold text-white hover:bg-[#6a1919]"
+        class="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent-hover"
       >
         A Domicilio
       </a>
@@ -37,21 +34,41 @@ const isHome = pathname === "/";
       {
         user ? (
           <a
-            class="grid h-10 w-10 place-items-center rounded-full border border-zinc-300 bg-white hover:bg-zinc-50"
+            class="grid h-10 w-10 place-items-center rounded-full cursor-pointer hover:-translate-y-0.5 active:translate-y-0 transition-transform"
             href="/cuenta"
             aria-label="Cuenta"
             title="Cuenta"
           >
-            <span class="text-sm">👤</span>
+            <span class="text-sm">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="24px"
+                viewBox="0 -960 960 960"
+                width="24px"
+                fill="#1f1f1f"
+              >
+                <path d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm296.5-343.5Q560-607 560-640t-23.5-56.5Q513-720 480-720t-56.5 23.5Q400-673 400-640t23.5 56.5Q447-560 480-560t56.5-23.5ZM480-640Zm0 400Z" />
+              </svg>
+            </span>
           </a>
         ) : (
           <a
-            class="grid h-10 w-10 place-items-center rounded-full border border-zinc-300 bg-white hover:bg-zinc-50"
+            class="grid h-10 w-10 place-items-center rounded-full cursor-pointer hover:-translate-y-0.5 active:translate-y-0 transition-transform"
             href={`/login?next=${next}`}
             aria-label="Entrar"
             title="Entrar"
           >
-            <span class="text-sm">👤</span>
+            <span class="text-sm">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="24px"
+                viewBox="0 -960 960 960"
+                width="24px"
+                fill="#1f1f1f"
+              >
+                <path d="M367-527q-47-47-47-113t47-113q47-47 113-47t113 47q47 47 47 113t-47 113q-47 47-113 47t-113-47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm296.5-343.5Q560-607 560-640t-23.5-56.5Q513-720 480-720t-56.5 23.5Q400-673 400-640t23.5 56.5Q447-560 480-560t56.5-23.5ZM480-640Zm0 400Z" />
+              </svg>
+            </span>
           </a>
         )
       }

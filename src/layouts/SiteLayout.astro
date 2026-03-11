@@ -40,9 +40,8 @@ const mainClass =
     <title>{title}</title>
 
     <style is:global>
-      /* Header: por defecto sólido */
       #site-header {
-        background: rgba(251, 250, 247, 0.9);
+        background: #fffffb;
         border-bottom: 1px solid rgb(228 228 231);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
         backdrop-filter: blur(10px);
@@ -52,15 +51,6 @@ const mainClass =
           box-shadow 260ms ease,
           border-color 260ms ease,
           backdrop-filter 260ms ease;
-      }
-
-      /* Cuando estamos “dentro del hero”: transparente */
-      #site-header[data-solid="false"] {
-        background: transparent;
-        border-bottom-color: transparent;
-        box-shadow: none;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
       }
     </style>
   </head>
@@ -78,54 +68,5 @@ const mainClass =
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
     <UpsellModal client:load />
-
-    <!-- ✅ Header transparente SOLO si hay un hero explícito -->
-    <script is:inline>
-      {
-        String.raw`
-      (() => {
-        const init = () => {
-          const header = document.getElementById("site-header");
-          if (!header) return;
-
-          // Solo activamos el modo "hero" si existe un elemento marcado.
-          const hero = document.querySelector("[data-hero]");
-          if (!hero) {
-            header.dataset.solid = "true";
-            return;
-          }
-
-          const update = () => {
-            const headerH = header.getBoundingClientRect().height || 84;
-            const rect = hero.getBoundingClientRect();
-            const inHero = rect.bottom > headerH + 2;
-            header.dataset.solid = inHero ? "false" : "true";
-          };
-
-          update();
-
-          let ticking = false;
-          const onScroll = () => {
-            if (ticking) return;
-            ticking = true;
-            requestAnimationFrame(() => {
-              update();
-              ticking = false;
-            });
-          };
-
-          window.addEventListener("scroll", onScroll, { passive: true });
-          window.addEventListener("resize", onScroll, { passive: true });
-        };
-
-        if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", init, { once: true });
-        } else {
-          init();
-        }
-      })();
-      `;
-      }
-    </script>
   </body>
 </html>

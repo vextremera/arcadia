@@ -74,6 +74,19 @@ async function getPaymentsSettings() {
   return (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 }
 
+type OrderItemInsert = {
+  orderId: number;
+  productId: number | null;
+  variantId: number | null;
+  nameSnapshot: string;
+  variantSnapshot: string | null;
+  unitPriceCents: number;
+  qty: number;
+  modifiers: any | null;
+  lineTotalCents: number;
+  notes: string | null;
+};
+
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
 
@@ -221,6 +234,7 @@ export const POST: APIRoute = async ({ request, session }) => {
       .select({
         id: ProductVariant.id,
         productId: ProductVariant.productId,
+        name: ProductVariant.name, // ✅ para variantSnapshot
         priceDeltaCents: ProductVariant.priceDeltaCents,
         active: ProductVariant.active,
       })
@@ -259,8 +273,7 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   // Construir items snapshot
   let subtotalCents = 0;
-
-  const itemsToInsert: Array<any> = [];
+  const itemsToInsert: OrderItemInsert[] = [];
 
   for (const line of cart) {
     const p = productById.get(line.productId);
@@ -289,27 +302,27 @@ export const POST: APIRoute = async ({ request, session }) => {
     const optionDelta = chosenOptions.reduce((acc, o) => acc + (o.priceDeltaCents ?? 0), 0);
     const addedDelta = added.reduce((acc, i) => acc + (i.addPriceDeltaCents ?? 0), 0);
 
+    const qty = Math.max(1, Number(line.qty ?? 1));
     const unitCents = baseUnit + optionDelta + addedDelta;
-    const lineTotalCents = unitCents * (line.qty ?? 1);
+    const lineTotalCents = unitCents * qty;
 
     subtotalCents += lineTotalCents;
 
     itemsToInsert.push({
+      orderId: 0, // placeholder; se setea al insertar
       productId: p.id,
       variantId: v?.id ?? null,
-      qty: line.qty,
+
+      // ✅ columnas NOT NULL / snapshot real
+      nameSnapshot: p.name,
+      variantSnapshot: v?.name ?? null,
+
       unitPriceCents: unitCents,
-      lineTotalCents,
-      snapshot: {
-        product: {
-          id: p.id,
-          name: p.name,
-          priceCents: p.priceCents,
-        },
-        variant: v
-          ? { id: v.id, priceDeltaCents: v.priceDeltaCents ?? 0 }
-          : null,
-        options: chosenOptions.map((o) => ({
+      qty,
+
+      // ✅ esto reemplaza el antiguo `snapshot`
+      modifiers: {
+        modifierOptions: chosenOptions.map((o) => ({
           id: o.id,
           name: o.name,
           priceDeltaCents: o.priceDeltaCents ?? 0,
@@ -321,6 +334,8 @@ export const POST: APIRoute = async ({ request, session }) => {
         })),
         ingredientsRemoved: removed.map((r) => ({ id: r.id, name: r.name })),
       },
+
+      lineTotalCents,
       notes: null,
     });
   }
@@ -383,7 +398,7 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   let savedAddressId: number | null = null;
 
-  // ✅ Guardar dirección si procede (no rompe nada si falla: lo tratamos como best-effort)
+  // ✅ Guardar dirección si procede (best-effort)
   if (saveAddress && type === "DELIVERY" && authUser?.role === "CUSTOMER") {
     try {
       const userId = authUser.id;
@@ -409,8 +424,6 @@ export const POST: APIRoute = async ({ request, session }) => {
       };
 
       let addressId: number | null = null;
-
-      savedAddressId = addressId;
 
       if (existing.length) {
         addressId = existing[0].id;
@@ -440,18 +453,23 @@ export const POST: APIRoute = async ({ request, session }) => {
         addressId = inserted[0]?.id ?? null;
       }
 
-      // ✅ Si el usuario pidió “guardar como default”, lo aplicamos
-      // (y también si es la primera dirección, ya queda default por isDefault=true)
+      // ✅ Default si procede
       if (saveAddressDefault && addressId) {
         await db.update(Address).set({ isDefault: false }).where(eq(Address.userId, userId));
-        await db.update(Address).set({ isDefault: true }).where(and(eq(Address.userId, userId), eq(Address.id, addressId)));
+        await db
+          .update(Address)
+          .set({ isDefault: true })
+          .where(and(eq(Address.userId, userId), eq(Address.id, addressId)));
       }
+
+      // ✅ devolver id guardado (fix del bug)
+      savedAddressId = addressId;
     } catch {
-      // best-effort: no bloqueamos el pedido por fallo al guardar dirección
+      // best-effort
     }
   }
 
-  // ✅ Guardar PERFIL (best-effort): si está logueado, guardamos nombre/teléfono usados
+  // ✅ Guardar PERFIL (best-effort)
   if (saveProfile && authUser?.role === "CUSTOMER") {
     try {
       const userId = authUser.id;
@@ -483,7 +501,7 @@ export const POST: APIRoute = async ({ request, session }) => {
         await db.update(UserProfile).set({ phone: customerPhone }).where(eq(UserProfile.userId, userId));
       }
     } catch {
-      // best-effort: no bloqueamos el pedido si falla el guardado del perfil
+      // best-effort
     }
   }
 

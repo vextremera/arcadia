@@ -89,7 +89,7 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
       <div class="hidden md:block rounded-2xl border border-zinc-300 bg-white/60 p-6" />
 
       <article
-        class={`rounded-2xl border border-zinc-300 bg-white p-6 shadow-sm transition-opacity duration-200 ${fade ? "opacity-0" : "opacity-100"
+        class={`rounded-2xl border min-h-90 border-zinc-300 bg-white p-6 shadow-sm transition-opacity duration-200 ${fade ? "opacity-0" : "opacity-100"
           }`}
       >
         <div class="flex items-center gap-3">

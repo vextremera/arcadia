@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState, useRef } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
 import FavoriteHoverButton from "@/islands/favorites/FavoriteHoverButton";
@@ -93,6 +93,68 @@ export default function CartaKiosk() {
     backgroundSize: "cover",
     backgroundPosition: "center",
   };
+  const catNavRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({
+    active: false,
+    startX: 0,
+    scrollLeft: 0,
+    dragged: false,
+  });
+
+  function onCatNavPointerDown(e: PointerEvent) {
+    const el = catNavRef.current;
+    if (!el) return;
+
+    // Solo ratón (en touch ya tienes swipe nativo)
+    if (e.pointerType !== "mouse") return;
+
+    dragRef.current.active = true;
+    dragRef.current.dragged = false;
+    dragRef.current.startX = e.clientX;
+    dragRef.current.scrollLeft = el.scrollLeft;
+
+    el.setPointerCapture(e.pointerId);
+  }
+
+  function onCatNavPointerMove(e: PointerEvent) {
+    const el = catNavRef.current;
+    if (!el) return;
+    if (!dragRef.current.active) return;
+
+    const dx = e.clientX - dragRef.current.startX;
+
+    // umbral para distinguir click de arrastre
+    if (Math.abs(dx) > 6) dragRef.current.dragged = true;
+
+    el.scrollLeft = dragRef.current.scrollLeft - dx;
+  }
+
+  function endCatNavDrag(e: PointerEvent) {
+    const el = catNavRef.current;
+    if (!el) return;
+    if (!dragRef.current.active) return;
+
+    dragRef.current.active = false;
+
+    try {
+      el.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    // Reseteo del flag en el siguiente tick para no “matar” clicks legítimos
+    window.setTimeout(() => {
+      dragRef.current.dragged = false;
+    }, 0);
+  }
+
+  // Si hemos arrastrado, bloqueamos el click en los <a> (si no, navegaría sin querer)
+  function onCatNavClickCapture(e: MouseEvent) {
+    if (dragRef.current.dragged) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
 
   return (
     <div class="w-full" id="top">
@@ -122,19 +184,32 @@ export default function CartaKiosk() {
           ) : navCategories.length === 0 ? (
             <div class="text-sm text-zinc-600">No hay categorías disponibles.</div>
           ) : (
-            <nav class="arcadia-catnav flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none]">
+            <div
+              ref={catNavRef}
+              onPointerDown={onCatNavPointerDown as any}
+              onPointerMove={onCatNavPointerMove as any}
+              onPointerUp={endCatNavDrag as any}
+              onPointerCancel={endCatNavDrag as any}
+              onPointerLeave={endCatNavDrag as any}
+              onClickCapture={onCatNavClickCapture as any}
+              class={`arcadia-catnav w-full overflow-x-auto overflow-y-hidden touch-pan-x overscroll-x-contain scroll-smooth select-none [scrollbar-width:none] [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] ${dragRef.current.active ? "cursor-grabbing" : "cursor-grab"
+                }`}
+            >
               <style>{".arcadia-catnav::-webkit-scrollbar{display:none}"}</style>
 
-              {navCategories.map((c) => (
-                <a
-                  key={c.id}
-                  href={`#cat-${c.slug}`}
-                  class="whitespace-nowrap rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-                >
-                  {c.name}
-                </a>
-              ))}
-            </nav>
+              <div class="flex w-max flex-nowrap items-center gap-2 pr-6">
+                {navCategories.map((c) => (
+                  <a
+                    key={c.id}
+                    href={`#cat-${c.slug}`}
+                    draggable={false as any}
+                    class="whitespace-nowrap rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                  >
+                    {c.name}
+                  </a>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -220,7 +295,7 @@ export default function CartaKiosk() {
                             </div>
 
                             {/* Imagen */}
-                            <div class="relative h-28 w-28 sm:h-32 sm:w-32 shrink-0">
+                            <div class="relative h-40 w-40 sm:h-46 sm:w-46 shrink-0">
                               {p.imageUrl ? (
                                 <img
                                   class="h-full w-full rounded-2xl object-cover border border-zinc-200 bg-zinc-100"

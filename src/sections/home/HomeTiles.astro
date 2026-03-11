@@ -1,10 +1,9 @@
 ---
-const BOOK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="52" viewBox="0 -960 960 960" width="52" fill="#fff"><path d="M160-120v-640q0-33 23.5-56.5T240-840h520v80H240v520h520v80H240q-33 0-56.5-23.5T160-120Zm160-120v-560h560v560H320Zm80-80h400v-400H400v400Zm0 0v-400 400Z"/></svg>`;
-const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="52" viewBox="0 -960 960 960" width="52" fill="#fff"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm120-120h320v-80H320v80Zm0-160h320v-80H320v80Zm0-160h320v-80H320v80Zm-120 440v-560 560Z"/></svg>`;
+const BOOK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="72px" viewBox="0 -960 960 960" width="72px" fill="#FFFFFF"><path d="M560-564v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-600q-38 0-73 9.5T560-564Zm0 220v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-380q-38 0-73 9t-67 27Zm0-110v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-490q-38 0-73 9.5T560-454ZM260-320q47 0 91.5 10.5T440-278v-394q-41-24-87-36t-93-12q-36 0-71.5 7T120-692v396q35-12 69.5-18t70.5-6Zm260 42q44-21 88.5-31.5T700-320q36 0 70.5 6t69.5 18v-396q-33-14-68.5-21t-71.5-7q-47 0-93 12t-87 36v394Zm-40 118q-48-38-104-59t-116-21q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740q51-30 106.5-45T700-800q52 0 102 12t96 36q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-60 0-116 21t-104 59ZM280-494Z"/></svg>`;
+const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="72px" viewBox="0 -960 960 960" width="72px" fill="#FFFFFF"><path d="M240-80q-33 0-56.5-23.5T160-160v-80h-40v-80h40v-120h-40v-80h40v-120h-40v-80h40v-80q0-33 23.5-56.5T240-880h480q33 0 56.5 23.5T800-800v640q0 33-23.5 56.5T720-80H240Zm0-80h480v-640H240v80h40v80h-40v120h40v80h-40v120h40v80h-40v80Zm0 0v-640 640Zm140-120h60v-160q26-7 43-28.5t17-48.5v-163h-40v151h-30v-151h-40v151h-30v-151h-40v163q0 27 17 48.5t43 28.5v160Zm220 0h60v-400q-50 0-85 35t-35 85v120h60v160Z"/></svg>`;
 
 // Imagen real online para "CARTA"
-const cartaBg =
-  "background-image:url('https://images.unsplash.com/photo-1708388064660-40e29379e7c6?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=70&w=2200');";
+const cartaBg = "/images/general/menu-bg.webp";
 ---
 
 <section class="w-full">
@@ -12,8 +11,8 @@ const cartaBg =
     <!-- CARTA -->
     <a
       href="/pedir"
-      class="relative aspect-square w-full overflow-hidden bg-zinc-900 text-white"
-      style={cartaBg}
+      class="relative aspect-square w-full overflow-hidden border-110 border-zinc-900 text-white"
+      style={`background-image: url('${cartaBg}'); background-size: cover; background-position: center; background-repeat: no-repeat;`}
     >
       <div
         class="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.60),rgba(0,0,0,0.25))]"
@@ -27,7 +26,7 @@ const cartaBg =
       <div class="relative grid h-full w-full place-items-center">
         <div class="text-center">
           <div
-            class="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-white/10"
+            class="mx-auto grid h-20 w-20 place-items-center rounded-3xl"
             set:html={BOOK_SVG}
           />
           <div class="mt-4 text-2xl font-black tracking-wide">CARTA</div>
@@ -36,14 +35,15 @@ const cartaBg =
     </a>
 
     <!-- MENÚ -->
-    <a href="/pedir" class="relative aspect-square w-full bg-[#7b1f1f]">
+    <a
+      href="/pedir"
+      class="relative aspect-square w-full border-110 border-accent"
+    >
       <div class="relative grid h-full w-full place-items-center">
-        <div
-          class="grid w-[70%] max-w-[420px] place-items-center bg-zinc-800 aspect-square"
-        >
+        <div class="grid w-full place-items-center bg-zinc-800 aspect-square">
           <div class="text-center">
             <div
-              class="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-white/10"
+              class="mx-auto grid h-20 w-20 place-items-center rounded-3xl"
               set:html={MENU_SVG}
             />
             <div class="mt-4 text-2xl font-black tracking-wide text-white">

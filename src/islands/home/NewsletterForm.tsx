@@ -1,10 +1,7 @@
 import { useState } from "preact/hooks";
 
 const ARROW = (
-  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h12" />
-    <path d="M13 6l6 6-6 6" />
-  </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 -960 960 960" width="48px" fill="#FFFFFF"><path d="M120-160v-640l760 320-760 320Zm80-120 474-200-474-200v140l240 60-240 60v140Zm0 0v-400 400Z" /></svg>
 );
 
 export default function NewsletterForm() {
@@ -41,7 +38,7 @@ export default function NewsletterForm() {
     <div>
       <div class="flex items-center gap-5">
         <input
-          class="h-14 w-full rounded-2xl border border-white/20 bg-white px-5 text-base text-zinc-900 outline-none placeholder:text-zinc-500"
+          class="h-14 w-240 rounded-2xl border border-white/20 bg-white px-5 text-base text-zinc-900 outline-none placeholder:text-zinc-500"
           placeholder="example@correo.com"
           value={email}
           onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
@@ -52,7 +49,7 @@ export default function NewsletterForm() {
 
         <button
           type="button"
-          class={`grid h-14 w-14 place-items-center rounded-2xl text-white hover:text-white/90 ${status === "loading" ? "opacity-60 pointer-events-none" : ""
+          class={`grid h-14 w-14 place-items-center rounded-2xl cursor-pointer text-white hover:text-white/90 ${status === "loading" ? "opacity-60 pointer-events-none" : ""
             }`}
           onClick={submit}
           aria-label="Suscribirme"
