@@ -3,64 +3,38 @@
  * HERO minimal: imagen B/N + degradados hacia crema (#fbfaf7) SIN corte visible.
  * Clave: un "cream fade" inferior largo y con base sólida (último tramo 100% crema).
  */
-const bgUrl =
-  "https://images.unsplash.com/photo-1668699837445-62972bed634c?auto=format&fit=crop&fm=jpg&ixlib=rb-4.1.0&q=70&w=2600";
+import bgImage from "public/images/general/bg.webp";
 ---
 
 <section
-  class="relative w-full overflow-hidden min-h-[calc(100svh-84px)] bg-[#fbfaf7]"
+  class="relative w-full overflow-hidden min-h-screen bg-[#fbfaf7] rounded-t-[50px]"
 >
   <!-- Fondo -->
-  <div class="absolute inset-0" aria-hidden="true">
-    <!-- Imagen base B/N -->
-    <div
-      class="h-full w-full bg-cover bg-center"
-      style={`background-image:url('${bgUrl}'); filter: grayscale(100%);`}
-    >
-    </div>
-
-    <!-- Arriba: casar con header -->
-    <div
-      class="absolute inset-0 bg-[linear-gradient(180deg,rgba(251,250,247,0.92)_0%,rgba(251,250,247,0.60)_28%,rgba(251,250,247,0.18)_60%,rgba(251,250,247,0.00)_84%)]"
-    >
-    </div>
-
-    <!-- Izquierda: limpiar zona del texto -->
-    <div
-      class="absolute inset-0 bg-[linear-gradient(90deg,rgba(251,250,247,0.98)_0%,rgba(251,250,247,0.90)_34%,rgba(251,250,247,0.55)_62%,rgba(251,250,247,0.18)_82%,rgba(251,250,247,0.00)_94%)]"
-    >
-    </div>
-
-    <!-- Derecha: toque suave crema -->
-    <div
-      class="absolute inset-0 bg-[linear-gradient(270deg,rgba(251,250,247,0.40)_0%,rgba(251,250,247,0.12)_28%,rgba(251,250,247,0.00)_56%)]"
-    >
-    </div>
-
-    <!-- Viñeta suave (no afecta al final porque el fade inferior va encima) -->
-    <div
-      class="absolute inset-0 bg-[radial-gradient(circle_at_72%_38%,rgba(0,0,0,0.14),transparent_58%)]"
-    >
-    </div>
-
-    <!-- ✅ FUSIÓN SIN CORTE: tramo inferior largo + base sólida crema
-         - Importante: va el último para “aplastar” cualquier sombra/imagen al final -->
-    <div
-      class="absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(0deg,#fbfaf7_0%,#fbfaf7_42%,rgba(251,250,247,0.0)_100%)]"
-    >
-    </div>
+  <div class="absolute inset-0 bg-cover bg-center z-0" aria-hidden="true">
+    <img
+      src={bgImage.src}
+      alt="Hero background"
+      class="w-full h-full object-center"
+    />
+    <div class="absolute inset-0 bg-black opacity-60"></div>
   </div>
-
-  <!-- Contenido: SOLO “ARCADIA” abajo -->
   <div
-    class="relative mx-auto flex w-full max-w-6xl px-6 min-h-[calc(100svh-84px)] items-end"
+    class="container mx-auto px-6 pt-32 pb-48 relative z-10"
+    x-data="{ fadeIn: false }"
+    x-init="setTimeout(() => fadeIn = true, 500)"
   >
-    <div class="pb-12 sm:pb-14 lg:pb-16">
-      <div
-        class="select-none text-[56px] font-black leading-none tracking-[0.35em] text-zinc-900 sm:text-[72px] lg:text-[92px]"
+    <div
+      class="w-full transition-all duration-1000 justify-center text-center"
+      :class="fadeIn ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-10'"
+    >
+      <h1
+        class="text-2xl md:text-4xl font-bold sigmar-regular text-white leading-tight mb-6"
       >
-        ARCADIA
-      </div>
+        RESTAURANTE<br /><span
+          class="text-8xl md:text-10xl font-extrabold sigmar-regular"
+          >ARCADIA</span
+        >
+      </h1>
     </div>
   </div>
 </section>
