@@ -1,5 +1,7 @@
 ---
 import LazyMap from "@/islands/home/LazyMap";
+import TripadvisorLogo from "public/assets/logos/tripadvisor_logo.svg";
+import GoogleLogo from "public/assets/logos/google_logo.svg";
 
 const addressLines = [
   "C/ Maria Aurèlia Campmany i Farnés, nº 2",
@@ -13,6 +15,7 @@ const instagram = "@bararcadia";
 // Placeholder hasta conectar APIs
 const ratings = {
   tripadvisor: { label: "Tripadvisor", rating: 5, count: 0 },
+  google: { label: "Google", rating: 5, count: 0}
 };
 
 const mapQuery =
@@ -25,28 +28,39 @@ const mapQuery =
   <div class="mx-auto w-full max-w-340 px-6 py-12 lg:py-16">
     <div class="grid gap-6 lg:grid-cols-2">
       <div
-        class="rounded-[28px] border border-zinc-300 bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
+        class="rounded-[28px] min-h-120 border border-zinc-300 bg-white p-8 shadow-[0_10px_30px_rgba(0,0,0,0.08)]"
       >
-        <h2 class="text-3xl font-black tracking-tight sm:text-4xl">
+        <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl">
           UBICACIÓN
         </h2>
 
-        <div class="mt-4 text-sm text-zinc-700">
+        <div class="mt-4 text-md text-zinc-700">
           {addressLines.map((l) => <div>{l}</div>)}
         </div>
 
         <div class="mt-6 flex flex-wrap gap-3">
           <div
-            class="flex items-center gap-2 rounded-full bg-emerald-100 px-5 py-2 text-sm"
+            class="flex items-center gap-2 rounded-full border-2 border-emerald-600 px-4 py-2 text-md"
           >
             <span class="font-semibold text-emerald-900"
-              >{ratings.tripadvisor.label}</span
+              > <TripadvisorLogo class="inline-block size-8 mr-2" /> {ratings.tripadvisor.label}</span
             >
-            <span class="text-emerald-900">{"★".repeat(5)}</span>
+            <span class="text-emerald-900 text-[18px] tracking-widest ml-3">{"★".repeat(5)}</span>
           </div>
         </div>
 
-        <div class="mt-8 space-y-2 text-sm text-zinc-800">
+        <div class="mt-2 flex flex-wrap gap-3">
+          <div
+            class="flex items-center gap-2 rounded-full border-2 border-yellow-400 px-4 py-2 text-md"
+          >
+            <span class="font-semibold text-black"
+              > <GoogleLogo class="inline-block size-8 mr-2" /> {ratings.google.label}</span
+            >
+            <span class="text-yellow-500 text-[18px] tracking-widest ml-3">{"★".repeat(5)}</span>
+          </div>
+        </div>
+
+        <div class="mt-20 space-y-2 text-md text-zinc-800">
           <div class="flex items-center justify-between gap-4">
             <span class="text-zinc-600">Teléfono:</span>
             <span class="font-semibold">{phone}</span>

@@ -86,10 +86,9 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
 
   return (
     <div class="grid items-stretch gap-6 md:grid-cols-3">
-      <div class="hidden md:block rounded-2xl border border-zinc-300 bg-white/60 p-6" />
 
       <article
-        class={`rounded-2xl border min-h-90 border-zinc-300 bg-white p-6 shadow-sm transition-opacity duration-200 ${fade ? "opacity-0" : "opacity-100"
+        class={`rounded-2xl border min-h-120 min-w-140 border-zinc-300 bg-white p-6 shadow-sm transition-opacity duration-200 ${fade ? "opacity-0" : "opacity-100"
           }`}
       >
         <div class="flex items-center gap-3">
@@ -117,8 +116,6 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
           <span class="text-xs font-semibold text-zinc-700">{r.rating.toFixed(1)}/5</span>
         </div>
       </article>
-
-      <div class="hidden md:block rounded-2xl border border-zinc-300 bg-white/60 p-6" />
     </div>
   );
 }

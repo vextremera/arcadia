@@ -1,23 +1,9 @@
----
-import ExpandableText from "@/islands/home/ExpandableText";
-
-const aboutText = `En el Bar Restaurante Arcadia encontrarás comida casera y auténtica, como la de antes, elaborada con tiempo, maestría y cariño.
-
-Una cocina nacida de la tradición popular y la vida cotidiana, la que se cocinaba en casa y que hoy sigue viva en las cocinas de Arcadia, adaptada a los gustos actuales pero sin perder su esencia. Platos familiares y generosos, pensados tanto para comer en el local como para disfrutar en casa, gracias a nuestro servicio de entrega a domicilio.
-
-Una cocina que habla del barrio, de los productos locales y de compartir mesa. Ingredientes sencillos, preparados con maestría, seleccionados con cuidado y cocinados con respeto, primando siempre la calidad y la confianza en nuestros proveedores de toda la vida.
-
-Una cocina pensada para todos: para un desayuno tranquilo, menús de mediodía, cenas informales, tapas con amigos o para esa comida que te apetece sin tener que cocinar.
-
-Una cocina elaborada con cuidado, pero sin florituras. Accesible, casera y sin pretensiones.
-
-Y sí, nos encanta la risa, el buen ambiente y hacer que todos se sientan como en casa. Tanto si vienes a nuestro local como si vamos nosotros al tuyo, todos sois bienvenidos en Arcadia.`;
----
-
-<section id="sobre" class="scroll-mt-24">
-  <div class="mx-auto w-full max-w-6xl px-6 py-14 lg:py-18">
+<section id="sobre" class="relative rounded-t-[50px] z-20">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:pt-16 lg:pb-22">
     <div class="text-center">
-      <h2 class="text-3xl font-black tracking-tight sm:text-4xl">
+      <h2
+        class="text-3xl font-black sm:text-4xl sigmar-regular tracking-widest"
+      >
         SOBRE NOSOTROS
       </h2>
       <div class="mt-2 text-base italic text-zinc-500 sm:text-lg">
@@ -25,9 +11,17 @@ Y sí, nos encanta la risa, el buen ambiente y hacer que todos se sientan como e
       </div>
     </div>
 
-    <!-- más ancho -->
-    <div class="mx-auto mt-10 w-full max-w-5xl">
-      <ExpandableText client:load text={aboutText} />
+    <div
+      class="mx-auto mt-10 w-full max-w-5xl text-[20px] leading-relaxed text-center text-stone-900"
+    >
+      En el Bar Restaurante Arcadia encontrarás comida casera y auténtica, como
+      la de antes, elaborada con tiempo, maestría y cariño. Productos de calidad
+      y buen servicio. <br />
+      <br /> Una cocina nacida de la tradición popular y la vida cotidiana, la que
+      se cocinaba en casa y que hoy sigue viva en las cocinas de Arcadia, adaptada
+      a los gustos actuales pero sin perder su esencia. Platos familiares y generosos,
+      pensados tanto para comer en el local como para disfrutar en casa, gracias a
+      nuestro servicio de entrega a domicilio.
     </div>
   </div>
 </section>

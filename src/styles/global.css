@@ -4,3 +4,9 @@
 :root {
   color-scheme: light;
 }
+
+@theme {
+  --color-bg: #FFFFF7;
+  --color-accent: #7b1f1f;
+  --color-accent-hover: #6a1919;
+}

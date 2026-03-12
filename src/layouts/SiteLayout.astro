@@ -9,10 +9,6 @@ import UpsellModal from "@/islands/upsell/UpsellModal";
 type Props = {
   title?: string;
   variant?: "default" | "landing";
-  /**
-   * Si true, el <main> no limita ancho ni añade padding.
-   * Útil para la carta tipo "kiosk/app".
-   */
   fullWidth?: boolean;
 };
 
@@ -35,8 +31,9 @@ const mainClass =
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/ARCADIA_LOGO.svg" />
 
     <title>{title}</title>
 
@@ -45,18 +42,12 @@ const mainClass =
 
       body {
         margin: auto 20px;
+        background-color: var(--color-bg);
       }
 
       .sigmar-regular {
         font-family: "Sigmar", sans-serif;
         font-style: normal;
-      }
-
-      :root {
-        --font-family-sigmar: "Sigmar", sans-serif;
-        --color-bg: #fffffb;
-        --color-accent: #7b1f1f;
-        --color-accent-hover: #6a1919;
       }
     </style>
   </head>
@@ -70,7 +61,6 @@ const mainClass =
 
     <Footer />
 
-    <!-- Islas globales -->
     <ProductConfiguratorModal client:load />
     <CartDrawer client:load />
     <UpsellModal client:load />

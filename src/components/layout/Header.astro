@@ -1,24 +1,24 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
-import NegativeLogo from "public/assets/Arcadia_Logo_Only_x500.jpg";
+import NegativeLogo from "public/ARCADIA_LOGO.svg";
 const user = Astro.locals.user;
 const pathname = Astro.url.pathname;
 const next = encodeURIComponent(pathname);
 ---
 
-<header class="sticky top-0 z-40">
+<header class="sticky top-0 z-40 bg-bg">
   <div
     class="mx-auto flex w-full max-w-340 items-center justify-between px-2 py-4"
   >
     <a href="/" class="text-xl font-black tracking-[0.28em]">
-      <img src={NegativeLogo.src} alt="Arcadia Logo" class="h-9" />
+      <img src={NegativeLogo.src} alt="Arcadia Logo" class="h-8" />
     </a>
 
     <nav
-      class="hidden items-center gap-10 text-sm font-semibold text-zinc-700 lg:flex"
+      class="hidden items-center gap-10 text-sm font-semibold text-stone-700 lg:flex"
     >
-      <a class="hover:text-zinc-900" href="/#sobre">Sobre Nosotros</a>
-      <a class="hover:text-zinc-900" href="/pedir">Carta</a>
+      <a class="hover:text-stone-900" href="/#sobre">Sobre Nosotros</a>
+      <a class="hover:text-stone-900" href="/pedir">Carta</a>
     </nav>
 
     <div class="flex items-center gap-3">

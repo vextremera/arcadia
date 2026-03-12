@@ -1,22 +1,15 @@
----
-/**
- * HERO minimal: imagen B/N + degradados hacia crema (#fbfaf7) SIN corte visible.
- * Clave: un "cream fade" inferior largo y con base sólida (último tramo 100% crema).
- */
-import bgImage from "public/images/general/bg.webp";
----
-
 <section
-  class="relative w-full overflow-hidden min-h-screen bg-[#fbfaf7] rounded-t-[50px]"
+  class="relative h-[calc(100%+4rem)] overflow-hidden min-h-screen rounded-t-[40px]"
 >
   <!-- Fondo -->
-  <div class="absolute inset-0 bg-cover bg-center z-0" aria-hidden="true">
-    <img
-      src={bgImage.src}
-      alt="Hero background"
-      class="w-full h-full object-center"
-    />
-    <div class="absolute inset-0 bg-black opacity-60"></div>
+  <div
+    class="absolute inset-0 z-0 bg-cover bg-center"
+    style={`background-image: url('/images/general/bg.webp');`}
+    aria-hidden="true"
+  >
+    <div class="absolute inset-0 bg-black/60 z-10"></div>
+    <div class="absolute inset-x-0 bottom-0 h-10 bg-bg z-20 rounded-t-[40px]">
+    </div>
   </div>
   <div
     class="container mx-auto px-6 pt-32 pb-48 relative z-10"
@@ -28,10 +21,10 @@ import bgImage from "public/images/general/bg.webp";
       :class="fadeIn ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-10'"
     >
       <h1
-        class="text-2xl md:text-4xl font-bold sigmar-regular text-white leading-tight mb-6"
+        class="text-2xl md:text-4xl font-medium sigmar-regular text-white leading-tight mb-6"
       >
-        RESTAURANTE<br /><span
-          class="text-8xl md:text-10xl font-extrabold sigmar-regular"
+        BAR RESTAURANTE<br /><span
+          class="text-8xl md:text-10xl font-extrabold tracking-widest text-white sigmar-regular block -mt-2"
           >ARCADIA</span
         >
       </h1>
