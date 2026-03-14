@@ -45,11 +45,46 @@ export default function CartaKiosk() {
   const [addingId, setAddingId] = useState<number | null>(null);
   const [flashAddedId, setFlashAddedId] = useState<number | null>(null);
 
+  const [scrollOffset, setScrollOffset] = useState(160);
+  const catBarRef = useRef<HTMLDivElement>(null);
+
+  const [catMenuOpen, setCatMenuOpen] = useState(false);
+
+  function scrollToCategory(slug: string) {
+    const id = `cat-${slug}`;
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", `#${id}`);
+    }
+    setCatMenuOpen(false);
+  }
+
   useEffect(() => {
-    const header = document.getElementById("site-header");
-    const h = header?.getBoundingClientRect().height;
-    if (h && Number.isFinite(h)) setStickyTop(Math.ceil(h));
-  }, []);
+    if (!catMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCatMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [catMenuOpen]);
+
+  useEffect(() => {
+    const update = () => {
+      const header = document.getElementById("site-header");
+      const headerH = header?.getBoundingClientRect().height ?? 70;
+      const barH = catBarRef.current?.getBoundingClientRect().height ?? 0;
+
+      setStickyTop(Math.ceil(headerH));
+      setScrollOffset(Math.ceil(headerH + barH + 12)); // +12px aire
+    };
+
+    update();
+    requestAnimationFrame(update);
+
+    window.addEventListener("resize", update, { passive: true });
+    return () => window.removeEventListener("resize", update);
+  }, [menu.length]);
 
   useEffect(() => {
     setLoading(true);
@@ -89,72 +124,10 @@ export default function CartaKiosk() {
 
   const heroStyle = {
     backgroundImage:
-      "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/pedir-hero.jpg')",
+      "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%)",
     backgroundSize: "cover",
     backgroundPosition: "center",
   };
-  const catNavRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({
-    active: false,
-    startX: 0,
-    scrollLeft: 0,
-    dragged: false,
-  });
-
-  function onCatNavPointerDown(e: PointerEvent) {
-    const el = catNavRef.current;
-    if (!el) return;
-
-    // Solo ratón (en touch ya tienes swipe nativo)
-    if (e.pointerType !== "mouse") return;
-
-    dragRef.current.active = true;
-    dragRef.current.dragged = false;
-    dragRef.current.startX = e.clientX;
-    dragRef.current.scrollLeft = el.scrollLeft;
-
-    el.setPointerCapture(e.pointerId);
-  }
-
-  function onCatNavPointerMove(e: PointerEvent) {
-    const el = catNavRef.current;
-    if (!el) return;
-    if (!dragRef.current.active) return;
-
-    const dx = e.clientX - dragRef.current.startX;
-
-    // umbral para distinguir click de arrastre
-    if (Math.abs(dx) > 6) dragRef.current.dragged = true;
-
-    el.scrollLeft = dragRef.current.scrollLeft - dx;
-  }
-
-  function endCatNavDrag(e: PointerEvent) {
-    const el = catNavRef.current;
-    if (!el) return;
-    if (!dragRef.current.active) return;
-
-    dragRef.current.active = false;
-
-    try {
-      el.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    // Reseteo del flag en el siguiente tick para no “matar” clicks legítimos
-    window.setTimeout(() => {
-      dragRef.current.dragged = false;
-    }, 0);
-  }
-
-  // Si hemos arrastrado, bloqueamos el click en los <a> (si no, navegaría sin querer)
-  function onCatNavClickCapture(e: MouseEvent) {
-    if (dragRef.current.dragged) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
 
   return (
     <div class="w-full" id="top">
@@ -175,7 +148,8 @@ export default function CartaKiosk() {
 
       {/* Submenu categorías (sticky bajo header, full width) */}
       <div
-        class="sticky z-30 border-b border-zinc-200 bg-white/95 backdrop-blur"
+        ref={catBarRef}
+        class="sticky z-30 border-b border-zinc-200 bg-bg backdrop-blur"
         style={{ top: `${stickyTop}px` }}
       >
         <div class="w-full px-4 py-3 sm:px-10">
@@ -184,32 +158,77 @@ export default function CartaKiosk() {
           ) : navCategories.length === 0 ? (
             <div class="text-sm text-zinc-600">No hay categorías disponibles.</div>
           ) : (
-            <div
-              ref={catNavRef}
-              onPointerDown={onCatNavPointerDown as any}
-              onPointerMove={onCatNavPointerMove as any}
-              onPointerUp={endCatNavDrag as any}
-              onPointerCancel={endCatNavDrag as any}
-              onPointerLeave={endCatNavDrag as any}
-              onClickCapture={onCatNavClickCapture as any}
-              class={`arcadia-catnav w-full overflow-x-auto overflow-y-hidden touch-pan-x overscroll-x-contain scroll-smooth select-none [scrollbar-width:none] [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] ${dragRef.current.active ? "cursor-grabbing" : "cursor-grab"
-                }`}
-            >
-              <style>{".arcadia-catnav::-webkit-scrollbar{display:none}"}</style>
+            <>
+              {/* móvil: botón hamburguesa */}
+              <div class="flex items-center justify-between sm:hidden">
+                <div class="text-sm font-semibold text-zinc-700">Categorías</div>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                  aria-haspopup="dialog"
+                  aria-expanded={catMenuOpen}
+                  onClick={() => setCatMenuOpen(true)}
+                >
+                  <span>Ver</span>
+                  <span aria-hidden="true">☰</span>
+                </button>
+              </div>
 
-              <div class="flex w-max flex-nowrap items-center gap-2 pr-6">
+              {/* sm+: chips normales (wrap) */}
+              <nav class="hidden sm:flex flex-wrap items-center gap-2" aria-label="Categorías">
                 {navCategories.map((c) => (
                   <a
                     key={c.id}
                     href={`#cat-${c.slug}`}
-                    draggable={false as any}
                     class="whitespace-nowrap rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
                   >
                     {c.name}
                   </a>
                 ))}
-              </div>
-            </div>
+              </nav>
+
+              {/* sheet móvil */}
+              {catMenuOpen ? (
+                <div
+                  class="fixed inset-0 z-60 bg-black/40 sm:hidden"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Categorías"
+                  onClick={() => setCatMenuOpen(false)}
+                >
+                  <div
+                    class="fixed inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div class="flex items-center justify-between">
+                      <div class="text-base font-black">Categorías</div>
+                      <button
+                        type="button"
+                        class="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                        onClick={() => setCatMenuOpen(false)}
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+
+                    <div class="mt-3 max-h-[60vh] overflow-auto">
+                      <div class="grid gap-2">
+                        {navCategories.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            class="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-left text-sm font-semibold hover:bg-zinc-50"
+                            onClick={() => scrollToCategory(c.slug)}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -223,7 +242,7 @@ export default function CartaKiosk() {
         ) : (
           <div class="space-y-10">
             {menu.map((cat) => (
-              <section key={cat.id} id={`cat-${cat.slug}`} class="scroll-mt-40">
+              <section key={cat.id} id={`cat-${cat.slug}`} style={{ scrollMarginTop: `${scrollOffset}px` }}>
                 <div class="flex items-baseline justify-between gap-3">
                   <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">{cat.name}</h2>
                   <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
@@ -237,16 +256,24 @@ export default function CartaKiosk() {
                   <div class="mt-4 grid gap-4 md:grid-cols-2">
                     {cat.products.map((p) => {
                       const ing = p.ingredients ?? [];
-                      const ingredientsText = ing.length > 0 ? ing.join(", ") : p.description ? p.description : "";
+                      const ingredientsText =
+                        ing.length > 0 ? ing.join(", ") : p.description ? p.description : "";
 
                       const busy = addingId === p.id;
                       const flashed = flashAddedId === p.id;
                       const displayName = shortTitle(p.name);
 
+                      const imgSrc =
+                        p.imageUrl && p.imageUrl.startsWith("/")
+                          ? p.imageUrl
+                          : p.imageUrl
+                            ? `/${p.imageUrl}`
+                            : null;
+
                       return (
                         <article
                           key={p.id}
-                          class="group relative rounded-3xl border border-zinc-200 bg-white p-4 sm:p-5 transition hover:bg-zinc-50 cursor-pointer"
+                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-white p-4 transition hover:bg-zinc-50 sm:p-5"
                           onClick={() => openProduct(p.id)}
                         >
                           <div class="flex gap-4">
@@ -255,24 +282,23 @@ export default function CartaKiosk() {
                               <div class="min-w-0">
                                 <div class="flex items-center gap-2 min-w-0">
                                   <h3
-                                    class="min-w-0 truncate text-base sm:text-lg font-semibold leading-tight"
+                                    class="min-w-0 truncate text-base font-semibold leading-tight sm:text-lg"
                                     title={p.name}
                                   >
                                     {displayName}
                                   </h3>
-
                                 </div>
 
                                 {ingredientsText ? (
-                                  <p class="mt-2 text-sm text-zinc-600 line-clamp-3">{ingredientsText}</p>
+                                  <p class="mt-2 line-clamp-3 text-sm text-zinc-600">{ingredientsText}</p>
                                 ) : (
                                   <p class="mt-2 text-sm text-zinc-500">(Sin descripción)</p>
                                 )}
                               </div>
 
-                              {/* Franja inferior: precio + (futuro) alérgenos */}
-                              <div class="mt-auto pt-4 flex items-end justify-between gap-3">
-                                <div class="text-lg sm:text-xl font-black">{money(p.priceCents)}</div>
+                              {/* Franja inferior: precio + alérgenos + ❤️ */}
+                              <div class="mt-auto flex items-end justify-between gap-3 pt-4">
+                                <div class="text-lg font-black sm:text-xl">{money(p.priceCents)}</div>
 
                                 {p.allergens?.length ? (
                                   <div class="flex flex-wrap gap-2">
@@ -295,11 +321,11 @@ export default function CartaKiosk() {
                             </div>
 
                             {/* Imagen */}
-                            <div class="relative h-40 w-40 sm:h-46 sm:w-46 shrink-0">
-                              {p.imageUrl ? (
+                            <div class="relative h-40 w-40 shrink-0 sm:h-44 sm:w-44">
+                              {imgSrc ? (
                                 <img
-                                  class="h-full w-full rounded-2xl object-cover border border-zinc-200 bg-zinc-100"
-                                  src={p.imageUrl}
+                                  class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-100 object-cover"
+                                  src={imgSrc}
                                   alt={p.name}
                                   loading="lazy"
                                 />
@@ -313,14 +339,15 @@ export default function CartaKiosk() {
                                 aria-label={p.isConfigurable ? "Abrir configurador" : "Añadir al carrito"}
                                 title={p.isConfigurable ? "Personalizar" : "Añadir"}
                                 onClick={(e) => onPlusClick(e, p)}
-                                class={`absolute -top-2 -right-2 grid h-11 w-11 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition ${busy ? "opacity-70 pointer-events-none" : "hover:scale-[1.02]"
-                                  }`}
+                                class={[
+                                  "absolute -top-2 -right-2 grid h-11 w-11 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition",
+                                  busy ? "pointer-events-none opacity-70" : "hover:scale-[1.02]",
+                                ].join(" ")}
                               >
                                 <span class="text-lg font-black leading-none">{flashed ? "✓" : "+"}</span>
                               </button>
                             </div>
                           </div>
-
                         </article>
                       );
                     })}
