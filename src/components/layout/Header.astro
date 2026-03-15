@@ -18,16 +18,14 @@ const next = encodeURIComponent(pathname);
       class="hidden items-center gap-10 text-sm font-semibold text-stone-700 lg:flex"
     >
       <a class="hover:text-stone-900" href="/#sobre">Sobre Nosotros</a>
-      <a class="hover:text-stone-900" href="/pedir">Carta</a>
+      <a class="hover:text-stone-900" href="/#horarios">Horario</a>
+      <a class="hover:text-stone-900" href="/#ubicacion">Ubicación</a>
+      <a class="hover:text-stone-900" href="/carta">Carta</a>
+      <a class="hover:text-stone-900" href="/menu">Menú</a>
+      <a class="hover:text-stone-900" href="/pedir">Domicilio</a>
     </nav>
 
     <div class="flex items-center gap-3">
-      <a
-        href="/pedir"
-        class="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent-hover"
-      >
-        A Domicilio
-      </a>
 
       <CartBadge client:load />
 

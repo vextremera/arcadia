@@ -1,0 +1,235 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import MenuTabs from "@/islands/menu/MenuTabs";
+import {
+    db,
+    Menu as MenuTable,
+    MenuItem as MenuItemTable,
+    Product,
+    eq,
+    inArray,
+} from "astro:db";
+
+type MenuKind = "DIARIO" | "FESTIVO";
+type DbCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
+
+type MenuRow = {
+    id: number;
+    title: string;
+    kind: MenuKind;
+    active: boolean;
+    validFrom: Date | null;
+    validTo: Date | null;
+};
+
+type MenuItemRow = {
+    id: number;
+    menuId: number;
+    productId: number;
+    course: DbCourse;
+    sortOrder: number | null;
+};
+
+type ProductRow = {
+    id: number;
+    name: string;
+    description: string | null;
+    details: string | null;
+};
+
+function extractPriceText(title: string): string | null {
+    const m = title.match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
+    if (!m) return null;
+    return `${m[1].replace(".", ",")}€`;
+}
+
+function isWithin(
+    m: { validFrom: Date | null; validTo: Date | null },
+    now: Date,
+) {
+    if (m.validFrom && now < m.validFrom) return false;
+    if (m.validTo && now > m.validTo) return false;
+    return true;
+}
+
+function pickBest(kind: MenuKind, menus: MenuRow[], now: Date) {
+    const candidates = menus.filter((m) => m.kind === kind);
+    const within = candidates.filter((m) => isWithin(m, now));
+    const list = within.length ? within : candidates;
+    if (!list.length) return null;
+
+    return [...list].sort((a, b) => {
+        const ta = a.validFrom ? a.validFrom.getTime() : 0;
+        const tb = b.validFrom ? b.validFrom.getTime() : 0;
+        if (ta !== tb) return tb - ta;
+        return b.id - a.id;
+    })[0];
+}
+
+function courseLabel(course: DbCourse) {
+    return course === "PRIMERO"
+        ? "ENTRANTES"
+        : course === "SEGUNDO"
+          ? "PRINCIPALES"
+          : "POSTRES";
+}
+
+const heroStyle = {
+    backgroundImage:
+        "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+};
+
+// 1) menús activos
+const menusRaw = (await db
+    .select({
+        id: MenuTable.id,
+        title: MenuTable.title,
+        kind: MenuTable.kind,
+        active: MenuTable.active,
+        validFrom: MenuTable.validFrom,
+        validTo: MenuTable.validTo,
+    })
+    .from(MenuTable)
+    .where(eq(MenuTable.active, true))) as unknown as MenuRow[];
+
+const now = new Date();
+const diario = pickBest("DIARIO", menusRaw, now);
+const festivo = pickBest("FESTIVO", menusRaw, now);
+
+const activeMenus = [diario, festivo].filter(Boolean) as MenuRow[];
+const menuIds = activeMenus.map((m) => m.id);
+
+// 2) items
+const items = menuIds.length
+    ? ((await db
+          .select({
+              id: MenuItemTable.id,
+              menuId: MenuItemTable.menuId,
+              productId: MenuItemTable.productId,
+              course: MenuItemTable.course,
+              sortOrder: MenuItemTable.sortOrder,
+          })
+          .from(MenuItemTable)
+          .where(
+              inArray(MenuItemTable.menuId, menuIds),
+          )) as unknown as MenuItemRow[])
+    : [];
+
+const productIds = [...new Set(items.map((i) => i.productId))];
+const products = productIds.length
+    ? ((await db
+          .select({
+              id: Product.id,
+              name: Product.name,
+              description: Product.description,
+              details: Product.details,
+          })
+          .from(Product)
+          .where(inArray(Product.id, productIds))) as unknown as ProductRow[])
+    : [];
+
+const productById = new Map(products.map((p) => [p.id, p]));
+
+function buildMenuData(menu: MenuRow | null) {
+    if (!menu) return null;
+
+    const grouped: Record<
+        DbCourse,
+        { name: string; desc: string | null; sort: number }[]
+    > = {
+        PRIMERO: [],
+        SEGUNDO: [],
+        POSTRE: [],
+    };
+
+    const its = items
+        .filter((it) => it.menuId === menu.id)
+        .sort((a, b) => {
+            const sa = a.sortOrder ?? 0;
+            const sb = b.sortOrder ?? 0;
+            if (sa !== sb) return sa - sb;
+            return a.id - b.id;
+        });
+
+    for (const it of its) {
+        const p = productById.get(it.productId);
+        if (!p) continue;
+        const desc = (p.details ?? p.description ?? "").trim();
+        grouped[it.course].push({
+            name: p.name,
+            desc: desc || null,
+            sort: it.sortOrder ?? 0,
+        });
+    }
+
+    return {
+        id: menu.id,
+        kind: menu.kind,
+        title: menu.title,
+        priceText: extractPriceText(menu.title),
+        courses: {
+            ENTRANTES: grouped.PRIMERO.map((x) => ({
+                name: x.name,
+                desc: x.desc,
+            })),
+            PRINCIPALES: grouped.SEGUNDO.map((x) => ({
+                name: x.name,
+                desc: x.desc,
+            })),
+            POSTRES: grouped.POSTRE.map((x) => ({
+                name: x.name,
+                desc: x.desc,
+            })),
+        },
+    };
+}
+
+const diarioData = buildMenuData(diario);
+const festivoData = buildMenuData(festivo);
+---
+
+<SiteLayout title="Menú · Arcadia" fullWidth>
+    <div class="w-full" id="top">
+        {/* Cabecero (mismo estilo que /pedir) */}
+        <section
+            class="relative w-full overflow-hidden bg-zinc-900 rounded-t-[50px]"
+            style={heroStyle}
+        >
+            <div class="h-70 sm:h-150"></div>
+            <div class="absolute inset-0">
+                <div
+                    class="absolute inset-x-0 bottom-0 h-8 bg-bg z-20 rounded-t-[40px]"
+                >
+                </div>
+                <div
+                    class="flex h-full w-full items-center justify-center text-center px-4 pb-18 sm:px-10 mt-10"
+                >
+                    <div class="text-white">
+                        <div
+                            class="text-4xl sm:text-5xl font-black tracking-widest sigmar-regular"
+                        >
+                            MENÚ
+                        </div>
+                        <div
+                            class="mt-1 text-base sm:text-[20px] text-white/80"
+                        >
+                            Platos especiales seleccionados por nuestro chef.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="w-full px-4 py-2 sm:px-10">
+            <div class="mx-auto w-full max-w-4xl">
+                <MenuTabs
+                    client:load
+                    diario={diarioData}
+                    festivo={festivoData}
+                />
+            </div>
+        </div>
+    </div>
+</SiteLayout>

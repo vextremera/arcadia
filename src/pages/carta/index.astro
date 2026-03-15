@@ -1,22 +1,166 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
-import { getActiveCategories } from "@/features/catalog/data/categories";
-const categories = await getActiveCategories();
+import { db, Category, Product, eq } from "astro:db";
+
+type RowCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  sortOrder: number;
+};
+
+type RowProduct = {
+  id: number;
+  categoryId: number;
+  name: string;
+  description: string | null;
+  details: string | null;
+  priceCents: number;
+};
+
+function money(cents: number) {
+  return `${(cents / 100).toFixed(2)} €`;
+}
+
+const categories = (await db
+  .select({
+    id: Category.id,
+    name: Category.name,
+    slug: Category.slug,
+    sortOrder: Category.sortOrder,
+  })
+  .from(Category)
+  .where(eq(Category.active, true))
+  .orderBy(Category.sortOrder)) as RowCategory[];
+
+const products = (await db
+  .select({
+    id: Product.id,
+    categoryId: Product.categoryId,
+    name: Product.name,
+    description: Product.description,
+    details: Product.details,
+    priceCents: Product.priceCents,
+  })
+  .from(Product)
+  .where(eq(Product.active, true))
+  .orderBy(Product.name)) as RowProduct[];
+
+const productsByCategory = new Map<number, RowProduct[]>();
+for (const p of products) {
+  const arr = productsByCategory.get(p.categoryId) ?? [];
+  arr.push(p);
+  productsByCategory.set(p.categoryId, arr);
+}
+
+const NUMERIC_ORDER_CATEGORIES = new Set(["platos-combinados", "platos-infantiles"]);
+
+function leadingNumber(name: string): number | null {
+  // Soporta: "1.- ...", "15.- ...", "101: ..."
+  const m = name.trim().match(/^(\d+)\s*(?:[.: -]|-)/);
+  return m ? Number(m[1]) : null;
+}
+
+function sortProductsForCategory(catSlug: string, prods: RowProduct[]) {
+  if (!NUMERIC_ORDER_CATEGORIES.has(catSlug)) return prods;
+
+  return [...prods].sort((a, b) => {
+    const na = leadingNumber(a.name);
+    const nb = leadingNumber(b.name);
+
+    if (na != null && nb != null) return na - nb;
+    if (na != null) return -1;
+    if (nb != null) return 1;
+
+    return a.name.localeCompare(b.name, "es");
+  });
+}
+
+const menu = categories
+  .map((c) => ({
+    ...c,
+    products: sortProductsForCategory(c.slug, productsByCategory.get(c.id) ?? []),
+  }))
+  .filter((c) => c.products.length > 0);
+
+const heroStyle = {
+  backgroundImage:
+    "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+};
 ---
 
-<SiteLayout title="Carta · Arcadia">
-  <h1 class="text-2xl font-semibold tracking-tight">Carta</h1>
-  <p class="mt-1 text-zinc-600">Elige una categoría:</p>
+<SiteLayout title="Carta · Arcadia" fullWidth>
+  <div class="w-full" id="top">
+    {/* Cabecero (igual estética que /pedir) */}
+    <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-[50px]" style={heroStyle}>
+      <div class="h-70 sm:h-150" />
+      <div class="absolute inset-0">
+        <div class="absolute inset-x-0 bottom-0 h-8 bg-bg z-20 rounded-t-[40px]" />
+        <div class="flex h-full w-full items-center justify-center text-center px-4 pb-18 sm:px-10 mt-10">
+            <div class="text-white">
+              <div class="text-4xl sm:text-5xl font-black tracking-widest sigmar-regular">CARTA</div> 
+              <div class="mt-1 text-base sm:text-[20px] text-white/80">
+                Consulta nuestra carta organizada por categorías.
+              </div>
+            </div>
+          </div>
+      </div>
+    </section>
 
-  <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    {categories.map((c) => (
-      <a
-        href={`/carta/${c.slug}`}
-        class="rounded-2xl border border-zinc-200 p-5 hover:bg-zinc-50"
-      >
-        <div class="text-lg font-semibold">{c.name}</div>
-        <div class="mt-1 text-sm text-zinc-600">Ver productos</div>
-      </a>
-    ))}
+    {/* Contenido */}
+    <div class="w-full px-4 py-10 sm:px-10">
+      <div class="mx-auto w-full max-w-5xl">
+        {menu.length === 0 ? (
+          <div class="text-sm text-zinc-600">No hay productos disponibles.</div>
+        ) : (
+          <div class="space-y-12">
+            {menu.map((cat) => (
+              <section id={`cat-${cat.slug}`} class="scroll-mt-24">
+                <div class="flex items-baseline justify-between gap-4">
+                  <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">
+                    {cat.name}
+                  </h2>
+                  <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
+                    ↑ arriba
+                  </a>
+                </div>
+
+                <div class="mt-5 divide-y divide-zinc-200/70 rounded-3xl border border-zinc-200 bg-bg shadow-sm">
+                  {cat.products.map((p) => {
+                    const desc = (p.details ?? p.description ?? "").trim();
+
+                    return (
+                      <div class="px-5 py-4 sm:px-6">
+                        <div class="flex items-baseline gap-3">
+                          {/* izquierda: nombre + descripción */}
+                          <div class="min-w-0">
+                            <div class="font-semibold text-zinc-900">{p.name}</div>
+                            {desc ? (
+                              <div class="mt-1 text-sm text-zinc-600 line-clamp-2">
+                                {desc}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {/* línea punteada hasta el precio (mejor en sm+) */}
+                          <div class="hidden sm:block flex-1 border-b border-dotted border-zinc-300/80 -translate-y-0.5" aria-hidden="true" />
+
+                          {/* derecha: precio */}
+                          <div class="shrink-0 font-semibold text-zinc-900 tabular-nums">
+                            {money(p.priceCents)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   </div>
 </SiteLayout>

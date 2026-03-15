@@ -1,21 +1,4 @@
 ---
-import SiteLayout from "@/layouts/SiteLayout.astro";
-import CategoriaCarta from "@/sections/carta/CategoriaCarta.astro";
-import { getCategoryBySlug } from "@/features/catalog/data/categories";
-
 const slug = Astro.params.categoria!;
-const category = await getCategoryBySlug(slug);
-
-if (!category) {
-  return new Response("Categoría no encontrada", { status: 404 });
-}
+return Astro.redirect(`/carta#cat-${slug}`, 302);
 ---
-
-<SiteLayout title={`${category.name} · Arcadia`}>
-  <div class="flex items-baseline justify-between gap-4">
-    <h1 class="text-2xl font-semibold tracking-tight">{category.name}</h1>
-    <a class="text-sm text-zinc-600 hover:underline" href="/carta">← Volver</a>
-  </div>
-
-  <CategoriaCarta categoryId={category.id} />
-</SiteLayout>

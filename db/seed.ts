@@ -18,6 +18,7 @@ import {
   OrderItem,
   Payment,
   Refund,
+  Menu,
   MenuItem,
   Ingredient,
   ProductIngredient,
@@ -117,6 +118,7 @@ async function buildProductImageIndex() {
 }
 
 const CATEGORY_PREFIX: Record<string, string> = {
+  "menu-del-dia": "menu",
   "platos-combinados": "plato-combinado",
   tapas: "", // sin prefijo, normalmente no hay imágenes con "tapa-"
   croquetas: "croquetas",
@@ -279,6 +281,7 @@ export default async function seed() {
   // -----------------------
   // Limpieza mínima idempotente (orden FK)
   // -----------------------
+  await db.delete(Menu);
   await db.delete(MenuItem);
   await db.delete(Refund);
   await db.delete(Payment);
@@ -344,7 +347,7 @@ export default async function seed() {
 
     console.log(`✅ Seed: creado admin ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
   } else {
-    console.log(`ℹ️ Seed: admin ya existe (${ADMIN_EMAIL})`);
+    // console.log(`ℹ️ Seed: admin ya existe (${ADMIN_EMAIL})`);
   }
 
   // -----------------------
@@ -360,6 +363,18 @@ export default async function seed() {
       imageUrl: null,
     }))
   );
+
+  // ✅ Categoría interna para productos de menú (NO aparece en /carta ni /pedir)
+  const MENU_CATEGORY_ID = 16;
+
+  await db.insert(Category).values({
+    id: MENU_CATEGORY_ID,
+    name: "Menú del día",
+    slug: "menu-del-dia",
+    sortOrder: 9999,
+    active: false,
+    imageUrl: null,
+  });
 
   // -----------------------
   // Alérgenos (14)
@@ -574,7 +589,7 @@ export default async function seed() {
   await db.insert(Product).values(productRows);
 
   const withImg = productRows.filter((x) => !!x.imageUrl).length;
-  console.log(`🖼️ Seed (parte2): imágenes asignadas: ${withImg}/${productRows.length}`);
+  // console.log(`🖼️ Seed (parte2): imágenes asignadas: ${withImg}/${productRows.length}`);
 
   // ----------------------------------------------------------
   // ProductIngredient
@@ -631,9 +646,9 @@ export default async function seed() {
     await db.insert(ProductAllergen).values(paRows);
   }
 
-  console.log(`✅ Seed (parte2): productos insertados: ${productRows.length}`);
-  console.log(`✅ Seed (parte2): ingredientes insertados: ${ingredientRows.length}`);
-  console.log(`✅ Seed (parte2): relaciones producto-alérgeno: ${paRows.length}`);
+  // console.log(`✅ Seed (parte2): productos insertados: ${productRows.length}`);
+  // console.log(`✅ Seed (parte2): ingredientes insertados: ${ingredientRows.length}`);
+  // console.log(`✅ Seed (parte2): relaciones producto-alérgeno: ${paRows.length}`);
 
   // ==========================================================
   // PART 3/?? — Tapas + Croquetas + Montaditos
@@ -1017,7 +1032,7 @@ export default async function seed() {
   await db.insert(Product).values(productRows3);
 
   const withImg3 = productRows3.filter((x) => !!x.imageUrl).length;
-  console.log(`🖼️ Seed (parte3): imágenes asignadas: ${withImg3}/${productRows3.length}`);
+  // console.log(`🖼️ Seed (parte3): imágenes asignadas: ${withImg3}/${productRows3.length}`);
 
   // ----------------------------------------------------------
   // 3) ProductIngredient (sin personalización: removable=false)
@@ -1067,9 +1082,9 @@ export default async function seed() {
 
   if (paRows3.length) await db.insert(ProductAllergen).values(paRows3);
 
-  console.log(`✅ Seed (parte3): productos insertados: ${productRows3.length}`);
-  console.log(`✅ Seed (parte3): nuevos ingredientes: ${newIngredientRows.length}`);
-  console.log(`✅ Seed (parte3): relaciones producto-alérgeno: ${paRows3.length}`);
+  // console.log(`✅ Seed (parte3): productos insertados: ${productRows3.length}`);
+  // console.log(`✅ Seed (parte3): nuevos ingredientes: ${newIngredientRows.length}`);
+  // console.log(`✅ Seed (parte3): relaciones producto-alérgeno: ${paRows3.length}`);
 
   // ==========================================================
   // PART 4/?? — Sandwiches + Wraps (ingredientes y precios del PDF)
@@ -1336,7 +1351,7 @@ export default async function seed() {
   await db.insert(Product).values(productRows4);
 
   const withImg4 = productRows4.filter((x) => !!x.imageUrl).length;
-  console.log(`🖼️ Seed (parte4): imágenes asignadas: ${withImg4}/${productRows4.length}`);
+  // console.log(`🖼️ Seed (parte4): imágenes asignadas: ${withImg4}/${productRows4.length}`);
 
   // ----------------------------------------------------------
   // 3) ProductIngredient (sandwiches/wraps: removable según isRemovableByCategory)
@@ -1389,9 +1404,9 @@ export default async function seed() {
 
   if (paRows4.length) await db.insert(ProductAllergen).values(paRows4);
 
-  console.log(`✅ Seed (parte4): productos insertados: ${productRows4.length}`);
-  console.log(`✅ Seed (parte4): nuevos ingredientes: ${newIngRows4.length}`);
-  console.log(`✅ Seed (parte4): relaciones producto-alérgeno: ${paRows4.length}`);
+  // console.log(`✅ Seed (parte4): productos insertados: ${productRows4.length}`);
+  // console.log(`✅ Seed (parte4): nuevos ingredientes: ${newIngRows4.length}`);
+  // console.log(`✅ Seed (parte4): relaciones producto-alérgeno: ${paRows4.length}`);
 
   // ==========================================================
   // PART 5/?? — Hamburguesas + Frankfurts + Platos infantiles + Ensaladas + Bebidas (simple)
@@ -1819,7 +1834,7 @@ export default async function seed() {
   await db.insert(Product).values(productRows5);
 
   const withImg5 = productRows5.filter((x) => !!x.imageUrl).length;
-  console.log(`🖼️ Seed (parte5): imágenes asignadas: ${withImg5}/${productRows5.length}`);
+  // console.log(`🖼️ Seed (parte5): imágenes asignadas: ${withImg5}/${productRows5.length}`);
 
   // ----------------------------------------------------------
   // 3) ProductIngredient
@@ -1877,9 +1892,9 @@ export default async function seed() {
 
   if (paRows5.length) await db.insert(ProductAllergen).values(paRows5);
 
-  console.log(`✅ Seed (parte5): productos insertados: ${productRows5.length}`);
-  console.log(`✅ Seed (parte5): nuevos ingredientes: ${newIngRows5.length}`);
-  console.log(`✅ Seed (parte5): relaciones producto-alérgeno: ${paRows5.length}`);
+  // console.log(`✅ Seed (parte5): productos insertados: ${productRows5.length}`);
+  // console.log(`✅ Seed (parte5): nuevos ingredientes: ${newIngRows5.length}`);
+  // console.log(`✅ Seed (parte5): relaciones producto-alérgeno: ${paRows5.length}`);
 
   // ==========================================================
   // PART 6/?? — Baguettes normales (de siempre) — 17 items
@@ -2100,7 +2115,7 @@ export default async function seed() {
   await db.insert(Product).values(productRows6);
 
   const withImg6 = productRows6.filter((x) => !!x.imageUrl).length;
-  console.log(`🖼️ Seed (parte6): imágenes asignadas: ${withImg6}/${productRows6.length}`);
+  // console.log(`🖼️ Seed (parte6): imágenes asignadas: ${withImg6}/${productRows6.length}`);
 
   // ----------------------------------------------------------
   // 3) ProductIngredient (baguettes: removable según isRemovableByCategory)
@@ -2151,10 +2166,170 @@ export default async function seed() {
 
   if (paRows6.length) await db.insert(ProductAllergen).values(paRows6);
 
-  console.log(`✅ Seed (parte6): productos insertados: ${productRows6.length}`);
-  console.log(`✅ Seed (parte6): nuevos ingredientes: ${newIngRows6.length}`);
-  console.log(`✅ Seed (parte6): relaciones producto-alérgeno: ${paRows6.length}`);
+  // console.log(`✅ Seed (parte6): productos insertados: ${productRows6.length}`);
+  // console.log(`✅ Seed (parte6): nuevos ingredientes: ${newIngRows6.length}`);
+  // console.log(`✅ Seed (parte6): relaciones producto-alérgeno: ${paRows6.length}`);
 
+  // ----------------------------------------------------------
+  // MENÚ (DIARIO / FESTIVO) — independiente de la carta
+  // - Productos en categoría INACTIVA + Product.active=false => no aparecen en /pedir ni /carta
+  // - /menu los mostrará igualmente (tu página no debería filtrar por active)
+  // ----------------------------------------------------------
+
+  const menuCategoryId = categoryIdBySlug.get("menu-del-dia");
+  if (!menuCategoryId) throw new Error("Seed: falta la categoría menu-del-dia");
+
+  // ids para productos de menú (a partir del máximo actual)
+  const existingProductsMenu = await db.select({ id: Product.id, slug: Product.slug }).from(Product);
+  const usedMenuSlugs = new Set(existingProductsMenu.map((p) => p.slug));
+  let nextMenuProductId = existingProductsMenu.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+
+  type MenuProdSeed = {
+    kind: "DIARIO" | "FESTIVO";
+    course: "PRIMERO" | "SEGUNDO" | "POSTRE";
+    name: string;
+    description: string;
+    details: string;
+  };
+
+  const MENU_PRODUCTS: MenuProdSeed[] = [
+    // ======================
+    // DIARIO — 6 primeros ligeros
+    // ======================
+    { kind: "DIARIO", course: "PRIMERO", name: "Ensalada verde con vinagreta", description: "Lechugas, tomate y vinagreta suave.", details: "Ensalada ligera con lechugas de temporada, tomate y vinagreta suave." },
+    { kind: "DIARIO", course: "PRIMERO", name: "Gazpacho andaluz", description: "Gazpacho fresquito del día.", details: "Gazpacho andaluz tradicional, servido frío. Ideal para empezar ligero." },
+    { kind: "DIARIO", course: "PRIMERO", name: "Salmorejo suave con picatostes", description: "Cremoso y suave, con picatostes.", details: "Salmorejo suave acompañado de picatostes. (Guarnición puede variar)." },
+    { kind: "DIARIO", course: "PRIMERO", name: "Crema de verduras de temporada", description: "Crema casera, cambia según mercado.", details: "Crema de verduras casera elaborada con producto de temporada." },
+    { kind: "DIARIO", course: "PRIMERO", name: "Pasta del día (consultar)", description: "Pasta con salsa suave del día.", details: "Pasta del día con salsa suave. Pregunta al personal por la preparación de hoy." },
+    { kind: "DIARIO", course: "PRIMERO", name: "Verduras a la plancha", description: "Verduras de temporada a la plancha.", details: "Verduras a la plancha con aceite de oliva y sal. Guarnición ligera y sana." },
+
+    // ======================
+    // DIARIO — 6 segundos carne/pescado
+    // ======================
+    { kind: "DIARIO", course: "SEGUNDO", name: "Pechuga de pollo a la plancha", description: "Pollo a la plancha con guarnición.", details: "Pechuga de pollo a la plancha con guarnición del día (patata/ensalada/verdura)." },
+    { kind: "DIARIO", course: "SEGUNDO", name: "Lomo adobado con patatas", description: "Lomo adobado a la plancha.", details: "Lomo adobado a la plancha con patatas." },
+    { kind: "DIARIO", course: "SEGUNDO", name: "Albóndigas caseras en salsa", description: "Albóndigas de la casa.", details: "Albóndigas caseras en salsa tradicional con guarnición del día." },
+    { kind: "DIARIO", course: "SEGUNDO", name: "Merluza a la plancha al limón", description: "Merluza a la plancha.", details: "Merluza a la plancha con limón y guarnición ligera." },
+    { kind: "DIARIO", course: "SEGUNDO", name: "Salmón a la plancha con verduras", description: "Salmón con verduras.", details: "Salmón a la plancha acompañado de verduras de temporada." },
+    { kind: "DIARIO", course: "SEGUNDO", name: "Filete de ternera a la plancha", description: "Ternera a la plancha.", details: "Filete de ternera a la plancha con guarnición del día." },
+
+    // ======================
+    // DIARIO — 4-5 postres caseros + “postre del día o helado”
+    // ======================
+    { kind: "DIARIO", course: "POSTRE", name: "Flan casero", description: "Flan de la casa.", details: "Flan casero tradicional." },
+    { kind: "DIARIO", course: "POSTRE", name: "Arroz con leche casero", description: "Cremoso y suave.", details: "Arroz con leche casero, cremoso y suave." },
+    { kind: "DIARIO", course: "POSTRE", name: "Crema catalana", description: "Crema catalana casera.", details: "Crema catalana con su capa crujiente." },
+    { kind: "DIARIO", course: "POSTRE", name: "Tarta de queso casera", description: "Tarta de queso de la casa.", details: "Tarta de queso casera, suave y cremosa." },
+    { kind: "DIARIO", course: "POSTRE", name: "Postre del día o helado (consultar)", description: "Preguntar al personal.", details: "Postre del día o helado. Preguntar al personal por disponibilidad." },
+
+    // ======================
+    // FESTIVO — 6 primeros con más cache
+    // ======================
+    { kind: "FESTIVO", course: "PRIMERO", name: "Ensalada de burrata, tomate y pesto", description: "Burrata, tomate y pesto suave.", details: "Ensalada de burrata con tomate y pesto suave. Plato más especial." },
+    { kind: "FESTIVO", course: "PRIMERO", name: "Canelones de carne gratinados", description: "Canelones gratinados al horno.", details: "Canelones de carne gratinados al horno, más elaborados para festivo." },
+    { kind: "FESTIVO", course: "PRIMERO", name: "Risotto de setas y parmesano", description: "Cremoso con setas.", details: "Risotto cremoso de setas con parmesano. Plato de más nivel." },
+    { kind: "FESTIVO", course: "PRIMERO", name: "Pulpo a la gallega (ración)", description: "Pulpo con aceite y pimentón.", details: "Pulpo a la gallega, ración. Un primero con más cache." },
+    { kind: "FESTIVO", course: "PRIMERO", name: "Fideuà de marisco (consultar)", description: "Fideuà del día.", details: "Fideuà de marisco. Preguntar al personal por la preparación de hoy." },
+    { kind: "FESTIVO", course: "PRIMERO", name: "Timbal de verduras asadas y queso de cabra", description: "Verduras asadas y queso de cabra.", details: "Timbal de verduras asadas con queso de cabra, más elaborado." },
+
+    // ======================
+    // FESTIVO — 6 segundos más elaborados (carne/pescado)
+    // ======================
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Entrecot de ternera con patatas", description: "Entrecot a la plancha.", details: "Entrecot de ternera a la plancha con patatas. Segundo estrella de festivo." },
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Carrillera ibérica al vino tinto", description: "Carrillera melosa.", details: "Carrillera ibérica cocinada lenta al vino tinto, muy melosa." },
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Bacalao confitado con samfaina", description: "Bacalao suave y verduras.", details: "Bacalao confitado con samfaina (verduras guisadas). Plato más elaborado." },
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Dorada al horno con patata panadera", description: "Dorada al horno.", details: "Dorada al horno con patata panadera. Muy de festivo." },
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Solomillo de cerdo con salsa roquefort", description: "Solomillo con roquefort.", details: "Solomillo de cerdo con salsa roquefort y guarnición." },
+    { kind: "FESTIVO", course: "SEGUNDO", name: "Sepia a la plancha con ajo y perejil", description: "Sepia a la plancha.", details: "Sepia a la plancha con ajo y perejil. Segundo más especial." },
+
+    // ======================
+    // FESTIVO — postres (4-5 caseros + “consultar”)
+    // ======================
+    { kind: "FESTIVO", course: "POSTRE", name: "Coulant de chocolate", description: "Corazón fundente.", details: "Coulant de chocolate con interior fundente." },
+    { kind: "FESTIVO", course: "POSTRE", name: "Tiramisú casero", description: "Tiramisú de la casa.", details: "Tiramisú casero, cremoso y clásico." },
+    { kind: "FESTIVO", course: "POSTRE", name: "Tarta de queso al horno", description: "Tarta de queso al horno.", details: "Tarta de queso al horno, más intensa." },
+    { kind: "FESTIVO", course: "POSTRE", name: "Brownie casero (consultar)", description: "Puede llevar frutos secos.", details: "Brownie casero. Preguntar al personal por ingredientes/alérgenos exactos." },
+    { kind: "FESTIVO", course: "POSTRE", name: "Postre del día o helado (consultar)", description: "Preguntar al personal.", details: "Postre del día o helado. Preguntar al personal por disponibilidad." },
+  ];
+
+  // Insert de productos menú (batch)
+  const menuProductRows = MENU_PRODUCTS.map((mp) => {
+    const id = nextMenuProductId++;
+    const slug = makeUniqueProductSlug({ name: mp.name, categorySlug: "menu-del-dia" }, usedMenuSlugs);
+
+    return {
+      id,
+      categoryId: menuCategoryId,
+      taxRateId: null,
+      name: mp.name,
+      slug,
+      description: mp.description,
+      details: mp.details,
+      imageUrl: null,
+      priceCents: 0,
+
+      deliveryEnabled: false,
+      pickupEnabled: false,
+      dineInEnabled: true,
+
+      active: false, // ✅ no salen en carta/pedir
+    };
+  });
+
+  await db.insert(Product).values(menuProductRows);
+
+  // ids menú
+  const existingMenus = await db.select({ id: Menu.id }).from(Menu);
+  let nextMenuId = existingMenus.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+
+  const diarioId = nextMenuId++;
+  const festivoId = nextMenuId++;
+
+  await db.insert(Menu).values([
+    { id: diarioId, title: "Menú diario · 13,50€", kind: "DIARIO", active: true, validFrom: undefined, validTo: undefined },
+    { id: festivoId, title: "Menú festivo · 15,90€", kind: "FESTIVO", active: true, validFrom: undefined, validTo: undefined },
+  ]);
+
+  // ids menuItem
+  const existingMenuItems = await db.select({ id: MenuItem.id }).from(MenuItem);
+  let nextMenuItemId = existingMenuItems.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+
+  // construir MenuItem rows
+  const rows: any[] = [];
+
+  function pushMenuItems(kind: "DIARIO" | "FESTIVO", menuId: number) {
+    const courses: Array<["PRIMERO" | "SEGUNDO" | "POSTRE", number]> = [
+      ["PRIMERO", 1],
+      ["SEGUNDO", 2],
+      ["POSTRE", 3],
+    ];
+
+    for (const [course] of courses) {
+      const list = MENU_PRODUCTS
+        .map((mp, idx) => ({ mp, idx }))
+        .filter((x) => x.mp.kind === kind && x.mp.course === course);
+
+      for (let i = 0; i < list.length; i++) {
+        const productRow = menuProductRows[list[i].idx];
+
+        rows.push({
+          id: nextMenuItemId++,
+          menuId,
+          productId: productRow.id,
+          course,
+          printOrder: 1,
+          sortOrder: i + 1,
+        });
+      }
+    }
+  }
+
+  pushMenuItems("DIARIO", diarioId);
+  pushMenuItems("FESTIVO", festivoId);
+
+  await db.insert(MenuItem).values(rows);
+
+  console.log("✅ Seed menú: DIARIO/FESTIVO creados (6 primeros, 6 segundos, 5 postres).");
   // ----------------------------------------------------------
   // FIN seed
   // ----------------------------------------------------------
@@ -2163,6 +2338,6 @@ export default async function seed() {
   const totalLinks = await db.select({ id: ProductAllergen.id }).from(ProductAllergen);
 
   console.log(
-    `🎉 Seed completo: productos=${totalProducts.length}, ingredientes=${totalIngredients.length}, producto-alérgeno=${totalLinks.length}`
+    `✅ Seed completo: productos=${totalProducts.length}, ingredientes=${totalIngredients.length}, producto-alérgeno=${totalLinks.length}`
   );
 }

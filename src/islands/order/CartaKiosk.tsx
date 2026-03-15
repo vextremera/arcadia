@@ -124,7 +124,7 @@ export default function CartaKiosk() {
 
   const heroStyle = {
     backgroundImage:
-      "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%)",
+      "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
     backgroundSize: "cover",
     backgroundPosition: "center",
   };
@@ -132,14 +132,15 @@ export default function CartaKiosk() {
   return (
     <div class="w-full" id="top">
       {/* Cabecero (full width) */}
-      <section class="relative w-full overflow-hidden bg-zinc-900" style={heroStyle}>
-        <div class="h-44 sm:h-56" />
+      <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-[50px]" style={heroStyle}>
+        <div class="h-70 sm:h-150" />
         <div class="absolute inset-0">
-          <div class="flex h-full w-full items-end px-4 pb-6 sm:px-10">
+        <div class="absolute inset-x-0 bottom-0 h-8 bg-bg z-20 rounded-t-[40px]" />
+          <div class="flex h-full w-full items-center justify-center text-center px-4 pb-18 sm:px-10 mt-10">
             <div class="text-white">
-              <div class="text-3xl sm:text-4xl font-black tracking-tight">Pedir</div>
-              <div class="mt-1 text-sm sm:text-base text-white/80">
-                Elige tus productos y personalízalos al momento.
+              <div class="text-4xl sm:text-5xl font-black tracking-widest sigmar-regular">PEDIR</div> 
+              <div class="mt-1 text-base sm:text-[20px] text-white/80">
+                Elige tus productos y perso nalízalos al momento.
               </div>
             </div>
           </div>
@@ -149,7 +150,7 @@ export default function CartaKiosk() {
       {/* Submenu categorías (sticky bajo header, full width) */}
       <div
         ref={catBarRef}
-        class="sticky z-30 border-b border-zinc-200 bg-bg backdrop-blur"
+        class="sticky z-30 border-b border-zinc-200 bg-[#FFFFF795] backdrop-blur"
         style={{ top: `${stickyTop}px` }}
       >
         <div class="w-full px-4 py-3 sm:px-10">
@@ -180,7 +181,7 @@ export default function CartaKiosk() {
                   <a
                     key={c.id}
                     href={`#cat-${c.slug}`}
-                    class="whitespace-nowrap rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                    class="whitespace-nowrap rounded-full border border-zinc-300 bg-bg px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-[#fffff1]"
                   >
                     {c.name}
                   </a>
@@ -244,7 +245,7 @@ export default function CartaKiosk() {
             {menu.map((cat) => (
               <section key={cat.id} id={`cat-${cat.slug}`} style={{ scrollMarginTop: `${scrollOffset}px` }}>
                 <div class="flex items-baseline justify-between gap-3">
-                  <h2 class="text-xl sm:text-2xl font-semibold tracking-tight">{cat.name}</h2>
+                  <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">{cat.name}</h2>
                   <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
                     ↑ arriba
                   </a>
@@ -273,9 +274,10 @@ export default function CartaKiosk() {
                       return (
                         <article
                           key={p.id}
-                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-white p-4 transition hover:bg-zinc-50 sm:p-5"
+                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-bg p-4 transition hover:bg-[#fffff1] sm:p-5 shadow-md"
                           onClick={() => openProduct(p.id)}
                         >
+
                           <div class="flex gap-4">
                             {/* Texto */}
                             <div class="min-w-0 flex-1 flex flex-col">
@@ -324,13 +326,13 @@ export default function CartaKiosk() {
                             <div class="relative h-40 w-40 shrink-0 sm:h-44 sm:w-44">
                               {imgSrc ? (
                                 <img
-                                  class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-100 object-cover"
+                                  class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-500 object-cover"
                                   src={imgSrc}
                                   alt={p.name}
                                   loading="lazy"
                                 />
                               ) : (
-                                <div class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-100" />
+                                <div class="h-full w-full rounded-2xl border border-zinc-200 bg-white backdrop-blur-2xl" />
                               )}
 
                               {/* + overlay */}
