@@ -65,19 +65,19 @@ export default function FavoriteHoverButton({ productId, variant = "icon", class
         };
     }, [productId]);
 
-    // Visible siempre si es favorito.
-    // Si no: aparece con hover del parent `.group`.
+    // En móvil/touch no existe hover real, así que queda visible.
+    // En desktop se mantiene el comportamiento original:
+    // - visible siempre si es favorito
+    // - si no, aparece con hover del parent `.group`
     const visibility = isFav
         ? "opacity-100 pointer-events-auto"
-        : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
+        : "opacity-100 pointer-events-auto md:opacity-0 md:pointer-events-none md:group-hover:opacity-100 md:group-hover:pointer-events-auto";
 
     return (
         <span
             class={[
                 "inline-flex shrink-0 items-center justify-center",
-                // ✅ fade in/out
                 "transition-opacity duration-200 ease-in-out",
-                // evita “flicker” en algunos navegadores
                 "will-change-[opacity]",
                 visibility,
                 className ?? "",

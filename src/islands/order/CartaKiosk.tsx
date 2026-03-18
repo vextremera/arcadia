@@ -76,7 +76,7 @@ export default function CartaKiosk() {
       const barH = catBarRef.current?.getBoundingClientRect().height ?? 0;
 
       setStickyTop(Math.ceil(headerH));
-      setScrollOffset(Math.ceil(headerH + barH + 12)); // +12px aire
+      setScrollOffset(Math.ceil(headerH + barH + 12));
     };
 
     update();
@@ -132,14 +132,17 @@ export default function CartaKiosk() {
   return (
     <div class="w-full" id="top">
       {/* Cabecero (full width) */}
-      <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-[50px]" style={heroStyle}>
-        <div class="h-70 sm:h-150" />
+      <section
+        class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"
+        style={heroStyle}
+      >
+        <div class="h-56 sm:h-150" />
         <div class="absolute inset-0">
-        <div class="absolute inset-x-0 bottom-0 h-8 bg-bg z-20 rounded-t-[40px]" />
-          <div class="flex h-full w-full items-center justify-center text-center px-4 pb-18 sm:px-10 mt-10">
+          <div class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]" />
+          <div class="flex h-full w-full items-center justify-center text-center px-4 pb-12 pt-8 sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10">
             <div class="text-white">
-              <div class="text-4xl sm:text-5xl font-black tracking-widest sigmar-regular">PEDIR</div> 
-              <div class="mt-1 text-base sm:text-[20px] text-white/80">
+              <div class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular">PEDIR</div>
+              <div class="mt-1 text-sm sm:text-[20px] text-white/80">
                 Elige tus productos y perso nalízalos al momento.
               </div>
             </div>
@@ -201,7 +204,7 @@ export default function CartaKiosk() {
                     class="fixed inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-3">
                       <div class="text-base font-black">Categorías</div>
                       <button
                         type="button"
@@ -235,16 +238,20 @@ export default function CartaKiosk() {
       </div>
 
       {/* Contenido (full width) */}
-      <div class="w-full px-4 py-8 sm:px-10">
+      <div class="w-full px-4 py-6 sm:px-10 sm:py-8">
         {loading && menu.length === 0 ? (
           <div class="text-sm text-zinc-600">Cargando productos…</div>
         ) : menu.length === 0 ? (
           <div class="text-sm text-zinc-600">No hay productos disponibles.</div>
         ) : (
-          <div class="space-y-10">
+          <div class="space-y-8 sm:space-y-10">
             {menu.map((cat) => (
-              <section key={cat.id} id={`cat-${cat.slug}`} style={{ scrollMarginTop: `${scrollOffset}px` }}>
-                <div class="flex items-baseline justify-between gap-3">
+              <section
+                key={cat.id}
+                id={`cat-${cat.slug}`}
+                style={{ scrollMarginTop: `${scrollOffset}px` }}
+              >
+                <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
                   <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">{cat.name}</h2>
                   <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
                     ↑ arriba
@@ -254,7 +261,7 @@ export default function CartaKiosk() {
                 {cat.products.length === 0 ? (
                   <div class="mt-3 text-sm text-zinc-600">No hay productos en esta categoría.</div>
                 ) : (
-                  <div class="mt-4 grid gap-4 md:grid-cols-2">
+                  <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
                     {cat.products.map((p) => {
                       const ing = p.ingredients ?? [];
                       const ingredientsText =
@@ -274,15 +281,14 @@ export default function CartaKiosk() {
                       return (
                         <article
                           key={p.id}
-                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-bg p-4 transition hover:bg-[#fffff1] sm:p-5 shadow-md"
+                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-bg p-3 shadow-md transition hover:bg-[#fffff1] sm:p-5"
                           onClick={() => openProduct(p.id)}
                         >
-
-                          <div class="flex gap-4">
+                          <div class="flex gap-3 sm:gap-4">
                             {/* Texto */}
                             <div class="min-w-0 flex-1 flex flex-col">
                               <div class="min-w-0">
-                                <div class="flex items-center gap-2 min-w-0">
+                                <div class="flex min-w-0 items-center gap-2">
                                   <h3
                                     class="min-w-0 truncate text-base font-semibold leading-tight sm:text-lg"
                                     title={p.name}
@@ -299,7 +305,7 @@ export default function CartaKiosk() {
                               </div>
 
                               {/* Franja inferior: precio + alérgenos + ❤️ */}
-                              <div class="mt-auto flex items-end justify-between gap-3 pt-4">
+                              <div class="mt-auto flex flex-wrap items-end justify-between gap-2 pt-4 sm:gap-3">
                                 <div class="text-lg font-black sm:text-xl">{money(p.priceCents)}</div>
 
                                 {p.allergens?.length ? (
@@ -323,7 +329,7 @@ export default function CartaKiosk() {
                             </div>
 
                             {/* Imagen */}
-                            <div class="relative h-40 w-40 shrink-0 sm:h-44 sm:w-44">
+                            <div class="relative h-28 w-28 shrink-0 sm:h-44 sm:w-44">
                               {imgSrc ? (
                                 <img
                                   class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-500 object-cover"
@@ -342,7 +348,7 @@ export default function CartaKiosk() {
                                 title={p.isConfigurable ? "Personalizar" : "Añadir"}
                                 onClick={(e) => onPlusClick(e, p)}
                                 class={[
-                                  "absolute -top-2 -right-2 grid h-11 w-11 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition",
+                                  "absolute -top-2 -right-2 grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition sm:h-11 sm:w-11",
                                   busy ? "pointer-events-none opacity-70" : "hover:scale-[1.02]",
                                 ].join(" ")}
                               >

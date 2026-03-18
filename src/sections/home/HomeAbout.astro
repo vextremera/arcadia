@@ -1,5 +1,5 @@
-<section id="sobre" class="relative rounded-t-[50px] z-20">
-  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:pt-16 lg:pb-22">
+<section id="sobre" class="relative rounded-t-[50px] z-20 home-about">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:pt-16 lg:pb-22 home-about__inner">
     <div class="text-center">
       <h2
         class="text-3xl font-black sm:text-4xl sigmar-regular tracking-widest"
@@ -12,7 +12,7 @@
     </div>
 
     <div
-      class="mx-auto mt-10 w-full max-w-5xl text-[20px] leading-relaxed text-center text-stone-900"
+      class="mx-auto mt-10 w-full max-w-5xl text-[20px] leading-relaxed text-center text-stone-900 home-about__copy"
     >
       En el Bar Restaurante Arcadia encontrarás comida casera y auténtica, como
       la de antes, elaborada con tiempo, maestría y cariño. Productos de calidad
@@ -25,3 +25,26 @@
     </div>
   </div>
 </section>
+
+<style>
+  @media (max-width: 639px) {
+    .home-about {
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
+    }
+
+    .home-about__inner {
+      padding-left: 1rem;
+      padding-right: 1rem;
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    .home-about__copy {
+      margin-top: 1.75rem;
+      max-width: 42rem;
+      font-size: 1rem;
+      line-height: 1.75;
+    }
+  }
+</style>

@@ -17,7 +17,7 @@ export default function LazyMap({ query, title = "Mapa", className = "" }: Props
   return (
     <div class={`relative overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 ${className}`}>
       {!loaded ? (
-        <div class="flex h-110 w-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <div class="flex h-80 w-full flex-col items-center justify-center gap-3 p-5 text-center sm:h-110 sm:p-6">
           <div class="text-sm font-semibold text-zinc-700">{title}</div>
           <div class="text-xs text-zinc-600">
             Cargamos el mapa solo si lo necesitas.
@@ -25,7 +25,7 @@ export default function LazyMap({ query, title = "Mapa", className = "" }: Props
 
           <button
             type="button"
-            class="rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+            class="w-full rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 sm:w-auto"
             onClick={() => setLoaded(true)}
           >
             Ver mapa
@@ -34,7 +34,7 @@ export default function LazyMap({ query, title = "Mapa", className = "" }: Props
       ) : (
         <iframe
           title={title}
-          class="h-110 w-full"
+          class="h-80 w-full sm:h-110"
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           src={src}

@@ -51,9 +51,9 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
 
     return (
         <div class="w-full max-w-md lg:max-w-112.5">
-            <div class="rounded-[22px] border border-zinc-300 bg-white p-7 shadow-[0_14px_40px_rgba(0,0,0,0.08)]">
+            <div class="rounded-[22px] border border-zinc-300 bg-white p-5 shadow-[0_14px_40px_rgba(0,0,0,0.08)] sm:p-7">
                 <div class="text-center">
-                    <h1 class="text-xl font-black tracking-wide">INICIA SESION</h1>
+                    <h1 class="text-lg font-black tracking-wide sm:text-xl">INICIA SESION</h1>
                 </div>
 
                 {errText ? (
@@ -61,7 +61,7 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                 ) : null}
 
                 <form
-                    class="mt-6 grid gap-4"
+                    class="mt-5 grid gap-3 sm:mt-6 sm:gap-4"
                     method="post"
                     action="/api/auth/login"
                     onSubmit={(e) => {
@@ -76,7 +76,7 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                     <label class="grid gap-2">
                         <span class="text-sm font-medium">Usuario o correo</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                            class="h-10 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500 sm:h-11"
                             name="email"
                             type="text"
                             required
@@ -89,7 +89,7 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         <span class="text-sm font-medium">Contraseña</span>
                         <div class="relative">
                             <input
-                                class="h-11 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500"
+                                class="h-10 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500 sm:h-11"
                                 name="password"
                                 type={showPwd ? "text" : "password"}
                                 required
@@ -108,19 +108,19 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         </div>
                     </label>
 
-                    <label class="flex items-center gap-3 text-sm text-zinc-600">
-                        <input name="remember" type="checkbox" class="h-4 w-4 rounded border-zinc-300" />
+                    <label class="flex items-start gap-3 text-sm text-zinc-600 sm:items-center">
+                        <input name="remember" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-zinc-300 sm:mt-0" />
                         Remember me
                     </label>
 
-                    <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                    <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
                         {hasRecaptcha ? (
                             <div class="g-recaptcha" data-sitekey={siteKey} />
                         ) : (
-                            <label class="flex items-center gap-3 text-sm text-zinc-700">
+                            <label class="flex items-start gap-3 text-sm text-zinc-700 sm:items-center">
                                 <input
                                     type="checkbox"
-                                    class="h-5 w-5 rounded border-zinc-300"
+                                    class="mt-0.5 h-5 w-5 rounded border-zinc-300 sm:mt-0"
                                     checked={fakeCaptchaOk}
                                     onChange={(e) => setFakeCaptchaOk((e.target as HTMLInputElement).checked)}
                                 />
@@ -129,11 +129,11 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         )}
                     </div>
 
-                    <a class="text-sm text-indigo-700 underline" href="#" onClick={(e) => e.preventDefault()}>
+                    <a class="w-fit text-sm text-indigo-700 underline" href="#" onClick={(e) => e.preventDefault()}>
                         Forgot your password?
                     </a>
 
-                    <button class="mt-1 h-11 w-full rounded-xl bg-[#7b1f1f] text-sm font-semibold text-white hover:bg-[#6a1919]" type="submit">
+                    <button class="mt-1 h-10 w-full rounded-xl bg-accent text-sm font-semibold text-white hover:bg-accent-hover sm:h-11" type="submit">
                         Entrar
                     </button>
 
@@ -145,10 +145,10 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
 
                     <button
                         type="button"
-                        class="h-11 w-full rounded-xl border border-zinc-300 bg-white text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                        class="h-10 w-full rounded-xl border border-zinc-300 bg-white text-sm font-semibold text-zinc-800 hover:bg-zinc-50 sm:h-11"
                         onClick={() => alert("Google OAuth se integrará más adelante.")}
                     >
-                        <span class="inline-flex items-center justify-center gap-3">
+                        <span class="inline-flex items-center justify-center gap-2 sm:gap-3">
                             <span class="grid h-6 w-6 place-items-center rounded-full bg-white">
                                 <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
                                     <path

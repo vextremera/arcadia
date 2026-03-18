@@ -79,8 +79,8 @@ export default function CartDrawer() {
     <div class="fixed inset-0 z-50">
       <div class="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
 
-      <div class="absolute right-0 top-0 h-full w-[92vw] max-w-md bg-white shadow-xl">
-        <div class="flex items-center justify-between border-b border-zinc-200 p-4">
+      <div class="absolute inset-x-0 bottom-0 h-[88dvh] w-full rounded-t-3xl bg-white shadow-xl sm:right-0 sm:top-0 sm:inset-x-auto sm:h-full sm:w-[92vw] sm:max-w-md sm:rounded-none">
+        <div class="flex items-center justify-between border-b border-zinc-200 p-3 sm:p-4">
           <div>
             <div class="text-xs text-zinc-600">Tu pedido</div>
             <div class="text-base font-semibold">Carrito</div>
@@ -91,20 +91,20 @@ export default function CartDrawer() {
           </button>
         </div>
 
-        <div class="h-[calc(100%-160px)] overflow-y-auto p-4">
+        <div class="h-[calc(100%-150px)] overflow-y-auto p-3 sm:h-[calc(100%-160px)] sm:p-4">
           {loading && !cart ? (
             <div class="text-sm text-zinc-600">Cargando…</div>
           ) : empty ? (
             <div class="text-sm text-zinc-600">Tu carrito está vacío.</div>
           ) : (
-            <div class="space-y-4">
+            <div class="space-y-3 sm:space-y-4">
               {items.map((it) => (
-                <div class="rounded-2xl border border-zinc-200 p-4" key={it.lineId}>
+                <div class="rounded-2xl border border-zinc-200 p-3 sm:p-4" key={it.lineId}>
                   <div class="flex gap-3">
                     {it.imageUrl ? (
-                      <img class="h-14 w-14 rounded-xl object-cover" src={it.imageUrl} alt={it.name} />
+                      <img class="h-12 w-12 rounded-xl object-cover sm:h-14 sm:w-14" src={it.imageUrl} alt={it.name} />
                     ) : (
-                      <div class="h-14 w-14 rounded-xl bg-zinc-100" />
+                      <div class="h-12 w-12 rounded-xl bg-zinc-100 sm:h-14 sm:w-14" />
                     )}
 
                     <div class="min-w-0 flex-1">
@@ -181,13 +181,13 @@ export default function CartDrawer() {
           )}
         </div>
 
-        <div class="border-t border-zinc-200 p-4">
+        <div class="border-t border-zinc-200 p-3 sm:p-4">
           <div class="flex items-center justify-between text-sm">
             <span class="text-zinc-600">Subtotal</span>
             <span class="font-semibold">{money(subtotal)}</span>
           </div>
 
-          <div class="mt-3 flex gap-2">
+          <div class="mt-3 flex flex-col gap-2 sm:flex-row">
             <button
               class="flex-1 rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
               type="button"

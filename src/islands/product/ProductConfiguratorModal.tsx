@@ -184,42 +184,44 @@ export default function ProductConfiguratorModal() {
     <div class="fixed inset-0 z-50">
       <div class="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
 
-      <div class="absolute left-1/2 top-1/2 h-[90dvh] w-[95vw] max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div class="flex items-center justify-between border-b border-zinc-200 p-4">
+      <div class="absolute inset-x-0 bottom-0 h-[92dvh] w-full overflow-hidden rounded-t-3xl bg-white shadow-xl sm:left-1/2 sm:top-1/2 sm:h-[90dvh] sm:w-[95vw] sm:max-w-3xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl">
+        <div class="flex items-center justify-between border-b border-zinc-200 p-3 sm:p-4">
           <div class="min-w-0">
             <div class="text-xs text-zinc-600">Personalizar</div>
-            <div class="truncate text-base font-semibold">
+            <div class="truncate text-sm font-semibold sm:text-base">
               {loading ? "Cargando..." : data?.product.name ?? "Producto"}
             </div>
           </div>
 
-          <button class="text-sm text-zinc-600 hover:underline" type="button" onClick={() => setOpen(false)}>
+          <button class="shrink-0 text-sm text-zinc-600 hover:underline" type="button" onClick={() => setOpen(false)}>
             Cerrar
           </button>
         </div>
 
-        <div class="h-full overflow-y-auto p-4">
+        <div class="h-[calc(100%-8.5rem)] overflow-y-auto p-3 sm:h-[calc(100%-9rem)] sm:p-4">
           {loading || !data ? (
             <div class="text-sm text-zinc-600">Cargando configuración…</div>
           ) : (
             <>
               {/* Stepper */}
-              <div class="mb-4 flex flex-wrap gap-2 text-xs">
-                {["Quitar", "Añadir comunes", "Añadir otros", "Extras", "Confirmar"].map((t, i) => (
-                  <button
-                    type="button"
-                    class={`rounded-full border px-3 py-1 ${i === step ? "border-zinc-900 text-zinc-900" : "border-zinc-300 text-zinc-600"}`}
-                    onClick={() => setStep(i)}
-                  >
-                    {i + 1}. {t}
-                  </button>
-                ))}
+              <div class="mb-4 -mx-1 overflow-x-auto pb-1">
+                <div class="flex min-w-max gap-2 px-1 text-xs sm:min-w-0 sm:flex-wrap">
+                  {["Quitar", "Añadir comunes", "Añadir otros", "Extras", "Confirmar"].map((t, i) => (
+                    <button
+                      type="button"
+                      class={`shrink-0 rounded-full border px-3 py-1 ${i === step ? "border-zinc-900 text-zinc-900" : "border-zinc-300 text-zinc-600"}`}
+                      onClick={() => setStep(i)}
+                    >
+                      {i + 1}. {t}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* STEP 0: remove */}
               {step === 0 && (
                 <section class="space-y-3">
-                  <h2 class="text-lg font-semibold">Quitar ingredientes</h2>
+                  <h2 class="text-base font-semibold sm:text-lg">Quitar ingredientes</h2>
                   {removable.length === 0 ? (
                     <p class="text-sm text-zinc-600">Este producto no tiene ingredientes quitables configurados.</p>
                   ) : (
@@ -242,7 +244,7 @@ export default function ProductConfiguratorModal() {
               {/* STEP 1: add common */}
               {step === 1 && (
                 <section class="space-y-3">
-                  <h2 class="text-lg font-semibold">Añadir ingredientes comunes</h2>
+                  <h2 class="text-base font-semibold sm:text-lg">Añadir ingredientes comunes</h2>
                   {commonToAdd.length === 0 ? (
                     <p class="text-sm text-zinc-600">No hay ingredientes comunes disponibles para añadir.</p>
                   ) : (
@@ -268,7 +270,7 @@ export default function ProductConfiguratorModal() {
               {/* STEP 2: add all (search) */}
               {step === 2 && (
                 <section class="space-y-3">
-                  <h2 class="text-lg font-semibold">Añadir otros ingredientes</h2>
+                  <h2 class="text-base font-semibold sm:text-lg">Añadir otros ingredientes</h2>
 
                   <input
                     class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
@@ -302,7 +304,7 @@ export default function ProductConfiguratorModal() {
               {/* STEP 3: modifier groups */}
               {step === 3 && (
                 <section className="space-y-4">
-                  <h2 className="text-lg font-semibold">Extras</h2>
+                  <h2 className="text-base font-semibold sm:text-lg">Extras</h2>
 
                   {data.modifierGroups.length === 0 ? (
                     <p className="text-sm text-zinc-600">
@@ -316,7 +318,7 @@ export default function ProductConfiguratorModal() {
                       );
 
                       return (
-                        <div key={g.id} className="rounded-2xl border border-zinc-200 p-4">
+                        <div key={g.id} className="rounded-2xl border border-zinc-200 p-3 sm:p-4">
                           <div className="flex items-baseline justify-between gap-3">
                             <div className="font-semibold">{g.name}</div>
                             <div className="text-xs text-zinc-600">
@@ -358,9 +360,9 @@ export default function ProductConfiguratorModal() {
               {/* STEP 4: confirm */}
               {step === 4 && (
                 <section class="space-y-3">
-                  <h2 class="text-lg font-semibold">Confirmar</h2>
+                  <h2 class="text-base font-semibold sm:text-lg">Confirmar</h2>
 
-                  <div class="rounded-2xl border border-zinc-200 p-4 text-sm">
+                  <div class="rounded-2xl border border-zinc-200 p-3 text-sm sm:p-4">
                     <div class="flex items-center justify-between">
                       <span class="text-zinc-600">Base</span>
                       <span class="font-semibold">{money(data.product.priceCents)}</span>
@@ -412,9 +414,9 @@ export default function ProductConfiguratorModal() {
         </div>
 
         {/* footer nav */}
-        <div class="border-t border-zinc-200 p-4 flex items-center justify-between">
+        <div class="border-t border-zinc-200 p-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between sm:p-4">
           <button
-            class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+            class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold sm:w-auto"
             type="button"
             onClick={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0}
@@ -423,7 +425,7 @@ export default function ProductConfiguratorModal() {
           </button>
 
           <button
-            class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+            class="w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
             type="button"
             onClick={() => setStep((s) => Math.min(4, s + 1))}
             disabled={step === 4 || loading || !data}

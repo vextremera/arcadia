@@ -106,7 +106,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
 
     return (
         <div class="w-full max-w-md sm:max-w-lg lg:max-w-150">
-            <div class="rounded-[22px] border border-zinc-300 bg-white p-7 shadow-[0_14px_40px_rgba(0,0,0,0.08)] sm:p-8">
+            <div class="rounded-[22px] border border-zinc-300 bg-white p-5 shadow-[0_14px_40px_rgba(0,0,0,0.08)] sm:p-8">
                 <div class="text-center">
                     <h1 class="text-xl font-black tracking-wide">CREAR CUENTA</h1>
                 </div>
@@ -116,7 +116,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                 ) : null}
 
                 <form
-                    class="mt-6 grid gap-4"
+                    class="mt-5 grid gap-3 sm:mt-6 sm:gap-4"
                     method="post"
                     action="/api/auth/register"
                     onSubmit={(e) => {
@@ -140,7 +140,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                         <label class="grid gap-2">
                             <span class="text-sm font-medium">Nombre</span>
                             <input
-                                class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                                class="h-10 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500 sm:h-11"
                                 value={firstName}
                                 onInput={(e) => setFirstName((e.target as HTMLInputElement).value)}
                                 placeholder="Pedro"
@@ -151,7 +151,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                         <label class="grid gap-2">
                             <span class="text-sm font-medium">Apellido</span>
                             <input
-                                class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                                class="h-10 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500 sm:h-11"
                                 value={lastName}
                                 onInput={(e) => setLastName((e.target as HTMLInputElement).value)}
                                 placeholder="Picapiedra"
@@ -163,7 +163,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                     <label class="grid gap-2">
                         <span class="text-sm font-medium">Usuario</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                            class="h-10 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500 sm:h-11"
                             value={username}
                             onInput={(e) => setUsername((e.target as HTMLInputElement).value)}
                             placeholder="lapiedra"
@@ -175,7 +175,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                     <label class="grid gap-2">
                         <span class="text-sm font-medium">Correo</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500"
+                            class="h-10 rounded-xl border border-zinc-300 px-4 text-sm outline-none focus:border-zinc-500 sm:h-11"
                             name="email"
                             type="email"
                             required
@@ -191,7 +191,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                             <span class="text-sm font-medium">Contraseña</span>
                             <div class="relative">
                                 <input
-                                    class="h-11 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500"
+                                    class="h-10 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500 sm:h-11"
                                     name="password"
                                     type={showPwd ? "text" : "password"}
                                     required
@@ -217,7 +217,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                             <span class="text-sm font-medium">Repite la contraseña</span>
                             <div class="relative">
                                 <input
-                                    class="h-11 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500"
+                                    class="h-10 w-full rounded-xl border border-zinc-300 px-4 pr-11 text-sm outline-none focus:border-zinc-500 sm:h-11"
                                     type={showPwd2 ? "text" : "password"}
                                     required
                                     value={password2}
@@ -257,7 +257,7 @@ export default function RegisterCard({ next = "/cuenta", error = "" }: Props) {
                     </div>
 
                     <button
-                        class={`mt-2 h-11 w-full rounded-xl bg-[#7b1f1f] text-sm font-semibold text-white hover:bg-[#6a1919] ${!allOk || !matchOk ? "opacity-90" : ""
+                        class={`mt-2 h-10 w-full rounded-xl bg-accent text-sm font-semibold text-white hover:bg-accent-hover sm:h-11 ${!allOk || !matchOk ? "opacity-90" : ""
                             }`}
                         type="submit"
                     >

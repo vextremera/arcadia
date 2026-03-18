@@ -35,7 +35,7 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
   }
 
   return (
-    <div class="space-y-6">
+    <div class="space-y-5 sm:space-y-6">
       {/* Selector */}
       <div class="flex justify-center">
         <div
@@ -52,7 +52,7 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
             disabled={!hasDiario}
             onClick={() => setActive("DIARIO")}
             class={[
-              "rounded-xl px-5 py-2 text-sm font-black tracking-widest sigmar-regular transition",
+              "rounded-xl px-4 py-2 text-xs font-black tracking-widest sigmar-regular transition sm:px-5 sm:text-sm",
               active === "DIARIO" ? "bg-zinc-900 text-white shadow" : "text-zinc-800 hover:bg-white",
               !hasDiario ? "opacity-40 cursor-not-allowed" : "",
             ].join(" ")}
@@ -67,7 +67,7 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
             disabled={!hasFestivo}
             onClick={() => setActive("FESTIVO")}
             class={[
-              "rounded-xl px-5 py-2 text-sm font-black tracking-widest sigmar-regular transition",
+              "rounded-xl px-4 py-2 text-xs font-black tracking-widest sigmar-regular transition sm:px-5 sm:text-sm",
               active === "FESTIVO" ? "bg-zinc-900 text-white shadow" : "text-zinc-800 hover:bg-white",
               !hasFestivo ? "opacity-40 cursor-not-allowed" : "",
             ].join(" ")}
@@ -79,32 +79,32 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
 
       {/* Cabecero del menú seleccionado */}
       {!current ? (
-        <div class="rounded-3xl border border-zinc-200 bg-bg p-6 text-center text-sm text-zinc-600">
+        <div class="rounded-3xl border border-zinc-200 bg-bg p-5 text-center text-sm text-zinc-600 sm:p-6">
           No hay menú publicado todavía.
         </div>
       ) : (
-        <div class="rounded-3xl border border-zinc-200 bg-bg p-6 shadow-sm">
+        <div class="rounded-3xl border border-zinc-200 bg-bg p-5 shadow-sm sm:p-6">
           <div class="text-center">
-            <div class="text-2xl sm:text-3xl font-black tracking-widest sigmar-regular">
+            <div class="text-xl sm:text-3xl font-black tracking-widest sigmar-regular">
               {active === "DIARIO" ? "MENÚ DIARIO" : "MENÚ FESTIVO"}
             </div>
             <div class="mt-1 text-sm text-zinc-700">
               Entrantes + Principales + Bebida + Postre o Café · Pan incluido
             </div>
             {current.priceText ? (
-              <div class="mt-2 text-xl tracking-widest font-bold text-zinc-900">
+              <div class="mt-2 text-lg tracking-widest font-bold text-zinc-900 sm:text-xl">
                 {current.priceText}
               </div>
             ) : null}
           </div>
 
           {/* Cursos: centrado y línea por línea */}
-          <div class="mt-6 space-y-6">
+          <div class="mt-5 space-y-5 sm:mt-6 sm:space-y-6">
             {(["ENTRANTES", "PRINCIPALES", "POSTRES"] as const).map((course) => {
               const list = current.courses[course] ?? [];
               return (
-                <div class="rounded-3xl border border-zinc-200 bg-white p-5 sm:p-6">
-                  <div class="text-center text-lg font-medium tracking-widest sigmar-regular">
+                <div class="rounded-3xl border border-zinc-200 bg-white p-4 sm:p-6">
+                  <div class="text-center text-base font-medium tracking-widest sigmar-regular sm:text-lg">
                     {course}
                   </div>
 
@@ -126,7 +126,9 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
               );
             })}
           </div>
-          <p class=" text-sm space-y-6 mt-6 mb-2 text-center text-zinc-500 tracking-widest">Menús personalizados disponibles bajo petición.<br />Horario de menú de <strong>13:00 a 15:30</strong>.</p>
+          <p class="text-sm space-y-6 mt-5 mb-1 text-center text-zinc-500 tracking-widest sm:mt-6 sm:mb-2">
+            Menús personalizados disponibles bajo petición.<br />Horario de menú de <strong>13:00 a 15:30</strong>.
+          </p>
         </div>
       )}
     </div>

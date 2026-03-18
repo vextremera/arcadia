@@ -349,10 +349,10 @@ export default function CheckoutForm() {
   if (!cart || cart.items.length === 0) return <div class="mt-6 text-sm text-zinc-600">Tu carrito está vacío.</div>;
 
   return (
-    <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_420px]">
-      <div class="space-y-6">
+    <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1fr_420px]">
+      <div class="space-y-4 sm:space-y-6">
         {/* Tipo */}
-        <section class="rounded-2xl border border-zinc-200 p-5">
+        <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Tipo de pedido</h2>
 
           {!avail?.deliveryAvailable ? (
@@ -362,7 +362,7 @@ export default function CheckoutForm() {
             </div>
           ) : null}
 
-          <div class="mt-4 flex gap-2">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               class={`rounded-xl px-4 py-2 text-sm font-semibold ${type === "DELIVERY" ? "bg-zinc-900 text-white" : "border border-zinc-300"
@@ -385,7 +385,7 @@ export default function CheckoutForm() {
         </section>
 
         {/* Contacto */}
-        <section class="rounded-2xl border border-zinc-200 p-5">
+        <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Datos de contacto</h2>
 
           <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -426,7 +426,7 @@ export default function CheckoutForm() {
 
         {/* Dirección si DELIVERY */}
         {type === "DELIVERY" ? (
-          <section class="rounded-2xl border border-zinc-200 p-5">
+          <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
             <div class="flex items-start justify-between gap-4">
               <h2 class="text-lg font-semibold">Dirección</h2>
 
@@ -594,10 +594,10 @@ export default function CheckoutForm() {
         ) : null}
 
         {/* Pago */}
-        <section class="rounded-2xl border border-zinc-200 p-5">
+        <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Pago</h2>
 
-          <div class="mt-4 flex gap-2">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
             <button
               type="button"
               class={`rounded-xl px-4 py-2 text-sm font-semibold ${paymentMethod === "CASH" ? "bg-zinc-900 text-white" : "border border-zinc-300"
@@ -621,7 +621,7 @@ export default function CheckoutForm() {
         </section>
 
         {/* Notas pedido */}
-        <section class="rounded-2xl border border-zinc-200 p-5">
+        <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Comentarios del pedido</h2>
           <p class="mt-1 text-sm text-zinc-600">Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).</p>
           <textarea
@@ -635,12 +635,12 @@ export default function CheckoutForm() {
 
       {/* Resumen */}
       <aside class="lg:sticky lg:top-4 lg:h-fit">
-        <div class="rounded-2xl border border-zinc-200 p-5">
+        <div class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Resumen</h2>
 
-          <div class="mt-4 space-y-4 text-sm">
+          <div class="mt-4 space-y-3 sm:space-y-4 text-sm">
             {cart.items.map((it) => (
-              <div key={it.lineId} class="rounded-2xl border border-zinc-200 p-4">
+              <div key={it.lineId} class="rounded-2xl border border-zinc-200 p-3 sm:p-4">
                 <div class="flex items-baseline justify-between gap-3">
                   <div class="min-w-0 truncate font-semibold">
                     {it.qty}× {it.name}

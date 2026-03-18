@@ -12,13 +12,18 @@ const heroStyle = {
 <SiteLayout title="Próximamente · Arcadia" fullWidth>
   <div class="w-full" id="top">
     {/* Cabecero estilo /pedir */}
-    <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-[50px]" style={heroStyle}>
-      <div class="h-70 sm:h-150" />
+    <section
+      class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"
+      style={heroStyle}
+    >
+      <div class="h-56 sm:h-150" />
       <div class="absolute inset-0">
-        <div class="absolute inset-x-0 bottom-0 h-8 bg-bg z-20 rounded-t-[40px]" />
-        <div class="flex h-full w-full items-end px-4 pb-18 sm:px-10">
+        <div class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]" />
+        <div class="flex h-full w-full items-end px-4 pb-12 sm:px-10 sm:pb-18">
           <div class="text-white">
-            <div class="text-3xl sm:text-4xl font-black tracking-widest sigmar-regular">PRÓXIMAMENTE</div>
+            <div class="text-3xl sm:text-4xl font-black tracking-widest sigmar-regular">
+              PRÓXIMAMENTE
+            </div>
             <div class="mt-1 text-sm sm:text-base text-white/80">
               Estamos preparando pedidos online y cuentas de usuario.
             </div>
@@ -27,15 +32,15 @@ const heroStyle = {
       </div>
     </section>
 
-    <div class="w-full px-4 py-10 sm:px-10">
+    <div class="w-full px-4 py-8 sm:px-10 sm:py-10">
       <div class="mx-auto w-full max-w-3xl space-y-6">
-        <div class="rounded-3xl border border-zinc-200 bg-bg p-6 shadow-sm">
+        <div class="rounded-3xl border border-zinc-200 bg-bg p-5 shadow-sm sm:p-6">
           <div class="text-lg font-semibold text-zinc-900">Funciones en preparación</div>
           <p class="mt-2 text-sm text-zinc-700">
             Ahora mismo la web está en modo informativo mientras terminamos:
           </p>
 
-          <ul class="mt-4 space-y-2 text-sm text-zinc-700 list-disc pl-5">
+          <ul class="mt-4 list-disc space-y-2 pl-5 text-sm text-zinc-700">
             <li>Pedidos a domicilio / recogida (flujo completo, pagos y horarios)</li>
             <li>Cuentas de usuario (perfil, direcciones, favoritos y niveles)</li>
           </ul>

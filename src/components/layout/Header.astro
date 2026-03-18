@@ -8,10 +8,10 @@ const next = encodeURIComponent(pathname);
 
 <header class="sticky top-0 z-40 bg-bg">
   <div
-    class="mx-auto flex w-full max-w-340 items-center justify-between px-2 py-4"
+    class="mx-auto flex w-full max-w-340 items-center justify-between px-1 py-3 sm:px-2 sm:py-4"
   >
     <a href="/" class="text-xl font-black tracking-[0.28em]">
-      <img src={NegativeLogo.src} alt="Arcadia Logo" class="h-8" />
+      <img src={NegativeLogo.src} alt="Arcadia Logo" class="h-7 sm:h-8" />
     </a>
 
     <nav
@@ -25,14 +25,14 @@ const next = encodeURIComponent(pathname);
       <a class="hover:text-stone-900" href="/pedir">Domicilio</a>
     </nav>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2 sm:gap-3">
 
       <CartBadge client:load />
 
       {
         user ? (
           <a
-            class="grid h-10 w-10 place-items-center rounded-full cursor-pointer hover:-translate-y-0.5 active:translate-y-0 transition-transform"
+            class="grid h-9 w-9 place-items-center rounded-full cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0 sm:h-10 sm:w-10"
             href="/cuenta"
             aria-label="Cuenta"
             title="Cuenta"
@@ -51,7 +51,7 @@ const next = encodeURIComponent(pathname);
           </a>
         ) : (
           <a
-            class="grid h-10 w-10 place-items-center rounded-full cursor-pointer hover:-translate-y-0.5 active:translate-y-0 transition-transform"
+            class="grid h-9 w-9 place-items-center rounded-full cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0 sm:h-10 sm:w-10"
             href={`/login?next=${next}`}
             aria-label="Entrar"
             title="Entrar"

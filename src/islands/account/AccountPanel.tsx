@@ -234,7 +234,7 @@ export default function AccountPanel() {
 
     if (loading) {
         return (
-            <div class="mt-6 rounded-2xl border border-zinc-200 p-5">
+            <div class="mt-6 rounded-2xl border border-zinc-200 p-4 sm:p-5">
                 <div class="text-sm text-zinc-600">Cargando datos de tu cuenta…</div>
             </div>
         );
@@ -242,12 +242,12 @@ export default function AccountPanel() {
 
     if (err) {
         return (
-            <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+            <div class="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 sm:p-5">
                 <div class="text-sm font-semibold text-red-900">No se pudo cargar tu cuenta</div>
                 <div class="mt-1 text-sm text-red-900/80">{err}</div>
                 <button
                     type="button"
-                    class="mt-4 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white"
+                    class="mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
                     onClick={loadAll}
                 >
                     Reintentar
@@ -257,9 +257,9 @@ export default function AccountPanel() {
     }
 
     return (
-        <div class="mt-6 space-y-6">
+        <div class="mt-6 space-y-4 sm:space-y-6">
             {/* Perfil */}
-            <section class="rounded-2xl border border-zinc-200 p-5">
+            <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
                 <div class="text-sm font-semibold">Mis datos</div>
                 <div class="mt-1 text-sm text-zinc-600">Estos datos se usarán para facilitar el checkout.</div>
 
@@ -267,7 +267,7 @@ export default function AccountPanel() {
                     <label class="grid gap-1">
                         <span class="text-xs font-semibold text-zinc-600">Nombre</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                            class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                             value={name}
                             onInput={(e) => setName((e.target as HTMLInputElement).value)}
                             placeholder="Tu nombre"
@@ -277,7 +277,7 @@ export default function AccountPanel() {
                     <label class="grid gap-1">
                         <span class="text-xs font-semibold text-zinc-600">Teléfono</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                            class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                             value={phone}
                             onInput={(e) => setPhone((e.target as HTMLInputElement).value)}
                             placeholder="600 123 123"
@@ -288,7 +288,7 @@ export default function AccountPanel() {
                     <label class="grid gap-1">
                         <span class="text-xs font-semibold text-zinc-600">Cumpleaños</span>
                         <input
-                            class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                            class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                             value={birthday}
                             onInput={(e) => setBirthday((e.target as HTMLInputElement).value)}
                             placeholder="YYYY-MM-DD"
@@ -296,10 +296,10 @@ export default function AccountPanel() {
                     </label>
                 </div>
 
-                <div class="mt-4 flex flex-wrap items-center gap-3">
+                <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                         type="button"
-                        class={`rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${savingProfile ? "opacity-60 pointer-events-none" : ""
+                        class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingProfile ? "opacity-60 pointer-events-none" : ""
                             }`}
                         onClick={saveProfile}
                     >
@@ -311,8 +311,8 @@ export default function AccountPanel() {
             </section>
 
             {/* Direcciones */}
-            <section class="rounded-2xl border border-zinc-200 p-5">
-                <div class="flex items-start justify-between gap-4">
+            <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+                <div class="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start sm:gap-4">
                     <div>
                         <div class="text-sm font-semibold">Direcciones</div>
                         <div class="mt-1 text-sm text-zinc-600">Guarda tus direcciones para pedir más rápido.</div>
@@ -320,7 +320,7 @@ export default function AccountPanel() {
 
                     <button
                         type="button"
-                        class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
+                        class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                         onClick={startNewAddress}
                     >
                         + Nueva
@@ -335,7 +335,7 @@ export default function AccountPanel() {
                     <div class="mt-4 grid gap-3">
                         {addresses.map((a) => (
                             <div key={a.id} class="rounded-2xl border border-zinc-200 p-4">
-                                <div class="flex items-start justify-between gap-4">
+                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="min-w-0">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <div class="text-sm font-semibold">{a.label ? a.label : "Dirección"}</div>
@@ -349,21 +349,21 @@ export default function AccountPanel() {
                                             ) : null}
                                         </div>
 
-                                        <div class="mt-1 text-sm text-zinc-700">
+                                        <div class="mt-1 wrap-break-words text-sm text-zinc-700">
                                             {a.contactName} · {a.phone}
                                         </div>
-                                        <div class="mt-1 text-sm text-zinc-600">
+                                        <div class="mt-1 wrap-break-words text-sm text-zinc-600">
                                             {a.line1}
                                             {a.line2 ? `, ${a.line2}` : ""} · {a.postalCode} {a.city}
                                         </div>
-                                        {a.notes ? <div class="mt-1 text-xs text-zinc-500">{a.notes}</div> : null}
+                                        {a.notes ? <div class="mt-1 wrap-break-words text-xs text-zinc-500">{a.notes}</div> : null}
                                     </div>
 
-                                    <div class="flex shrink-0 flex-wrap gap-2">
+                                    <div class="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap sm:justify-end">
                                         {!a.isDefault ? (
                                             <button
                                                 type="button"
-                                                class="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                                class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                                                 onClick={() => makeDefault(a.id)}
                                             >
                                                 Hacer default
@@ -371,14 +371,14 @@ export default function AccountPanel() {
                                         ) : null}
                                         <button
                                             type="button"
-                                            class="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
+                                            class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
                                             onClick={() => startEditAddress(a)}
                                         >
                                             Editar
                                         </button>
                                         <button
                                             type="button"
-                                            class="rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                                            class="w-full rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 sm:w-auto"
                                             onClick={() => deleteAddress(a.id)}
                                         >
                                             Borrar
@@ -398,7 +398,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-zinc-600">Etiqueta (opcional)</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.label}
                                     onInput={(e) => patchEditing({ label: (e.target as HTMLInputElement).value })}
                                     placeholder="Casa / Trabajo"
@@ -408,7 +408,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-zinc-600">Contacto *</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.contactName}
                                     onInput={(e) => patchEditing({ contactName: (e.target as HTMLInputElement).value })}
                                     placeholder="Nombre"
@@ -418,7 +418,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-zinc-600">Teléfono *</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.phone}
                                     onInput={(e) => patchEditing({ phone: (e.target as HTMLInputElement).value })}
                                     placeholder="600 123 123"
@@ -429,7 +429,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1 sm:col-span-2">
                                 <span class="text-xs font-semibold text-zinc-600">Dirección *</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.line1}
                                     onInput={(e) => patchEditing({ line1: (e.target as HTMLInputElement).value })}
                                     placeholder="Calle / número"
@@ -439,7 +439,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1 sm:col-span-2">
                                 <span class="text-xs font-semibold text-zinc-600">Piso / puerta (opcional)</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.line2}
                                     onInput={(e) => patchEditing({ line2: (e.target as HTMLInputElement).value })}
                                     placeholder="2º 1ª"
@@ -449,7 +449,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-zinc-600">Ciudad *</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.city}
                                     onInput={(e) => patchEditing({ city: (e.target as HTMLInputElement).value })}
                                 />
@@ -458,7 +458,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-zinc-600">Código postal *</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.postalCode}
                                     onInput={(e) => patchEditing({ postalCode: (e.target as HTMLInputElement).value })}
                                     placeholder="17310"
@@ -469,7 +469,7 @@ export default function AccountPanel() {
                             <label class="grid gap-1 sm:col-span-2">
                                 <span class="text-xs font-semibold text-zinc-600">Notas (opcional)</span>
                                 <input
-                                    class="h-11 rounded-xl border border-zinc-300 px-3 text-sm"
+                                    class="h-10 rounded-xl border border-zinc-300 px-3 text-sm sm:h-11"
                                     value={form.notes}
                                     onInput={(e) => patchEditing({ notes: (e.target as HTMLInputElement).value })}
                                     placeholder="Llamar al llegar, timbre..."
@@ -477,7 +477,7 @@ export default function AccountPanel() {
                             </label>
                         </div>
 
-                        <label class="mt-4 flex items-center gap-2 text-sm">
+                        <label class="mt-4 flex items-start gap-2 text-sm sm:items-center">
                             <input
                                 type="checkbox"
                                 checked={form.isDefault}
@@ -486,10 +486,10 @@ export default function AccountPanel() {
                             Marcar como default
                         </label>
 
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                             <button
                                 type="button"
-                                class={`rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${savingAddress ? "opacity-60 pointer-events-none" : ""
+                                class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingAddress ? "opacity-60 pointer-events-none" : ""
                                     }`}
                                 onClick={saveAddress}
                             >
@@ -497,7 +497,7 @@ export default function AccountPanel() {
                             </button>
                             <button
                                 type="button"
-                                class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-100"
+                                class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-100 sm:w-auto"
                                 onClick={() => setEditing(null)}
                             >
                                 Cancelar

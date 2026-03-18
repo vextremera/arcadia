@@ -85,14 +85,13 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
   const r = safe[idx];
 
   return (
-    <div class="grid items-stretch gap-6 md:grid-cols-3">
-
+    <div class="grid items-stretch gap-4 sm:gap-6 md:grid-cols-3">
       <article
-        class={`rounded-2xl border min-h-120 min-w-140 border-zinc-300 bg-white p-6 shadow-sm transition-opacity duration-200 ${fade ? "opacity-0" : "opacity-100"
+        class={`rounded-2xl border min-h-88 min-w-0 border-zinc-300 bg-white p-4 shadow-sm transition-opacity duration-200 sm:min-h-120 sm:min-w-140 sm:p-6 ${fade ? "opacity-0" : "opacity-100"
           }`}
       >
         <div class="flex items-center gap-3">
-          <div class="h-11 w-11 overflow-hidden rounded-full bg-zinc-100">
+          <div class="h-10 w-10 overflow-hidden rounded-full bg-zinc-100 sm:h-11 sm:w-11">
             {r.avatarUrl ? (
               <img src={r.avatarUrl} alt={r.name} class="h-full w-full object-cover" loading="lazy" />
             ) : (
@@ -111,9 +110,9 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
 
         <p class="mt-4 text-sm leading-relaxed text-zinc-800">{r.text}</p>
 
-        <div class="mt-4 flex items-center justify-between">
+        <div class="mt-4 flex items-center justify-between gap-3">
           <Stars rating={r.rating} />
-          <span class="text-xs font-semibold text-zinc-700">{r.rating.toFixed(1)}/5</span>
+          <span class="shrink-0 text-xs font-semibold text-zinc-700">{r.rating.toFixed(1)}/5</span>
         </div>
       </article>
     </div>

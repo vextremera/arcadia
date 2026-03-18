@@ -73,15 +73,15 @@ export default function UpsellModal() {
         type="button"
       />
 
-      <div class="relative mx-auto mt-24 w-[min(92vw,720px)] rounded-3xl bg-white p-5 shadow-2xl">
-        <div class="flex items-start justify-between gap-3">
+      <div class="fixed inset-x-0 bottom-0 max-h-[84dvh] w-full overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:relative sm:mx-auto sm:mt-24 sm:max-h-none sm:w-[min(92vw,720px)] sm:overflow-visible sm:rounded-3xl sm:p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div class="text-xl font-semibold tracking-tight">¿Quieres algo más?</div>
             <div class="mt-1 text-sm text-zinc-600">Añade algo rápido al carrito.</div>
           </div>
 
           <button
-            class="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold"
+            class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold sm:w-auto"
             onClick={() => setOpen(false)}
             type="button"
           >
@@ -97,7 +97,7 @@ export default function UpsellModal() {
           ) : (
             <div class="grid gap-3 sm:grid-cols-2">
               {products.map((p) => (
-                <div class="rounded-2xl border border-zinc-200 p-4" key={p.id}>
+                <div class="rounded-2xl border border-zinc-200 p-3 sm:p-4" key={p.id}>
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                       <div class="truncate text-sm font-semibold">{p.name}</div>
@@ -108,9 +108,9 @@ export default function UpsellModal() {
                     </div>
 
                     {p.imageUrl ? (
-                      <img class="h-14 w-14 rounded-xl object-cover" src={p.imageUrl} alt={p.name} />
+                      <img class="h-12 w-12 rounded-xl object-cover sm:h-14 sm:w-14" src={p.imageUrl} alt={p.name} />
                     ) : (
-                      <div class="h-14 w-14 rounded-xl bg-zinc-100" />
+                      <div class="h-12 w-12 rounded-xl bg-zinc-100 sm:h-14 sm:w-14" />
                     )}
                   </div>
 
@@ -128,16 +128,16 @@ export default function UpsellModal() {
           )}
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
-            class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+            class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold sm:w-auto"
             type="button"
             onClick={() => window.dispatchEvent(new Event("arcadia:cart:open"))}
           >
             Ver carrito
           </button>
 
-          <a class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" href="/checkout">
+          <a class="w-full rounded-xl bg-zinc-900 px-4 py-2 text-center text-sm font-semibold text-white sm:w-auto" href="/checkout">
             Ir a checkout
           </a>
         </div>
