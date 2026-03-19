@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
-import FavoriteHoverButton from "@/islands/favorites/FavoriteHoverButton";
+
+type ProductAllergen = {
+  slug: string;
+  name: string;
+  iconUrl: string | null;
+};
 
 type MenuProduct = {
   id: number;
@@ -14,7 +19,7 @@ type MenuProduct = {
   pickupEnabled: boolean;
   ingredients: string[];
   isConfigurable: boolean;
-  allergens?: string[];
+  allergens: ProductAllergen[];
 };
 
 type MenuCategory = {
@@ -33,9 +38,8 @@ function openProduct(productId: number) {
   window.dispatchEvent(new CustomEvent("arcadia:product:open", { detail: { productId } }));
 }
 
-function shortTitle(name: string) {
-  const TITLE_MAX = 50;
-  return name.length > TITLE_MAX ? `${name.slice(0, TITLE_MAX)}…` : name;
+function allergenIconPath(allergen: ProductAllergen) {
+  return allergen.iconUrl ?? `/images/allergens/${allergen.slug}.webp`;
 }
 
 export default function CartaKiosk() {
@@ -46,15 +50,16 @@ export default function CartaKiosk() {
   const [flashAddedId, setFlashAddedId] = useState<number | null>(null);
 
   const [scrollOffset, setScrollOffset] = useState(160);
+  const [mobileCatMenuTop, setMobileCatMenuTop] = useState(160);
   const catBarRef = useRef<HTMLDivElement>(null);
 
   const [catMenuOpen, setCatMenuOpen] = useState(false);
 
   function scrollToCategory(slug: string) {
     const id = `cat-${slug}`;
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
       history.replaceState(null, "", `#${id}`);
     }
     setCatMenuOpen(false);
@@ -62,8 +67,8 @@ export default function CartaKiosk() {
 
   useEffect(() => {
     if (!catMenuOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setCatMenuOpen(false);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCatMenuOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -72,11 +77,12 @@ export default function CartaKiosk() {
   useEffect(() => {
     const update = () => {
       const header = document.getElementById("site-header");
-      const headerH = header?.getBoundingClientRect().height ?? 70;
-      const barH = catBarRef.current?.getBoundingClientRect().height ?? 0;
+      const headerHeight = header?.getBoundingClientRect().height ?? 70;
+      const barHeight = catBarRef.current?.getBoundingClientRect().height ?? 0;
 
-      setStickyTop(Math.ceil(headerH));
-      setScrollOffset(Math.ceil(headerH + barH + 12));
+      setStickyTop(Math.ceil(headerHeight));
+      setScrollOffset(Math.ceil(headerHeight + barHeight + 12));
+      setMobileCatMenuTop(Math.ceil(headerHeight + barHeight));
     };
 
     update();
@@ -93,7 +99,10 @@ export default function CartaKiosk() {
       .finally(() => setLoading(false));
   }, []);
 
-  const navCategories = useMemo(() => menu.filter((c) => (c.products ?? []).length > 0), [menu]);
+  const navCategories = useMemo(
+    () => menu.filter((category) => (category.products ?? []).length > 0),
+    [menu]
+  );
 
   async function quickAdd(product: MenuProduct) {
     setAddingId(product.id);
@@ -108,18 +117,17 @@ export default function CartaKiosk() {
 
       setFlashAddedId(product.id);
       window.setTimeout(() => setFlashAddedId(null), 900);
-      window.dispatchEvent(new Event("arcadia:upsell:open"));
-    } catch (err) {
-      alert((err as any)?.message || "No se pudo añadir al carrito");
+    } catch (error) {
+      alert((error as any)?.message || "No se pudo añadir al carrito");
     } finally {
       setAddingId(null);
     }
   }
 
-  function onPlusClick(e: any, p: MenuProduct) {
-    e.stopPropagation();
-    if (p.isConfigurable) openProduct(p.id);
-    else void quickAdd(p);
+  function onPlusClick(event: any, product: MenuProduct) {
+    event.stopPropagation();
+    if (product.isConfigurable) openProduct(product.id);
+    else void quickAdd(product);
   }
 
   const heroStyle = {
@@ -131,39 +139,33 @@ export default function CartaKiosk() {
 
   return (
     <div class="w-full" id="top">
-      {/* Cabecero (full width) */}
-      <section
-        class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"
-        style={heroStyle}
-      >
+      <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]" style={heroStyle}>
         <div class="h-56 sm:h-150" />
         <div class="absolute inset-0">
           <div class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]" />
-          <div class="flex h-full w-full items-center justify-center text-center px-4 pb-12 pt-8 sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10">
+          <div class="flex h-full w-full items-center justify-center px-4 pb-12 pt-8 text-center sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10">
             <div class="text-white">
               <div class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular">PEDIR</div>
               <div class="mt-1 text-sm sm:text-[20px] text-white/80">
-                Elige tus productos y perso nalízalos al momento.
+                Elige tus productos y personalízalos al momento.
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Submenu categorías (sticky bajo header, full width) */}
       <div
         ref={catBarRef}
         class="sticky z-30 border-b border-zinc-200 bg-[#FFFFF795] backdrop-blur"
         style={{ top: `${stickyTop}px` }}
       >
-        <div class="w-full px-4 py-3 sm:px-10">
+        <div class="mx-auto w-full max-w-448 px-4 py-3 sm:px-10">
           {loading && menu.length === 0 ? (
             <div class="text-sm text-zinc-600">Cargando categorías…</div>
           ) : navCategories.length === 0 ? (
             <div class="text-sm text-zinc-600">No hay categorías disponibles.</div>
           ) : (
             <>
-              {/* móvil: botón hamburguesa */}
               <div class="flex items-center justify-between sm:hidden">
                 <div class="text-sm font-semibold text-zinc-700">Categorías</div>
                 <button
@@ -178,57 +180,43 @@ export default function CartaKiosk() {
                 </button>
               </div>
 
-              {/* sm+: chips normales (wrap) */}
-              <nav class="hidden sm:flex flex-wrap items-center gap-2" aria-label="Categorías">
-                {navCategories.map((c) => (
+              <nav class="hidden flex-wrap items-center gap-2 sm:flex" aria-label="Categorías">
+                {navCategories.map((category) => (
                   <a
-                    key={c.id}
-                    href={`#cat-${c.slug}`}
+                    key={category.id}
+                    href={`#cat-${category.slug}`}
                     class="whitespace-nowrap rounded-full border border-zinc-300 bg-bg px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-[#fffff1]"
                   >
-                    {c.name}
+                    {category.name}
                   </a>
                 ))}
               </nav>
 
-              {/* sheet móvil */}
               {catMenuOpen ? (
                 <div
-                  class="fixed inset-0 z-60 bg-black/40 sm:hidden"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Categorías"
-                  onClick={() => setCatMenuOpen(false)}
+                  class="fixed inset-x-0 bottom-0 z-60 max-h-[calc(100dvh-1.5rem)] sm:hidden"
+                  style={{ top: `${mobileCatMenuTop}px` }}
                 >
-                  <div
-                    class="fixed inset-x-0 bottom-0 rounded-t-3xl bg-white p-4 shadow-2xl"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="text-base font-black">Categorías</div>
-                      <button
-                        type="button"
-                        class="rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold hover:bg-zinc-50"
-                        onClick={() => setCatMenuOpen(false)}
-                      >
-                        Cerrar
-                      </button>
-                    </div>
+                  <button
+                    type="button"
+                    class="absolute inset-0 h-full w-full bg-black/35"
+                    aria-label="Cerrar categorías"
+                    onClick={() => setCatMenuOpen(false)}
+                  />
 
-                    <div class="mt-3 max-h-[60vh] overflow-auto">
-                      <div class="grid gap-2">
-                        {navCategories.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            class="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-left text-sm font-semibold hover:bg-zinc-50"
-                            onClick={() => scrollToCategory(c.slug)}
-                          >
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                  <div class="absolute inset-x-3 top-0 max-h-[calc(100dvh-2rem)] overflow-auto rounded-4xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)]">
+                    <nav class="grid gap-1" aria-label="Categorías">
+                      {navCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          class="rounded-2xl px-4 py-3 text-left text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+                          onClick={() => scrollToCategory(category.slug)}
+                        >
+                          {category.name}
+                        </button>
+                      ))}
+                    </nav>
                   </div>
                 </div>
               ) : null}
@@ -237,134 +225,130 @@ export default function CartaKiosk() {
         </div>
       </div>
 
-      {/* Contenido (full width) */}
       <div class="w-full px-4 py-6 sm:px-10 sm:py-8">
-        {loading && menu.length === 0 ? (
-          <div class="text-sm text-zinc-600">Cargando productos…</div>
-        ) : menu.length === 0 ? (
-          <div class="text-sm text-zinc-600">No hay productos disponibles.</div>
-        ) : (
-          <div class="space-y-8 sm:space-y-10">
-            {menu.map((cat) => (
-              <section
-                key={cat.id}
-                id={`cat-${cat.slug}`}
-                style={{ scrollMarginTop: `${scrollOffset}px` }}
-              >
-                <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
-                  <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">{cat.name}</h2>
-                  <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
-                    ↑ arriba
-                  </a>
-                </div>
+        <div class="mx-auto w-full max-w-448">
+          {loading && menu.length === 0 ? (
+            <div class="text-sm text-zinc-600">Cargando productos…</div>
+          ) : menu.length === 0 ? (
+            <div class="text-sm text-zinc-600">No hay productos disponibles.</div>
+          ) : (
+            <div class="space-y-8 sm:space-y-10">
+              {menu.map((category) => (
+                <section
+                  key={category.id}
+                  id={`cat-${category.slug}`}
+                  style={{ scrollMarginTop: `${scrollOffset}px` }}
+                >
+                  <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                    <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">
+                      {category.name}
+                    </h2>
+                    <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
+                      ↑ arriba
+                    </a>
+                  </div>
 
-                {cat.products.length === 0 ? (
-                  <div class="mt-3 text-sm text-zinc-600">No hay productos en esta categoría.</div>
-                ) : (
-                  <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
-                    {cat.products.map((p) => {
-                      const ing = p.ingredients ?? [];
-                      const ingredientsText =
-                        ing.length > 0 ? ing.join(", ") : p.description ? p.description : "";
+                  {category.products.length === 0 ? (
+                    <div class="mt-3 text-sm text-zinc-600">No hay productos en esta categoría.</div>
+                  ) : (
+                    <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
+                      {category.products.map((product) => {
+                        const ingredients = product.ingredients ?? [];
+                        const ingredientsText =
+                          ingredients.length > 0
+                            ? ingredients.join(", ")
+                            : product.description
+                              ? product.description
+                              : "";
 
-                      const busy = addingId === p.id;
-                      const flashed = flashAddedId === p.id;
-                      const displayName = shortTitle(p.name);
+                        const busy = addingId === product.id;
+                        const flashed = flashAddedId === product.id;
 
-                      const imgSrc =
-                        p.imageUrl && p.imageUrl.startsWith("/")
-                          ? p.imageUrl
-                          : p.imageUrl
-                            ? `/${p.imageUrl}`
-                            : null;
+                        const imageSrc =
+                          product.imageUrl && product.imageUrl.startsWith("/")
+                            ? product.imageUrl
+                            : product.imageUrl
+                              ? `/${product.imageUrl}`
+                              : null;
 
-                      return (
-                        <article
-                          key={p.id}
-                          class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-bg p-3 shadow-md transition hover:bg-[#fffff1] sm:p-5"
-                          onClick={() => openProduct(p.id)}
-                        >
-                          <div class="flex gap-3 sm:gap-4">
-                            {/* Texto */}
-                            <div class="min-w-0 flex-1 flex flex-col">
-                              <div class="min-w-0">
-                                <div class="flex min-w-0 items-center gap-2">
-                                  <h3
-                                    class="min-w-0 truncate text-base font-semibold leading-tight sm:text-lg"
-                                    title={p.name}
-                                  >
-                                    {displayName}
+                        return (
+                          <article
+                            key={product.id}
+                            class="group relative cursor-pointer rounded-3xl border border-zinc-200 bg-bg p-3 shadow-md transition hover:bg-[#fffff1] sm:p-5"
+                            onClick={() => openProduct(product.id)}
+                          >
+                            <div class="flex flex-col gap-4 min-[520px]:flex-row sm:gap-4">
+                              <div class="min-w-0 flex-1 flex flex-col">
+                                <div class="min-w-0">
+                                  <h3 class="text-base font-semibold leading-tight wrap-break-words sm:text-lg" title={product.name}>
+                                    {product.name}
                                   </h3>
+
+                                  {ingredientsText ? (
+                                    <p class="mt-2 line-clamp-3 text-sm text-zinc-600">{ingredientsText}</p>
+                                  ) : (
+                                    <p class="mt-2 text-sm text-zinc-500">(Sin descripción)</p>
+                                  )}
                                 </div>
 
-                                {ingredientsText ? (
-                                  <p class="mt-2 line-clamp-3 text-sm text-zinc-600">{ingredientsText}</p>
-                                ) : (
-                                  <p class="mt-2 text-sm text-zinc-500">(Sin descripción)</p>
-                                )}
+                                <div class="mt-auto flex flex-wrap items-end gap-3 pt-4">
+                                  <div class="text-lg font-black sm:text-xl">{money(product.priceCents)}</div>
+
+                                  {product.allergens.length > 0 ? (
+                                    <div class="ml-auto flex flex-wrap justify-end gap-2">
+                                      {product.allergens.map((allergen) => (
+                                        <img
+                                          key={`${product.id}-${allergen.slug}`}
+                                          src={allergenIconPath(allergen)}
+                                          alt={allergen.name}
+                                          title={allergen.name}
+                                          class="h-7 w-7 object-contain sm:h-8 sm:w-8"
+                                          loading="lazy"
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div class="ml-auto" />
+                                  )}
+                                </div>
                               </div>
 
-                              {/* Franja inferior: precio + alérgenos + ❤️ */}
-                              <div class="mt-auto flex flex-wrap items-end justify-between gap-2 pt-4 sm:gap-3">
-                                <div class="text-lg font-black sm:text-xl">{money(p.priceCents)}</div>
-
-                                {p.allergens?.length ? (
-                                  <div class="flex flex-wrap gap-2">
-                                    {p.allergens.map((a) => (
-                                      <span
-                                        key={a}
-                                        class="grid h-7 w-7 place-items-center rounded-full border border-zinc-300 text-[10px] font-bold text-zinc-700"
-                                        title={a}
-                                      >
-                                        {a.slice(0, 2).toUpperCase()}
-                                      </span>
-                                    ))}
-                                  </div>
+                              <div class="relative h-44 w-full shrink-0 min-[520px]:h-36 min-[520px]:w-36 xl:h-40 xl:w-40">
+                                {imageSrc ? (
+                                  <img
+                                    class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-500 object-cover"
+                                    src={imageSrc}
+                                    alt={product.name}
+                                    loading="lazy"
+                                  />
                                 ) : (
-                                  <div class="h-7" />
+                                  <div class="h-full w-full rounded-2xl border border-zinc-200 bg-white backdrop-blur-2xl" />
                                 )}
 
-                                <FavoriteHoverButton productId={p.id} variant="icon" />
+                                <button
+                                  type="button"
+                                  aria-label={product.isConfigurable ? "Abrir configurador" : "Añadir al carrito"}
+                                  title={product.isConfigurable ? "Personalizar" : "Añadir"}
+                                  onClick={(event) => onPlusClick(event, product)}
+                                  class={[
+                                    "absolute -top-2 -right-2 grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition sm:h-11 sm:w-11",
+                                    busy ? "pointer-events-none opacity-70" : "hover:scale-[1.02]",
+                                  ].join(" ")}
+                                >
+                                  <span class="text-lg font-black leading-none">{flashed ? "✓" : "+"}</span>
+                                </button>
                               </div>
                             </div>
-
-                            {/* Imagen */}
-                            <div class="relative h-28 w-28 shrink-0 sm:h-44 sm:w-44">
-                              {imgSrc ? (
-                                <img
-                                  class="h-full w-full rounded-2xl border border-zinc-200 bg-zinc-500 object-cover"
-                                  src={imgSrc}
-                                  alt={p.name}
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div class="h-full w-full rounded-2xl border border-zinc-200 bg-white backdrop-blur-2xl" />
-                              )}
-
-                              {/* + overlay */}
-                              <button
-                                type="button"
-                                aria-label={p.isConfigurable ? "Abrir configurador" : "Añadir al carrito"}
-                                title={p.isConfigurable ? "Personalizar" : "Añadir"}
-                                onClick={(e) => onPlusClick(e, p)}
-                                class={[
-                                  "absolute -top-2 -right-2 grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition sm:h-11 sm:w-11",
-                                  busy ? "pointer-events-none opacity-70" : "hover:scale-[1.02]",
-                                ].join(" ")}
-                              >
-                                <span class="text-lg font-black leading-none">{flashed ? "✓" : "+"}</span>
-                              </button>
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            ))}
-          </div>
-        )}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

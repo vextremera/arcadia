@@ -8,6 +8,8 @@ import {
   ProductModifierGroup,
   ProductIngredient,
   Ingredient,
+  ProductAllergen,
+  Allergen,
   eq,
   inArray,
   and,
@@ -20,11 +22,14 @@ function json(data: unknown, status = 200) {
   });
 }
 
+function allergenIconPath(slug: string, iconUrl?: string | null) {
+  return iconUrl ?? `/images/allergens/${slug}.webp`;
+}
+
 export const GET: APIRoute = async ({ params, locals }) => {
   const id = Number(params.id);
   if (!Number.isFinite(id)) return json({ error: "INVALID_ID" }, 400);
 
-  // 1) Producto
   const [product] = await db
     .select({
       id: Product.id,
@@ -41,7 +46,6 @@ export const GET: APIRoute = async ({ params, locals }) => {
 
   if (!product || !product.active) return json({ error: "NOT_FOUND" }, 404);
 
-  // 2) Variantes
   const variants = await db
     .select({
       id: ProductVariant.id,
@@ -53,8 +57,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     .from(ProductVariant)
     .where(eq(ProductVariant.productId, id));
 
-  // 3) Grupos de modificadores asignados al producto
-  const pmg = await db
+  const productModifierGroups = await db
     .select({
       groupId: ProductModifierGroup.groupId,
       sortOrder: ProductModifierGroup.sortOrder,
@@ -62,7 +65,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
     .from(ProductModifierGroup)
     .where(eq(ProductModifierGroup.productId, id));
 
-  const groupIds = pmg.map((x) => x.groupId);
+  const groupIds = productModifierGroups.map((row) => row.groupId);
 
   const groups = groupIds.length
     ? await db
@@ -93,8 +96,7 @@ export const GET: APIRoute = async ({ params, locals }) => {
         .where(inArray(ModifierOption.groupId, groupIds))
     : [];
 
-  // 4) Ingredientes del producto (para "Quitar...")
-  const prodIngredients = await db
+  const productIngredients = await db
     .select({
       id: ProductIngredient.id,
       ingredientId: ProductIngredient.ingredientId,
@@ -109,7 +111,6 @@ export const GET: APIRoute = async ({ params, locals }) => {
     .where(and(eq(ProductIngredient.productId, id), eq(Ingredient.active, true)))
     .orderBy(ProductIngredient.sortOrder);
 
-  // 5) Ingredientes comunes y todos activos
   const commonIngredients = await db
     .select({
       id: Ingredient.id,
@@ -136,51 +137,62 @@ export const GET: APIRoute = async ({ params, locals }) => {
     .where(eq(Ingredient.active, true))
     .orderBy(Ingredient.name);
 
-  // (Opcional futuro) favoritos
+  const allergens = await db
+    .select({
+      slug: Allergen.slug,
+      name: Allergen.name,
+      iconUrl: Allergen.iconUrl,
+      sortOrder: Allergen.sortOrder,
+    })
+    .from(ProductAllergen)
+    .innerJoin(Allergen, eq(ProductAllergen.allergenId, Allergen.id))
+    .where(and(eq(ProductAllergen.productId, id), eq(Allergen.active, true)))
+    .orderBy(Allergen.sortOrder, Allergen.name);
+
   const favorited = locals.user ? false : null;
 
   return json({
     product,
 
-    variants: variants.filter((v) => v.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    variants: variants.filter((variant) => variant.active).sort((a, b) => a.sortOrder - b.sortOrder),
 
     modifierGroups: groups
-      .filter((g) => g.active)
-      .map((g) => ({
-        id: g.id,
-        name: g.name,
-        minSelect: g.minSelect,
-        maxSelect: g.maxSelect,
-        required: g.required,
-        sortOrder: g.sortOrder,
+      .filter((group) => group.active)
+      .map((group) => ({
+        id: group.id,
+        name: group.name,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        required: group.required,
+        sortOrder: group.sortOrder,
         options: options
-          .filter((o) => o.active && o.groupId === g.id)
+          .filter((option) => option.active && option.groupId === group.id)
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((o) => ({
-            id: o.id,
-            name: o.name,
-            priceDeltaCents: o.priceDeltaCents,
-            sortOrder: o.sortOrder,
+          .map((option) => ({
+            id: option.id,
+            name: option.name,
+            priceDeltaCents: option.priceDeltaCents,
+            sortOrder: option.sortOrder,
           })),
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder),
 
-    // Ingredientes del producto para "Quitar..."
-    productIngredients: prodIngredients.map((pi) => ({
-      ingredientId: pi.ingredientId,
-      name: pi.name,
-      slug: pi.slug,
-      defaultIncluded: pi.defaultIncluded,
-      removable: pi.removable,
-      sortOrder: pi.sortOrder,
+    productIngredients: productIngredients.map((productIngredient) => ({
+      ingredientId: productIngredient.ingredientId,
+      name: productIngredient.name,
+      slug: productIngredient.slug,
+      defaultIncluded: productIngredient.defaultIncluded,
+      removable: productIngredient.removable,
+      sortOrder: productIngredient.sortOrder,
     })),
 
-    // Para "Añadir comunes"
     commonIngredients,
-
-    // Para "Añadir todos"
     allIngredients,
-
+    allergens: allergens.map((allergen) => ({
+      slug: allergen.slug,
+      name: allergen.name,
+      iconUrl: allergenIconPath(allergen.slug, allergen.iconUrl),
+    })),
     favorited,
   });
 };

@@ -36,7 +36,7 @@ export default function NewsletterForm() {
 
   return (
     <div>
-      <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-5">
+      <div class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
         <input
           class="h-14 w-full rounded-2xl border border-white/20 bg-white px-5 text-base text-zinc-900 outline-none placeholder:text-zinc-500 sm:w-240"
           placeholder="example@correo.com"
@@ -49,7 +49,7 @@ export default function NewsletterForm() {
 
         <button
           type="button"
-          class={`grid h-14 w-full place-items-center rounded-2xl cursor-pointer text-white hover:text-white/90 sm:w-14 ${status === "loading" ? "opacity-60 pointer-events-none" : ""
+          class={`grid h-14 w-14 shrink-0 place-items-center self-start rounded-2xl cursor-pointer text-white hover:text-white/90 ${status === "loading" ? "opacity-60 pointer-events-none" : ""
             }`}
           onClick={submit}
           aria-label="Suscribirme"

@@ -3,15 +3,12 @@ import { api } from "@/islands/_shared/http";
 
 type Availability = {
   now: string;
-
   pauseOrders: boolean;
   forcePickup: boolean;
   deliveryFeeCents: number;
-
   isOpen: boolean;
   kitchenOpen: boolean;
   deliveryAvailable: boolean;
-
   windows: {
     open: { start: string; end: string };
     kitchen: { start: string; end: string };
@@ -31,12 +28,9 @@ type CartResponse = {
     name: string;
     qty: number;
     lineTotalCents: number;
-
     baseLineTotalCents: number;
-
     modifierDetails?: Array<{ id: number; name: string; deltaCents: number }>;
     addedIngredientDetails?: Array<{ id: number; name: string; deltaCents: number }>;
-
     removedLines?: string[];
     variantLabel?: string | null;
   }>;
@@ -76,7 +70,6 @@ function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
 
-// fetch “tolerante”: si estás anónimo, no rompe el checkout
 async function safeJson<T>(url: string): Promise<T | null> {
   try {
     const res = await fetch(url);
@@ -111,7 +104,6 @@ export default function CheckoutForm() {
   const [nameDirty, setNameDirty] = useState(false);
   const [phoneDirty, setPhoneDirty] = useState(false);
 
-  // para micro-mejora saveProfile
   const [initialProfileName, setInitialProfileName] = useState("");
   const [initialProfilePhone, setInitialProfilePhone] = useState("");
 
@@ -123,12 +115,10 @@ export default function CheckoutForm() {
 
   const [orderNotes, setOrderNotes] = useState("");
 
-  // Cuenta / direcciones
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<AddressDto[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | "">("");
 
-  // Guardar dirección desde checkout
   const [saveThisAddress, setSaveThisAddress] = useState(false);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saveAddressLabel, setSaveAddressLabel] = useState("");
@@ -155,18 +145,16 @@ export default function CheckoutForm() {
     return type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
   }, [payments, type]);
 
-  function applyAddress(a: AddressDto) {
-    setLine1(a.line1 ?? "");
-    setLine2(a.line2 ?? "");
-    setCity(a.city ?? "Lloret de Mar");
-    setPostalCode(a.postalCode ?? "");
-    setAddressNotes(a.notes ?? "");
+  function applyAddress(address: AddressDto) {
+    setLine1(address.line1 ?? "");
+    setLine2(address.line2 ?? "");
+    setCity(address.city ?? "Lloret de Mar");
+    setPostalCode(address.postalCode ?? "");
+    setAddressNotes(address.notes ?? "");
 
-    // Si el usuario no ha tocado los inputs, usamos contacto/teléfono de esa dirección
-    if (!nameDirty) setCustomerName(a.contactName ?? "");
-    if (!phoneDirty) setCustomerPhone(a.phone ?? "");
+    if (!nameDirty) setCustomerName(address.contactName ?? "");
+    if (!phoneDirty) setCustomerPhone(address.phone ?? "");
 
-    // Si escoges una guardada, no tiene sentido “guardar”
     setSaveThisAddress(false);
     setSaveAsDefault(false);
     setSaveAddressLabel("");
@@ -185,41 +173,38 @@ export default function CheckoutForm() {
         setCart(c);
         setAvail(a);
         setPayments(p);
-
         setType(a.deliveryAvailable ? "DELIVERY" : "PICKUP");
 
-        // Prefill si hay sesión
-        const prof = await safeJson<ProfileResponse>("/api/account/profile");
-        if (prof?.ok && prof.user?.role === "CUSTOMER") {
+        const profile = await safeJson<ProfileResponse>("/api/account/profile");
+        if (profile?.ok && profile.user?.role === "CUSTOMER") {
           setIsLoggedIn(true);
 
-          const initName = prof.user.name ?? "";
-          const initPhone = prof.profile?.phone ?? "";
+          const initialName = profile.user.name ?? "";
+          const initialPhone = profile.profile?.phone ?? "";
 
-          setInitialProfileName(initName);
-          setInitialProfilePhone(initPhone);
+          setInitialProfileName(initialName);
+          setInitialProfilePhone(initialPhone);
 
-          if (initName) setCustomerName(initName);
-          if (prof.user.email) setCustomerEmail(prof.user.email);
-          if (initPhone) setCustomerPhone(initPhone);
+          if (initialName) setCustomerName(initialName);
+          if (profile.user.email) setCustomerEmail(profile.user.email);
+          if (initialPhone) setCustomerPhone(initialPhone);
 
-          const addr = await safeJson<AddressesResponse>("/api/account/addresses");
-          const list = addr?.ok ? addr.addresses ?? [] : [];
+          const addressResponse = await safeJson<AddressesResponse>("/api/account/addresses");
+          const list = addressResponse?.ok ? addressResponse.addresses ?? [] : [];
           setSavedAddresses(list);
 
           const lastIdRaw =
             typeof window !== "undefined" ? window.localStorage.getItem(LAST_ADDRESS_KEY) : null;
           const lastId = lastIdRaw ? Number(lastIdRaw) : NaN;
 
-          const last = Number.isFinite(lastId) ? list.find((x) => x.id === lastId) : undefined;
-          const def = list.find((x) => x.isDefault);
+          const last = Number.isFinite(lastId) ? list.find((item) => item.id === lastId) : undefined;
+          const def = list.find((item) => item.isDefault);
           const chosen = last ?? def ?? list[0];
 
           if (chosen) {
             setSelectedAddressId(chosen.id);
             applyAddress(chosen);
           } else {
-            // si estás logueado y no tienes direcciones, sugerimos guardarla
             setSaveThisAddress(true);
           }
         } else {
@@ -229,7 +214,6 @@ export default function CheckoutForm() {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -242,7 +226,6 @@ export default function CheckoutForm() {
     if (paymentMethod === "CARD" && !okCard && okCash) setPaymentMethod("CASH");
   }, [payments, type, paymentMethod]);
 
-  // Si cambias a PICKUP, no mostramos dirección ni guardado
   useEffect(() => {
     if (type !== "DELIVERY") {
       setSaveThisAddress(false);
@@ -262,12 +245,10 @@ export default function CheckoutForm() {
       });
       if (!res?.ok) throw new Error(res?.error || "No se pudo marcar como default.");
 
-      // guardar como “última”
       try {
         window.localStorage.setItem(LAST_ADDRESS_KEY, String(selectedAddressId));
-      } catch { }
+      } catch {}
 
-      // refrescar lista local
       const addr = await safeJson<AddressesResponse>("/api/account/addresses");
       const list = addr?.ok ? addr.addresses ?? [] : [];
       setSavedAddresses(list);
@@ -305,11 +286,7 @@ export default function CheckoutForm() {
         postalCode,
         notes: addressNotes,
       },
-
-      // ✅ guardar perfil (best-effort) solo si hay cambios
       saveProfile: shouldSaveProfile,
-
-      // ✅ guardar dirección (si es nueva)
       saveAddress: isLoggedIn && type === "DELIVERY" && saveThisAddress && !selectedAddressId,
       saveAddressDefault:
         isLoggedIn && type === "DELIVERY" && saveThisAddress && saveAsDefault && !selectedAddressId,
@@ -331,11 +308,10 @@ export default function CheckoutForm() {
       return;
     }
 
-    // ✅ si el backend guardó/actualizó una address desde checkout, la recordamos como última
     if (data?.savedAddressId) {
       try {
         window.localStorage.setItem(LAST_ADDRESS_KEY, String(data.savedAddressId));
-      } catch { }
+      } catch {}
     }
 
     if (data.forcedPickup) {
@@ -346,27 +322,29 @@ export default function CheckoutForm() {
   }
 
   if (loading) return <div class="mt-6 text-sm text-zinc-600">Cargando checkout…</div>;
-  if (!cart || cart.items.length === 0) return <div class="mt-6 text-sm text-zinc-600">Tu carrito está vacío.</div>;
+  if (!cart || cart.items.length === 0) {
+    return <div class="mt-6 text-sm text-zinc-600">Tu carrito está vacío.</div>;
+  }
 
   return (
-    <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1fr_420px]">
+    <div class="mt-4 grid gap-4 sm:mt-6 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_26rem] 2xl:grid-cols-[minmax(0,1fr)_30rem]">
       <div class="space-y-4 sm:space-y-6">
-        {/* Tipo */}
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Tipo de pedido</h2>
 
           {!avail?.deliveryAvailable ? (
             <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Ahora mismo no hay reparto. Horario delivery: {avail?.windows.delivery.start}–{avail?.windows.delivery.end}.
-              Tu pedido será <b>recogida</b>.
+              Ahora mismo no hay reparto. Horario delivery: {avail?.windows.delivery.start}–
+              {avail?.windows.delivery.end}. Tu pedido será <b>recogida</b>.
             </div>
           ) : null}
 
-          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${type === "DELIVERY" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-                } ${deliveryDisabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                type === "DELIVERY" ? "bg-zinc-900 text-white" : "border border-zinc-300"
+              } ${deliveryDisabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setType("DELIVERY")}
               disabled={deliveryDisabled}
             >
@@ -375,8 +353,9 @@ export default function CheckoutForm() {
 
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${type === "PICKUP" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-                }`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                type === "PICKUP" ? "bg-zinc-900 text-white" : "border border-zinc-300"
+              }`}
               onClick={() => setType("PICKUP")}
             >
               Recogida
@@ -384,11 +363,10 @@ export default function CheckoutForm() {
           </div>
         </section>
 
-        {/* Contacto */}
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Datos de contacto</h2>
 
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
             <div>
               <label class="text-sm font-medium">Nombre</label>
               <input
@@ -413,7 +391,7 @@ export default function CheckoutForm() {
               />
             </div>
 
-            <div class="sm:col-span-2">
+            <div class="lg:col-span-2">
               <label class="text-sm font-medium">Email (opcional)</label>
               <input
                 class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
@@ -424,10 +402,9 @@ export default function CheckoutForm() {
           </div>
         </section>
 
-        {/* Dirección si DELIVERY */}
         {type === "DELIVERY" ? (
           <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
-            <div class="flex items-start justify-between gap-4">
+            <div class="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-start sm:gap-4">
               <h2 class="text-lg font-semibold">Dirección</h2>
 
               {isLoggedIn ? (
@@ -444,31 +421,31 @@ export default function CheckoutForm() {
               <div class="mt-3">
                 <label class="text-sm font-medium">Usar dirección guardada</label>
 
-                <div class="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div class="mt-1 flex flex-col gap-2 xl:flex-row xl:items-center">
                   <select
                     class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
                     value={selectedAddressId}
                     onChange={(e) => {
-                      const v = (e.target as HTMLSelectElement).value;
-                      const id = v ? Number(v) : "";
+                      const value = (e.target as HTMLSelectElement).value;
+                      const id = value ? Number(value) : "";
                       setSelectedAddressId(id);
 
                       if (id) {
                         try {
                           window.localStorage.setItem(LAST_ADDRESS_KEY, String(id));
-                        } catch { }
+                        } catch {}
                       }
 
-                      const a = savedAddresses.find((x) => x.id === id);
-                      if (a) applyAddress(a);
+                      const address = savedAddresses.find((item) => item.id === id);
+                      if (address) applyAddress(address);
                     }}
                   >
                     <option value="">— Introducir nueva —</option>
-                    {savedAddresses.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {(a.label ? `${a.label} · ` : "")}
-                        {a.line1} · {a.postalCode} {a.city}
-                        {a.isDefault ? " (default)" : ""}
+                    {savedAddresses.map((address) => (
+                      <option key={address.id} value={address.id}>
+                        {(address.label ? `${address.label} · ` : "")}
+                        {address.line1} · {address.postalCode} {address.city}
+                        {address.isDefault ? " (default)" : ""}
                       </option>
                     ))}
                   </select>
@@ -484,12 +461,14 @@ export default function CheckoutForm() {
                   ) : null}
                 </div>
 
-                <div class="mt-2 text-xs text-zinc-600">Si eliges una guardada, no se volverá a guardar.</div>
+                <div class="mt-2 text-xs text-zinc-600">
+                  Si eliges una guardada, no se volverá a guardar.
+                </div>
               </div>
             ) : null}
 
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <div class="sm:col-span-2">
+            <div class="mt-4 grid gap-3 lg:grid-cols-2">
+              <div class="lg:col-span-2">
                 <label class="text-sm font-medium">Dirección</label>
                 <input
                   class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
@@ -501,7 +480,7 @@ export default function CheckoutForm() {
                 />
               </div>
 
-              <div class="sm:col-span-2">
+              <div class="lg:col-span-2">
                 <label class="text-sm font-medium">Piso/puerta (opcional)</label>
                 <input
                   class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
@@ -537,7 +516,7 @@ export default function CheckoutForm() {
                 />
               </div>
 
-              <div class="sm:col-span-2">
+              <div class="lg:col-span-2">
                 <label class="text-sm font-medium">Notas de dirección (opcional)</label>
                 <input
                   class="mt-1 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
@@ -550,7 +529,6 @@ export default function CheckoutForm() {
               </div>
             </div>
 
-            {/* Guardar dirección */}
             {isLoggedIn && !selectedAddressId ? (
               <label class="mt-4 flex items-center gap-2 text-sm text-zinc-700">
                 <input
@@ -593,15 +571,15 @@ export default function CheckoutForm() {
           </section>
         ) : null}
 
-        {/* Pago */}
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Pago</h2>
 
-          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+          <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${paymentMethod === "CASH" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-                } ${!cashEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                paymentMethod === "CASH" ? "bg-zinc-900 text-white" : "border border-zinc-300"
+              } ${!cashEnabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setPaymentMethod("CASH")}
               disabled={!cashEnabled}
             >
@@ -610,8 +588,9 @@ export default function CheckoutForm() {
 
             <button
               type="button"
-              class={`rounded-xl px-4 py-2 text-sm font-semibold ${paymentMethod === "CARD" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-                } ${!cardEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              class={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                paymentMethod === "CARD" ? "bg-zinc-900 text-white" : "border border-zinc-300"
+              } ${!cardEnabled ? "opacity-50 pointer-events-none" : ""}`}
               onClick={() => setPaymentMethod("CARD")}
               disabled={!cardEnabled}
             >
@@ -620,10 +599,11 @@ export default function CheckoutForm() {
           </div>
         </section>
 
-        {/* Notas pedido */}
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Comentarios del pedido</h2>
-          <p class="mt-1 text-sm text-zinc-600">Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).</p>
+          <p class="mt-1 text-sm text-zinc-600">
+            Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).
+          </p>
           <textarea
             class="mt-3 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm"
             rows={3}
@@ -633,27 +613,28 @@ export default function CheckoutForm() {
         </section>
       </div>
 
-      {/* Resumen */}
-      <aside class="lg:sticky lg:top-4 lg:h-fit">
-        <div class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+      <aside class="xl:sticky xl:top-4 xl:h-fit">
+        <div class="rounded-2xl border border-zinc-200 p-4 sm:p-5 2xl:p-6">
           <h2 class="text-lg font-semibold">Resumen</h2>
 
           <div class="mt-4 space-y-3 sm:space-y-4 text-sm">
-            {cart.items.map((it) => (
-              <div key={it.lineId} class="rounded-2xl border border-zinc-200 p-3 sm:p-4">
+            {cart.items.map((item) => (
+              <div key={item.lineId} class="rounded-2xl border border-zinc-200 p-3 sm:p-4">
                 <div class="flex items-baseline justify-between gap-3">
                   <div class="min-w-0 truncate font-semibold">
-                    {it.qty}× {it.name}
+                    {item.qty}× {item.name}
                   </div>
-                  <div class="shrink-0 font-semibold">{money(it.lineTotalCents)}</div>
+                  <div class="shrink-0 font-semibold">{money(item.lineTotalCents)}</div>
                 </div>
 
-                {it.variantLabel ? <div class="mt-1 text-xs text-zinc-600">{it.variantLabel}</div> : null}
+                {item.variantLabel ? (
+                  <div class="mt-1 text-xs text-zinc-600">{item.variantLabel}</div>
+                ) : null}
               </div>
             ))}
           </div>
 
-          <div class="mt-4 border-t border-zinc-200 pt-4 flex items-center justify-between text-sm">
+          <div class="mt-4 flex items-center justify-between border-t border-zinc-200 pt-4 text-sm">
             <span class="text-zinc-600">Subtotal</span>
             <span class="font-semibold">{money(cart.subtotalCents)}</span>
           </div>
@@ -671,8 +652,9 @@ export default function CheckoutForm() {
           </div>
 
           <button
-            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${avail?.pauseOrders ? "opacity-60 pointer-events-none" : ""
-              }`}
+            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${
+              avail?.pauseOrders ? "opacity-60 pointer-events-none" : ""
+            }`}
             type="button"
             onClick={submit}
             disabled={!!avail?.pauseOrders}

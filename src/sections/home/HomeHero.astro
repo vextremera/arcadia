@@ -1,30 +1,30 @@
-<section
-  class="relative h-[calc(100%+4rem)] overflow-hidden min-h-screen rounded-t-[40px] home-hero"
->
+<section class="home-hero relative overflow-hidden rounded-t-[40px]">
   <!-- Fondo -->
   <div
     class="absolute inset-0 z-0 bg-cover bg-center"
     style={`background-image: url('/images/general/bg.webp');`}
     aria-hidden="true"
   >
-    <div class="absolute inset-0 bg-black/60 z-10"></div>
-    <div class="absolute inset-x-0 bottom-0 h-10 bg-bg z-20 rounded-t-[40px]">
-    </div>
+    <div class="absolute inset-0 z-10 bg-black/60"></div>
   </div>
+
+  <!-- Transición inferior -->
+  <div class="home-hero__cap pointer-events-none absolute inset-x-0 -bottom-px z-20 h-10 rounded-t-[40px] bg-bg"></div>
+
   <div
-    class="container mx-auto px-6 pt-32 pb-48 relative z-10 home-hero__inner"
+    class="home-hero__inner relative z-10 mx-auto flex w-full max-w-440 items-center justify-center px-4 py-24 text-center sm:px-6 sm:py-32 lg:px-10 lg:py-40"
     x-data="{ fadeIn: false }"
     x-init="setTimeout(() => fadeIn = true, 500)"
   >
     <div
-      class="w-full transition-all duration-1000 justify-center text-center"
+      class="w-full transition-all duration-1000"
       :class="fadeIn ? 'opacity-100 transform translate-y-0' : 'opacity-0 transform translate-y-10'"
     >
       <h1
-        class="text-2xl md:text-4xl font-medium sigmar-regular text-white leading-tight mb-6 home-hero__title"
+        class="mx-auto w-full max-w-88 text-[clamp(1.1rem,4vw,2.25rem)] font-medium leading-tight text-white sigmar-regular min-[380px]:max-w-none sm:text-4xl"
       >
         BAR RESTAURANTE<br /><span
-          class="text-8xl md:text-10xl font-extrabold tracking-widest text-white sigmar-regular block -mt-2 home-hero__brand"
+          class="home-hero__brand mx-auto mt-1 block max-w-full text-center text-[clamp(3.2rem,16vw,8rem)] font-extrabold leading-[0.9] tracking-[0.02em] text-white sigmar-regular sm:-mt-2 sm:text-8xl sm:tracking-[0.06em] md:text-10xl md:tracking-widest"
           >ARCADIA</span
         >
       </h1>
@@ -33,36 +33,46 @@
 </section>
 
 <style>
-  @media (max-width: 639px) {
+  .home-hero {
+    min-height: calc(100svh - 2.5rem);
+  }
+
+  @media (max-width: 549px) {
     .home-hero {
-      min-height: 100svh;
-      border-top-left-radius: 24px;
-      border-top-right-radius: 24px;
+      min-height: calc(100svh - 1.5rem);
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
     }
 
-    .home-hero [aria-hidden="true"] > .rounded-t-\[40px\] {
-      border-top-left-radius: 24px;
-      border-top-right-radius: 24px;
-      height: 1.75rem;
+    .home-hero__cap {
+      height: 2rem;
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
     }
 
     .home-hero__inner {
-      padding-left: 1rem;
-      padding-right: 1rem;
       padding-top: 6.5rem;
-      padding-bottom: 7rem;
+      padding-bottom: 6rem;
     }
+  }
 
-    .home-hero__title {
-      margin-bottom: 1rem;
-      line-height: 1.15;
-    }
-
+  @media (max-width: 430px) {
     .home-hero__brand {
-      font-size: clamp(3.5rem, 18vw, 5.75rem);
-      line-height: 0.95;
-      letter-spacing: 0.08em;
-      margin-top: 0.25rem;
+      font-size: clamp(2.9rem, 15vw, 4.4rem);
+      letter-spacing: 0.01em;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .home-hero__brand {
+      font-size: clamp(2.5rem, 14vw, 3.8rem);
+      letter-spacing: 0;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .home-hero {
+      min-height: 68rem;
     }
   }
 </style>

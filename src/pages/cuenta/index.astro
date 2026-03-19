@@ -2,7 +2,6 @@
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, UserProfile, LoyaltyTier, eq } from "astro:db";
 import AccountPanel from "@/islands/account/AccountPanel";
-import FavoritesCount from "@/islands/favorites/FavoritesCount";
 
 const user = Astro.locals.user;
 
@@ -67,14 +66,6 @@ if (user) {
           href="/cuenta/pedidos"
         >
           Mis pedidos
-        </a>
-
-        <a
-          class="inline-flex w-full items-center justify-center rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
-          href="/cuenta/favoritos"
-        >
-          <span>Favoritos</span>
-          <FavoritesCount client:load />
         </a>
       </div>
     </div>

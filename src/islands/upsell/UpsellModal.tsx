@@ -17,26 +17,36 @@ function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
 
+function goToCheckout() {
+  window.location.href = "/checkout";
+}
+
 export default function UpsellModal() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<UpsellProduct[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  async function load() {
+  async function load(): Promise<UpsellProduct[]> {
     setLoading(true);
     try {
       const res = await api<{ products: UpsellProduct[] }>("/api/catalog/upsell");
-      setProducts(res.products ?? []);
+      const list = res.products ?? [];
+      setProducts(list);
+      return list;
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    const onOpen = () => {
+    const onOpen = async () => {
       setOpen(true);
-      load();
+      const list = await load();
+      if (list.length === 0) {
+        setOpen(false);
+        goToCheckout();
+      }
     };
 
     window.addEventListener("arcadia:upsell:open", onOpen as any);
@@ -46,7 +56,6 @@ export default function UpsellModal() {
   async function quickAdd(productId: number) {
     setBusyId(productId);
     try {
-      // Añadido “rápido”: sin personalización
       await addToCart({
         productId,
         qty: 1,
@@ -55,6 +64,7 @@ export default function UpsellModal() {
         removedIngredientIds: [],
       });
       setOpen(false);
+      goToCheckout();
     } catch (err) {
       alert((err as any)?.message || "No se pudo añadir");
     } finally {
@@ -77,12 +87,12 @@ export default function UpsellModal() {
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div class="text-xl font-semibold tracking-tight">¿Quieres algo más?</div>
-            <div class="mt-1 text-sm text-zinc-600">Añade algo rápido al carrito.</div>
+            <div class="mt-1 text-sm text-zinc-600">Añade algo rápido antes de terminar tu pedido.</div>
           </div>
 
           <button
             class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm font-semibold sm:w-auto"
-            onClick={() => setOpen(false)}
+            onClick={goToCheckout}
             type="button"
           >
             No, gracias
@@ -132,14 +142,21 @@ export default function UpsellModal() {
           <button
             class="w-full rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold sm:w-auto"
             type="button"
-            onClick={() => window.dispatchEvent(new Event("arcadia:cart:open"))}
+            onClick={() => {
+              setOpen(false);
+              window.dispatchEvent(new Event("arcadia:cart:open"));
+            }}
           >
             Ver carrito
           </button>
 
-          <a class="w-full rounded-xl bg-zinc-900 px-4 py-2 text-center text-sm font-semibold text-white sm:w-auto" href="/checkout">
+          <button
+            class="w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto"
+            type="button"
+            onClick={goToCheckout}
+          >
             Ir a checkout
-          </a>
+          </button>
         </div>
       </div>
     </div>

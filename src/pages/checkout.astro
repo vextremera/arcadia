@@ -4,6 +4,10 @@ import CheckoutForm from "@/islands/checkout/CheckoutForm";
 ---
 
 <SiteLayout title="Checkout · Arcadia">
-  <h1 class="text-2xl font-semibold tracking-tight">Finalizar pedido</h1>
-  <CheckoutForm client:load />
+  <div class="mx-auto w-full max-w-448">
+    <h1 class="text-2xl font-semibold tracking-tight 2xl:text-[2rem]">
+      Finalizar pedido
+    </h1>
+    <CheckoutForm client:load />
+  </div>
 </SiteLayout>

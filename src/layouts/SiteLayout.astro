@@ -17,6 +17,7 @@ const {
   variant = "default",
   fullWidth = false,
 } = Astro.props as Props;
+
 const isLanding = variant === "landing";
 
 const bodyClass = isLanding
@@ -26,7 +27,7 @@ const bodyClass = isLanding
 const mainClass =
   fullWidth || isLanding
     ? "w-full"
-    : "mx-auto w-full max-w-6xl px-4 py-6 sm:py-8";
+    : "mx-auto w-full max-w-6xl px-4 py-6 sm:py-8 2xl:max-w-[112rem]";
 ---
 
 <!doctype html>
@@ -50,6 +51,12 @@ const mainClass =
       @media (max-width: 639px) {
         body {
           margin: auto 12px;
+        }
+      }
+
+      @media (min-width: 1536px) {
+        body {
+          margin: auto 32px;
         }
       }
 

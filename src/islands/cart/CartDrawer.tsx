@@ -28,12 +28,10 @@ export default function CartDrawer() {
     }
   }
 
-  // Mantener el drawer sincronizado con el snapshot global del carrito.
   useEffect(() => {
     return subscribeCart(() => setCart(getCartSnapshot()));
   }, []);
 
-  // Eventos globales para abrir/cerrar (útil para header button)
   useEffect(() => {
     const onOpen = () => setOpen(true);
     const onClose = () => setOpen(false);
@@ -50,7 +48,6 @@ export default function CartDrawer() {
     };
   }, []);
 
-  // Cargar carrito al abrir
   useEffect(() => {
     if (open) void loadCart();
   }, [open]);
@@ -71,6 +68,12 @@ export default function CartDrawer() {
 
   async function clearCart() {
     await clearCartServer();
+  }
+
+  function openUpsell() {
+    if (items.length === 0) return;
+    setOpen(false);
+    window.dispatchEvent(new Event("arcadia:upsell:open"));
   }
 
   if (!open) return null;
@@ -197,13 +200,15 @@ export default function CartDrawer() {
               Vaciar
             </button>
 
-            <a
+            <button
               class={`flex-1 rounded-xl px-4 py-2 text-center text-sm font-semibold text-white ${items.length === 0 ? "bg-zinc-400 pointer-events-none" : "bg-zinc-900"
                 }`}
-              href="/checkout"
+              type="button"
+              onClick={openUpsell}
+              disabled={items.length === 0}
             >
               Finalizar
-            </a>
+            </button>
           </div>
         </div>
       </div>
