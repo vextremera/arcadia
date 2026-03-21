@@ -1,0 +1,401 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, Allergen, ProductAllergen, Product, eq, inArray } from "astro:db";
+
+type LinkedProduct = {
+  id: number;
+  name: string;
+  active: boolean;
+};
+
+type AllergenSummary = {
+  id: number;
+  slug: string;
+  name: string;
+  iconUrl: string | null;
+  sortOrder: number;
+  active: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  linkedProductCount: number;
+  linkedProducts: LinkedProduct[];
+};
+
+const EXPECTED_ALLERGEN_COUNT = 14;
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") === "1";
+const error = url.searchParams.get("error") ?? "";
+
+const allergenRows = await db
+  .select({
+    id: Allergen.id,
+    slug: Allergen.slug,
+    name: Allergen.name,
+    iconUrl: Allergen.iconUrl,
+    sortOrder: Allergen.sortOrder,
+    active: Allergen.active,
+    createdAt: Allergen.createdAt,
+    updatedAt: Allergen.updatedAt,
+  })
+  .from(Allergen)
+  .orderBy(Allergen.sortOrder, Allergen.name);
+
+const allergenIds = allergenRows.map((row) => row.id);
+
+const linkedRows = allergenIds.length
+  ? await db
+      .select({
+        allergenId: ProductAllergen.allergenId,
+        productId: Product.id,
+        productName: Product.name,
+        productActive: Product.active,
+      })
+      .from(ProductAllergen)
+      .innerJoin(Product, eq(ProductAllergen.productId, Product.id))
+      .where(inArray(ProductAllergen.allergenId, allergenIds))
+      .orderBy(ProductAllergen.allergenId, Product.name)
+  : [];
+
+const linkedProductsByAllergen = new Map<number, LinkedProduct[]>();
+for (const row of linkedRows) {
+  if (!linkedProductsByAllergen.has(row.allergenId)) {
+    linkedProductsByAllergen.set(row.allergenId, []);
+  }
+
+  linkedProductsByAllergen.get(row.allergenId)?.push({
+    id: row.productId,
+    name: row.productName,
+    active: row.productActive,
+  });
+}
+
+const allergens: AllergenSummary[] = allergenRows.map((row) => {
+  const linkedProducts = linkedProductsByAllergen.get(row.id) ?? [];
+
+  return {
+    ...row,
+    iconUrl: row.iconUrl ? String(row.iconUrl).trim() || null : null,
+    linkedProductCount: linkedProducts.length,
+    linkedProducts,
+  };
+});
+
+const totalAllergens = allergens.length;
+const activeAllergens = allergens.filter((allergen) => allergen.active).length;
+const allergensInUse = allergens.filter((allergen) => allergen.linkedProductCount > 0).length;
+const allergensWithIcon = allergens.filter((allergen) => Boolean(allergen.iconUrl)).length;
+const unexpectedCount = totalAllergens !== EXPECTED_ALLERGEN_COUNT;
+
+const errorMessage =
+  error === "invalid-allergen"
+    ? "El alérgeno indicado no es válido."
+    : error === "not-found"
+      ? "El alérgeno ya no existe."
+      : error === "missing-name"
+        ? "El nombre es obligatorio."
+        : error === "invalid-intent"
+          ? "Acción no válida."
+          : "";
+---
+
+<AdminLayout
+  title="Alérgenos · Admin · Arcadia"
+  heading="Alérgenos"
+  description="Mantenimiento controlado del catálogo fijo de alérgenos. Aquí se revisan iconos, orden, visibilidad y uso real en productos, sin abrir altas ni bajas libres."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin/catalogo/productos"
+        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+      >
+        Ver productos
+      </a>
+
+      <a
+        href="/admin/catalogo/ingredientes"
+        class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
+      >
+        Ingredientes
+      </a>
+
+      <a
+        href="/admin/catalogo/modificadores"
+        class="inline-flex items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-300 transition hover:border-violet-400/30 hover:bg-violet-400/15"
+      >
+        Modificadores
+      </a>
+    </div>
+  </Fragment>
+
+  {saved ? (
+    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      Alérgenos actualizados correctamente.
+    </section>
+  ) : null}
+
+  {errorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {errorMessage}
+    </section>
+  ) : null}
+
+  {unexpectedCount ? (
+    <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+      El catálogo actual tiene <span class="font-semibold text-amber-200">{totalAllergens}</span> alérgenos y el modelo esperado documenta un catálogo fijo de <span class="font-semibold text-amber-200">{EXPECTED_ALLERGEN_COUNT}</span>. Revisa seeds o datos antes de abrir cambios más grandes.
+    </section>
+  ) : null}
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Total</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalAllergens}</div>
+      <p class="mt-2 text-sm text-slate-400">Elementos del catálogo de alérgenos</p>
+    </article>
+
+    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">Activos</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeAllergens}</div>
+      <p class="mt-2 text-sm text-emerald-100/70">Visibles para enlazar a producto</p>
+    </article>
+
+    <article class="rounded-[28px] border border-amber-400/15 bg-amber-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/80">En uso</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{allergensInUse}</div>
+      <p class="mt-2 text-sm text-amber-100/75">Asociados ya a uno o más productos</p>
+    </article>
+
+    <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">Con icono</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{allergensWithIcon}</div>
+      <p class="mt-2 text-sm text-cyan-100/70">Tienen `iconUrl` informada</p>
+    </article>
+  </section>
+
+  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px]">
+    <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="border-b border-white/10 px-6 py-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/80">
+              Catálogo fijo
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Mantenimiento controlado de alérgenos
+            </h2>
+          </div>
+
+          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+            Slug bloqueado · sin altas ni borrado
+          </div>
+        </div>
+      </div>
+
+      {allergens.length === 0 ? (
+        <div class="px-6 py-12 text-center">
+          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+            <div class="text-lg font-semibold text-white">No hay alérgenos</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              El catálogo fijo no está cargado en esta base de datos.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div class="space-y-4 px-6 py-6">
+          {allergens.map((allergen) => (
+            <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex items-start gap-4">
+                  <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
+                    {allergen.iconUrl ? (
+                      <img
+                        src={allergen.iconUrl}
+                        alt={allergen.name}
+                        class="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Sin icono
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <div class="text-base font-semibold text-white">{allergen.name}</div>
+                    <div class="mt-1">
+                      <code class="rounded-xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-300">
+                        {allergen.slug}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                  <span class:list={[
+                    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                    allergen.active
+                      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                      : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                  ]}>
+                    {allergen.active ? "Activo" : "Inactivo"}
+                  </span>
+
+                  <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">
+                    {allergen.linkedProductCount} productos
+                  </span>
+
+                  <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                    Orden {allergen.sortOrder}
+                  </span>
+                </div>
+              </div>
+
+              <form method="post" action="/api/admin/allergens" class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_140px]">
+                <input type="hidden" name="intent" value="update" />
+                <input type="hidden" name="allergenId" value={allergen.id} />
+
+                <label class="grid gap-2 text-sm text-slate-300">
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+                  <input
+                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none"
+                    type="text"
+                    name="name"
+                    value={allergen.name}
+                    required
+                  />
+                </label>
+
+                <label class="grid gap-2 text-sm text-slate-300">
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+                  <input
+                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none"
+                    type="number"
+                    name="sortOrder"
+                    min="0"
+                    step="1"
+                    value={allergen.sortOrder}
+                  />
+                </label>
+
+                <div class="flex items-end justify-end">
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center rounded-2xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
+                  >
+                    Guardar
+                  </button>
+                </div>
+
+                <label class="grid gap-2 text-sm text-slate-300 lg:col-span-2">
+                  <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Icon URL</span>
+                  <input
+                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none"
+                    type="text"
+                    name="iconUrl"
+                    value={allergen.iconUrl ?? ""}
+                    placeholder="/images/allergens/gluten.webp"
+                  />
+                </label>
+
+                <div class="flex flex-wrap items-center gap-6 lg:col-span-2">
+                  <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                    <input
+                      class="h-4 w-4 rounded border-white/20 bg-slate-950 text-amber-400"
+                      type="checkbox"
+                      name="active"
+                      checked={allergen.active}
+                    />
+                    Activo
+                  </label>
+
+                  <div class="text-sm text-slate-500">
+                    El slug <span class="font-semibold text-slate-300">{allergen.slug}</span> queda bloqueado para mantener el catálogo fijo.
+                  </div>
+                </div>
+
+                <div class="flex items-end justify-end">
+                  <a
+                    href="/admin/catalogo/productos"
+                    class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+                  >
+                    Ver catálogo
+                  </a>
+                </div>
+              </form>
+
+              <div class="mt-4 rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-white">Uso en productos</div>
+                  <div class="text-xs uppercase tracking-[0.14em] text-slate-500">
+                    {allergen.linkedProductCount === 0 ? "Sin uso" : `${allergen.linkedProductCount} enlazado(s)`}
+                  </div>
+                </div>
+
+                {allergen.linkedProducts.length === 0 ? (
+                  <p class="mt-3 text-sm text-slate-400">
+                    Este alérgeno no está asociado a ningún producto ahora mismo.
+                  </p>
+                ) : (
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    {allergen.linkedProducts.slice(0, 6).map((product) => (
+                      <a
+                        href={`/admin/catalogo/productos/${product.id}#alergenos`}
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          product.active
+                            ? "border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white"
+                            : "border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15",
+                        ]}
+                      >
+                        {product.name}
+                      </a>
+                    ))}
+
+                    {allergen.linkedProducts.length > 6 ? (
+                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-400">
+                        +{allergen.linkedProducts.length - 6} más
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </article>
+
+    <aside class="space-y-6">
+      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Regla</div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Catálogo fijo de 14</h2>
+
+        <div class="mt-6 space-y-4">
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Sin altas ni bajas</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              El schema documenta los alérgenos como un catálogo fijo. Por eso aquí no hay creación ni borrado libre.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div class="text-sm font-semibold text-amber-200">Edición controlada</div>
+            <p class="mt-2 text-sm leading-6 text-amber-100/80">
+              Solo se mantienen nombre, icono, orden y estado. El <code>slug</code> se conserva estable para no romper semillas, imágenes ni referencias.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Dónde se usa</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              La asociación real sigue viviéndose en la ficha de producto, en el bloque de alérgenos de <code>/admin/catalogo/productos/[id]</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </section>
+</AdminLayout>

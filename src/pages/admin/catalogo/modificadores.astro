@@ -1,0 +1,700 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, ModifierGroup, ModifierOption, ProductModifierGroup, inArray } from "astro:db";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function moneyInput(cents: number) {
+  return (Number(cents ?? 0) / 100).toFixed(2);
+}
+
+type ModifierOptionSummary = {
+  id: number;
+  groupId: number;
+  name: string;
+  priceDeltaCents: number;
+  sortOrder: number;
+  active: boolean;
+};
+
+type ModifierGroupSummary = {
+  id: number;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  required: boolean;
+  sortOrder: number;
+  active: boolean;
+  linkedProductCount: number;
+  optionCount: number;
+  activeOptionCount: number;
+  options: ModifierOptionSummary[];
+};
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") === "1";
+const error = url.searchParams.get("error") ?? "";
+const modifierOptionSaved = url.searchParams.get("modifierOptionSaved") === "1";
+const modifierOptionError = url.searchParams.get("modifierOptionError") ?? "";
+
+const groupRows = await db
+  .select({
+    id: ModifierGroup.id,
+    name: ModifierGroup.name,
+    minSelect: ModifierGroup.minSelect,
+    maxSelect: ModifierGroup.maxSelect,
+    required: ModifierGroup.required,
+    sortOrder: ModifierGroup.sortOrder,
+    active: ModifierGroup.active,
+  })
+  .from(ModifierGroup)
+  .orderBy(ModifierGroup.sortOrder, ModifierGroup.name);
+
+const groupIds = groupRows.map((group) => group.id);
+
+const productLinks = groupIds.length
+  ? await db
+      .select({
+        groupId: ProductModifierGroup.groupId,
+      })
+      .from(ProductModifierGroup)
+      .where(inArray(ProductModifierGroup.groupId, groupIds))
+  : [];
+
+const optionRows = groupIds.length
+  ? await db
+      .select({
+        id: ModifierOption.id,
+        groupId: ModifierOption.groupId,
+        name: ModifierOption.name,
+        priceDeltaCents: ModifierOption.priceDeltaCents,
+        sortOrder: ModifierOption.sortOrder,
+        active: ModifierOption.active,
+      })
+      .from(ModifierOption)
+      .where(inArray(ModifierOption.groupId, groupIds))
+      .orderBy(ModifierOption.sortOrder, ModifierOption.name)
+  : [];
+
+const linkedProductCountByGroup = new Map<number, number>();
+for (const row of productLinks) {
+  linkedProductCountByGroup.set(
+    row.groupId,
+    (linkedProductCountByGroup.get(row.groupId) ?? 0) + 1
+  );
+}
+
+const optionsByGroup = new Map<number, ModifierOptionSummary[]>();
+for (const option of optionRows) {
+  if (!optionsByGroup.has(option.groupId)) {
+    optionsByGroup.set(option.groupId, []);
+  }
+  optionsByGroup.get(option.groupId)?.push(option);
+}
+
+const groups: ModifierGroupSummary[] = groupRows.map((group) => {
+  const options = (optionsByGroup.get(group.id) ?? []).sort((a, b) => {
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+    return a.name.localeCompare(b.name, "es");
+  });
+
+  return {
+    ...group,
+    linkedProductCount: linkedProductCountByGroup.get(group.id) ?? 0,
+    optionCount: options.length,
+    activeOptionCount: options.filter((option) => option.active).length,
+    options,
+  };
+});
+
+const totalGroups = groups.length;
+const activeGroups = groups.filter((group) => group.active).length;
+const linkedGroups = groups.filter((group) => group.linkedProductCount > 0).length;
+const totalOptions = optionRows.length;
+
+const errorMessage =
+  error === "missing-name"
+    ? "El nombre del grupo es obligatorio."
+    : error === "invalid-limits"
+      ? "Los límites no son válidos. Revisa mínimos y máximos."
+      : error === "invalid-group"
+        ? "El grupo indicado no es válido."
+        : error === "not-found"
+          ? "El grupo ya no existe."
+          : error === "in-use-products"
+            ? "No se puede borrar porque sigue vinculado a productos."
+            : error === "in-use-options"
+              ? "No se puede borrar porque aún tiene opciones asociadas."
+              : error === "invalid-intent"
+                ? "Acción no válida."
+                : "";
+
+const modifierOptionErrorMessage =
+  modifierOptionError === "missing-name"
+    ? "El nombre de la opción es obligatorio."
+    : modifierOptionError === "invalid-price"
+      ? "El precio de la opción no es válido."
+      : modifierOptionError === "invalid-option"
+        ? "La opción indicada no es válida."
+        : modifierOptionError === "not-found"
+          ? "La opción ya no existe o no pertenece al grupo."
+          : modifierOptionError === "invalid-intent"
+            ? "Acción de opción no válida."
+            : "";
+---
+
+<AdminLayout
+  title="Modificadores · Admin · Arcadia"
+  heading="Modificadores"
+  description="Catálogo global de grupos y opciones reutilizable desde las fichas de producto. Aquí se gestionan límites, orden, estado y opciones."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin/catalogo/ingredientes"
+        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+      >
+        Ver ingredientes
+      </a>
+
+      <a
+        href="/admin/catalogo/productos"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Ver productos
+      </a>
+    </div>
+  </Fragment>
+
+  {saved ? (
+    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      Grupos actualizados correctamente.
+    </section>
+  ) : null}
+
+  {errorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {errorMessage}
+    </section>
+  ) : null}
+
+  {modifierOptionSaved ? (
+    <section class="mb-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-4 text-sm text-cyan-200">
+      Opciones de modificador actualizadas correctamente.
+    </section>
+  ) : null}
+
+  {modifierOptionErrorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {modifierOptionErrorMessage}
+    </section>
+  ) : null}
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Total grupos</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalGroups}</div>
+      <p class="mt-2 text-sm text-slate-400">Grupos globales registrados</p>
+    </article>
+
+    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">Activos</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeGroups}</div>
+      <p class="mt-2 text-sm text-emerald-100/70">Disponibles para enlazar a producto</p>
+    </article>
+
+    <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">En uso</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{linkedGroups}</div>
+      <p class="mt-2 text-sm text-cyan-100/70">Vinculados ya a productos</p>
+    </article>
+
+    <article class="rounded-[28px] border border-indigo-400/15 bg-indigo-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-200/80">Opciones</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalOptions}</div>
+      <p class="mt-2 text-sm text-indigo-100/70">Total de opciones definidas</p>
+    </article>
+  </section>
+
+  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_380px]">
+    <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="border-b border-white/10 px-6 py-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+              Catálogo base
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Grupos globales y sus opciones
+            </h2>
+          </div>
+
+          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+            {groups.filter((group) => group.optionCount === 0).length} sin opciones
+          </div>
+        </div>
+      </div>
+
+      {groups.length === 0 ? (
+        <div class="px-6 py-12 text-center">
+          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+            <div class="text-lg font-semibold text-white">No hay grupos de modificadores</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              El catálogo global aún no tiene grupos definidos.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div class="space-y-4 px-6 py-6">
+          {groups.map((group) => {
+            const canDelete = group.linkedProductCount === 0 && group.optionCount === 0;
+            const redirectTo = `/admin/catalogo/modificadores#group-${group.id}`;
+
+            return (
+              <section id={`group-${group.id}`} class="rounded-3xl border border-white/10 bg-white/4 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div class="text-base font-semibold text-white">{group.name}</div>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                      <span class:list={[
+                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                        group.active
+                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                          : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                      ]}>
+                        {group.active ? "Activo" : "Inactivo"}
+                      </span>
+
+                      {group.required ? (
+                        <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                          Requerido
+                        </span>
+                      ) : null}
+
+                      <span class="inline-flex items-center rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-indigo-300">
+                        {group.linkedProductCount} productos
+                      </span>
+
+                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                        {group.activeOptionCount}/{group.optionCount} opciones activas
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-slate-300">
+                    min {group.minSelect} · max {group.maxSelect} · orden {group.sortOrder}
+                  </div>
+                </div>
+
+                <form method="post" action="/api/admin/modifier-groups" class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_140px_140px_140px]">
+                  <input type="hidden" name="intent" value="update" />
+                  <input type="hidden" name="groupId" value={group.id} />
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="text"
+                      name="name"
+                      value={group.name}
+                      required
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Min</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="minSelect"
+                      min="0"
+                      step="1"
+                      value={group.minSelect}
+                      required
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Max</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="maxSelect"
+                      min="0"
+                      step="1"
+                      value={group.maxSelect}
+                      required
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="sortOrder"
+                      min="0"
+                      step="1"
+                      value={group.sortOrder}
+                    />
+                  </label>
+
+                  <div class="flex flex-wrap items-center gap-6 lg:col-span-3">
+                    <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                      <input
+                        class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                        type="checkbox"
+                        name="required"
+                        checked={group.required}
+                      />
+                      Requerido
+                    </label>
+
+                    <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                      <input
+                        class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                        type="checkbox"
+                        name="active"
+                        checked={group.active}
+                      />
+                      Activo
+                    </label>
+                  </div>
+
+                  <div class="flex items-center justify-end">
+                    <button
+                      type="submit"
+                      class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                    >
+                      Guardar grupo
+                    </button>
+                  </div>
+                </form>
+
+                <section class="mt-6 rounded-3xl border border-violet-400/20 bg-violet-400/10 p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-200/80">
+                        Opciones
+                      </div>
+                      <h3 class="mt-2 text-lg font-semibold text-white">
+                        Gestionar opciones de {group.name}
+                      </h3>
+                    </div>
+
+                    <div class="text-sm text-violet-100/70">
+                      {group.activeOptionCount} activas · {group.optionCount} totales
+                    </div>
+                  </div>
+
+                  <form
+                    method="post"
+                    action={`/api/admin/modifier-groups/${group.id}/options`}
+                    class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px_auto]"
+                  >
+                    <input type="hidden" name="intent" value="create" />
+                    <input type="hidden" name="redirectTo" value={redirectTo} />
+
+                    <label class="grid gap-2 text-sm text-violet-100/80">
+                      <span class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-200/60">Nombre</span>
+                      <input
+                        class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                        type="text"
+                        name="name"
+                        placeholder="Extra queso"
+                        required
+                      />
+                    </label>
+
+                    <label class="grid gap-2 text-sm text-violet-100/80">
+                      <span class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-200/60">Precio</span>
+                      <input
+                        class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                        type="number"
+                        name="priceDeltaEur"
+                        step="0.01"
+                        value="0.00"
+                        required
+                      />
+                    </label>
+
+                    <label class="grid gap-2 text-sm text-violet-100/80">
+                      <span class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-200/60">Orden</span>
+                      <input
+                        class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                        type="number"
+                        name="sortOrder"
+                        min="0"
+                        step="1"
+                        value={group.optionCount}
+                      />
+                    </label>
+
+                    <div class="flex items-end gap-3">
+                      <label class="inline-flex items-center gap-3 text-sm text-violet-100/80">
+                        <input
+                          class="h-4 w-4 rounded border-white/20 bg-slate-950 text-violet-300"
+                          type="checkbox"
+                          name="active"
+                          checked
+                        />
+                        Activa
+                      </label>
+
+                      <button
+                        type="submit"
+                        class="inline-flex items-center justify-center rounded-2xl bg-violet-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-200"
+                      >
+                        Añadir opción
+                      </button>
+                    </div>
+                  </form>
+
+                  {group.options.length === 0 ? (
+                    <div class="mt-5 rounded-2xl border border-white/10 bg-[#0b1120]/60 px-4 py-4 text-sm text-slate-400">
+                      Este grupo todavía no tiene opciones.
+                    </div>
+                  ) : (
+                    <div class="mt-5 space-y-3">
+                      {group.options.map((option) => (
+                        <div class="rounded-2xl border border-white/10 bg-[#0b1120]/70 p-4">
+                          <form
+                            method="post"
+                            action={`/api/admin/modifier-groups/${group.id}/options`}
+                            class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px_auto]"
+                          >
+                            <input type="hidden" name="intent" value="update" />
+                            <input type="hidden" name="optionId" value={option.id} />
+                            <input type="hidden" name="redirectTo" value={redirectTo} />
+
+                            <label class="grid gap-2 text-sm text-slate-300">
+                              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+                              <input
+                                class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                                type="text"
+                                name="name"
+                                value={option.name}
+                                required
+                              />
+                            </label>
+
+                            <label class="grid gap-2 text-sm text-slate-300">
+                              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Precio</span>
+                              <input
+                                class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                                type="number"
+                                name="priceDeltaEur"
+                                step="0.01"
+                                value={moneyInput(option.priceDeltaCents)}
+                                required
+                              />
+                            </label>
+
+                            <label class="grid gap-2 text-sm text-slate-300">
+                              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+                              <input
+                                class="w-full rounded-2xl border border-white/10 bg-slate-950/80 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                                type="number"
+                                name="sortOrder"
+                                min="0"
+                                step="1"
+                                value={option.sortOrder}
+                              />
+                            </label>
+
+                            <div class="flex flex-wrap items-end justify-between gap-3">
+                              <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                                <input
+                                  class="h-4 w-4 rounded border-white/20 bg-slate-950 text-violet-300"
+                                  type="checkbox"
+                                  name="active"
+                                  checked={option.active}
+                                />
+                                Activa
+                              </label>
+
+                              <button
+                                type="submit"
+                                class="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
+                              >
+                                Guardar opción
+                              </button>
+                            </div>
+                          </form>
+
+                          <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+                            <div class="text-sm text-slate-500">
+                              Delta actual: <span class="font-semibold text-slate-300">{money(option.priceDeltaCents)}</span>
+                            </div>
+
+                            <form method="post" action={`/api/admin/modifier-groups/${group.id}/options`}>
+                              <input type="hidden" name="intent" value="delete" />
+                              <input type="hidden" name="optionId" value={option.id} />
+                              <input type="hidden" name="redirectTo" value={redirectTo} />
+                              <button
+                                type="submit"
+                                class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2.5 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                              >
+                                Borrar opción
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                  <p class="text-sm text-slate-500">
+                    {canDelete
+                      ? "Se puede borrar porque no tiene productos enlazados ni opciones."
+                      : "No se puede borrar mientras tenga productos enlazados o opciones activas en el grupo."}
+                  </p>
+
+                  <form method="post" action="/api/admin/modifier-groups">
+                    <input type="hidden" name="intent" value="delete" />
+                    <input type="hidden" name="groupId" value={group.id} />
+                    <button
+                      type="submit"
+                      disabled={!canDelete}
+                      class:list={[
+                        "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                        canDelete
+                          ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
+                          : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                      ]}
+                    >
+                      Borrar grupo
+                    </button>
+                  </form>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </article>
+
+    <aside class="space-y-6">
+      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Alta</div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Nuevo grupo</h2>
+
+        <form method="post" action="/api/admin/modifier-groups" class="mt-6 grid gap-4">
+          <input type="hidden" name="intent" value="create" />
+
+          <label class="grid gap-2 text-sm text-slate-300">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="text"
+              name="name"
+              placeholder="Elige tu salsa"
+              required
+            />
+          </label>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-2 text-sm text-slate-300">
+              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Min</span>
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                type="number"
+                name="minSelect"
+                min="0"
+                step="1"
+                value="0"
+                required
+              />
+            </label>
+
+            <label class="grid gap-2 text-sm text-slate-300">
+              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Max</span>
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                type="number"
+                name="maxSelect"
+                min="0"
+                step="1"
+                value="1"
+                required
+              />
+            </label>
+          </div>
+
+          <label class="grid gap-2 text-sm text-slate-300">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="number"
+              name="sortOrder"
+              min="0"
+              step="1"
+              value={groups.length}
+            />
+          </label>
+
+          <div class="flex flex-wrap gap-6">
+            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <input
+                class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                type="checkbox"
+                name="required"
+              />
+              Requerido
+            </label>
+
+            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <input
+                class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                type="checkbox"
+                name="active"
+                checked
+              />
+              Activo
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+          >
+            Crear grupo
+          </button>
+        </form>
+      </section>
+
+      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Criterio</div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Qué resuelve este módulo</h2>
+
+        <div class="mt-6 space-y-4">
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Base reutilizable</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Separa la definición global de grupos y opciones del enlazado concreto a cada producto.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div class="text-sm font-semibold text-amber-200">Importante</div>
+            <p class="mt-2 text-sm leading-6 text-amber-100/80">
+              Un grupo solo se puede borrar cuando ya no tiene productos enlazados ni opciones asociadas.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Modelo real</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Este módulo no inventa reglas nuevas: usa <code>ModifierGroup</code>, <code>ModifierOption</code> y <code>ProductModifierGroup</code> tal como están en el schema.
+            </p>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </section>
+</AdminLayout>

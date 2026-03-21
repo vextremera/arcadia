@@ -1,0 +1,277 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, Category } from "astro:db";
+
+const url = new URL(Astro.request.url);
+const error = url.searchParams.get("error") ?? "";
+
+const categories = await db
+  .select({
+    id: Category.id,
+    name: Category.name,
+    active: Category.active,
+    sortOrder: Category.sortOrder,
+  })
+  .from(Category)
+  .orderBy(Category.sortOrder);
+
+const activeCategories = categories.filter((category) => category.active);
+
+const errorMessage =
+  error === "missing-name"
+    ? "El nombre es obligatorio."
+    : error === "invalid-slug"
+      ? "El slug no es válido."
+      : error === "invalid-category"
+        ? "La categoría seleccionada no es válida."
+        : error === "invalid-price"
+          ? "El precio no es válido."
+          : error === "duplicate-slug"
+            ? "Ya existe otro producto con ese slug."
+            : "";
+---
+
+<AdminLayout
+  title="Nuevo producto · Admin · Arcadia"
+  heading="Nuevo producto"
+  description="Alta base de producto sobre el schema real. Después podrás completar variantes, ingredientes, modificadores y alérgenos desde su ficha."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin/catalogo/productos"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Volver al listado
+      </a>
+    </div>
+  </Fragment>
+
+  {
+    errorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {errorMessage}
+      </section>
+    ) : null
+  }
+
+  <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <form
+      method="post"
+      action="/api/admin/products/new"
+      class="rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+    >
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+          Alta base
+        </div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+          Datos principales
+        </h2>
+      </div>
+
+      <div class="mt-6 grid gap-4">
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Nombre
+            </span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              type="text"
+              name="name"
+              required
+            />
+          </label>
+
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Slug
+            </span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
+              type="text"
+              name="slug"
+              placeholder="opcional · se genera desde el nombre"
+            />
+          </label>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Categoría
+            </span>
+            <select
+              class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              name="categoryId"
+              required
+            >
+              {activeCategories.map((category) => (
+                <option value={category.id}>{category.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Precio (€)
+            </span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              type="number"
+              name="priceEur"
+              min="0"
+              step="0.01"
+              value="0.00"
+              required
+            />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Image URL
+          </span>
+          <input
+            class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
+            type="text"
+            name="imageUrl"
+            placeholder="/images/productos/nuevo.webp"
+          />
+        </label>
+
+        <label class="block">
+          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Description
+          </span>
+          <textarea
+            class="min-h-27.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+            name="description"
+          ></textarea>
+        </label>
+
+        <label class="block">
+          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Details
+          </span>
+          <textarea
+            class="min-h-37.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+            name="details"
+          ></textarea>
+        </label>
+      </div>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="active"
+              checked
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Activo</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en catálogo</p>
+            </div>
+          </div>
+        </label>
+
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="deliveryEnabled"
+              checked
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Delivery</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">Canal a domicilio</p>
+            </div>
+          </div>
+        </label>
+
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="pickupEnabled"
+              checked
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Pickup</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">Canal recogida</p>
+            </div>
+          </div>
+        </label>
+
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="dineInEnabled"
+              checked
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Sala</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">Consumo en local</p>
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        <button
+          class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+          type="submit"
+        >
+          Crear producto
+        </button>
+
+        <a
+          href="/admin/catalogo/productos"
+          class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        >
+          Cancelar
+        </a>
+      </div>
+    </form>
+
+    <aside class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Qué crea esto
+      </div>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        Alta mínima válida
+      </h2>
+
+      <div class="mt-6 space-y-4">
+        <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <div class="text-sm font-semibold text-white">Sí crea</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Registro base en <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">Product</span> con nombre, slug, categoría, precio, imagen y canales.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <div class="text-sm font-semibold text-white">No crea todavía</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Variantes, ingredientes, modifier groups y alérgenos. Eso se añade después desde la ficha del producto.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
+          <div class="text-sm font-semibold text-amber-200">Importante</div>
+          <p class="mt-2 text-sm leading-6 text-amber-100/80">
+            El slug debe ser único. Si lo dejas vacío, se genera automáticamente a partir del nombre.
+          </p>
+        </div>
+      </div>
+    </aside>
+  </section>
+</AdminLayout>

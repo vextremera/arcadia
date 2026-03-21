@@ -1,6 +1,11 @@
 import type { APIRoute } from "astro";
 import { db, AppSetting, eq } from "astro:db";
 
+type PaymentsSetting = {
+  delivery: { cashEnabled: boolean; cardEnabled: boolean };
+  pickup: { cashEnabled: boolean; cardEnabled: boolean };
+};
+
 export const POST: APIRoute = async (context) => {
   const u = context.locals.user;
   if (!u || (u.role !== "ADMIN" && u.role !== "STAFF")) {
@@ -9,7 +14,7 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
 
-  const value = {
+  const value: PaymentsSetting = {
     delivery: {
       cashEnabled: form.get("deliveryCash") === "on",
       cardEnabled: form.get("deliveryCard") === "on",
@@ -27,10 +32,13 @@ export const POST: APIRoute = async (context) => {
     .limit(1);
 
   if (existing) {
-    await db.update(AppSetting).set({ value }).where(eq(AppSetting.key, "payments"));
+    await db
+      .update(AppSetting)
+      .set({ value, updatedAt: new Date() })
+      .where(eq(AppSetting.key, "payments"));
   } else {
     await db.insert(AppSetting).values({ key: "payments", value });
   }
 
-  return context.redirect("/admin/ajustes/pagos");
+  return context.redirect("/admin/ajustes/pagos?saved=1");
 };

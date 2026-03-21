@@ -1,8 +1,13 @@
 ---
-import SiteLayout from "@/layouts/SiteLayout.astro";
+import AdminLayout from "@/layouts/AdminLayout.astro";
 import { db, AppSetting, eq } from "astro:db";
 
-const DEFAULT_PAYMENTS = {
+type PaymentsSetting = {
+  delivery: { cashEnabled: boolean; cardEnabled: boolean };
+  pickup: { cashEnabled: boolean; cardEnabled: boolean };
+};
+
+const DEFAULT_PAYMENTS: PaymentsSetting = {
   delivery: { cashEnabled: true, cardEnabled: true },
   pickup: { cashEnabled: true, cardEnabled: true },
 };
@@ -13,39 +18,227 @@ const [row] = await db
   .where(eq(AppSetting.key, "payments"))
   .limit(1);
 
-const payments = (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
+const payments = (row?.value ?? DEFAULT_PAYMENTS) as PaymentsSetting;
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") === "1";
+
+const cards = [
+  {
+    label: "Delivery · efectivo",
+    value: payments.delivery.cashEnabled ? "Activo" : "Inactivo",
+    tone: payments.delivery.cashEnabled
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      : "border-rose-400/20 bg-rose-400/10 text-rose-200",
+    help: "Pago en mano al repartidor",
+  },
+  {
+    label: "Delivery · tarjeta",
+    value: payments.delivery.cardEnabled ? "Activo" : "Inactivo",
+    tone: payments.delivery.cardEnabled
+      ? "border-sky-400/20 bg-sky-400/10 text-sky-200"
+      : "border-rose-400/20 bg-rose-400/10 text-rose-200",
+    help: "Cobro con tarjeta en pedidos a domicilio",
+  },
+  {
+    label: "Pickup · efectivo",
+    value: payments.pickup.cashEnabled ? "Activo" : "Inactivo",
+    tone: payments.pickup.cashEnabled
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"
+      : "border-rose-400/20 bg-rose-400/10 text-rose-200",
+    help: "Cobro en local al recoger",
+  },
+  {
+    label: "Pickup · tarjeta",
+    value: payments.pickup.cardEnabled ? "Activo" : "Inactivo",
+    tone: payments.pickup.cardEnabled
+      ? "border-sky-400/20 bg-sky-400/10 text-sky-200"
+      : "border-rose-400/20 bg-rose-400/10 text-rose-200",
+    help: "Pago con tarjeta en recogida",
+  },
+];
 ---
 
-<SiteLayout title="Pagos · Admin · Arcadia">
-  <h1 class="text-2xl font-semibold tracking-tight">Ajustes de pagos</h1>
+<AdminLayout
+  title="Pagos · Admin · Arcadia"
+  heading="Pagos"
+  description="Configuración de métodos de pago disponibles por canal. Estos ajustes impactan directamente en checkout."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin/operativa"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Ir a operativa
+      </a>
 
-  <form class="mt-6 space-y-6" method="post" action="/api/admin/settings/payments">
-    <div class="rounded-2xl border border-zinc-200 p-5">
-      <h2 class="text-lg font-semibold">Delivery</h2>
-      <label class="mt-3 flex items-center gap-2 text-sm">
-        <input type="checkbox" name="deliveryCash" checked={payments.delivery.cashEnabled} />
-        Efectivo habilitado
-      </label>
-      <label class="mt-2 flex items-center gap-2 text-sm">
-        <input type="checkbox" name="deliveryCard" checked={payments.delivery.cardEnabled} />
-        Tarjeta habilitada
-      </label>
+      <a
+        href="/admin/ajustes/fees"
+        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+      >
+        Ver fees
+      </a>
     </div>
+  </Fragment>
 
-    <div class="rounded-2xl border border-zinc-200 p-5">
-      <h2 class="text-lg font-semibold">Recogida</h2>
-      <label class="mt-3 flex items-center gap-2 text-sm">
-        <input type="checkbox" name="pickupCash" checked={payments.pickup.cashEnabled} />
-        Efectivo habilitado
-      </label>
-      <label class="mt-2 flex items-center gap-2 text-sm">
-        <input type="checkbox" name="pickupCard" checked={payments.pickup.cardEnabled} />
-        Tarjeta habilitada
-      </label>
+  {saved ? (
+    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      Métodos de pago guardados correctamente.
+    </section>
+  ) : null}
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    {cards.map((card) => (
+      <article
+        class:list={[
+          "rounded-3xl border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+          card.tone,
+        ]}
+      >
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em]">
+          {card.label}
+        </div>
+        <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+          {card.value}
+        </div>
+        <p class="mt-2 text-sm text-white/75">{card.help}</p>
+      </article>
+    ))}
+  </section>
+
+  <form
+    class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+    method="post"
+    action="/api/admin/settings/payments"
+  >
+    <article class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300">
+            Canal
+          </div>
+          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+            Delivery
+          </h2>
+          <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            Define qué métodos de pago puede usar el cliente cuando el pedido se envía a domicilio.
+          </p>
+        </div>
+
+        <div class="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+          Delivery
+        </div>
+      </div>
+
+      <div class="mt-6 space-y-4">
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="deliveryCash"
+              checked={payments.delivery.cashEnabled}
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Efectivo habilitado</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Permite pagar en metálico al recibir el pedido.
+              </p>
+            </div>
+          </div>
+        </label>
+
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="deliveryCard"
+              checked={payments.delivery.cardEnabled}
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Tarjeta habilitada</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Permite usar tarjeta para pedidos delivery.
+              </p>
+            </div>
+          </div>
+        </label>
+      </div>
+    </article>
+
+    <article class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-300">
+            Canal
+          </div>
+          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+            Pickup
+          </h2>
+          <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            Controla los métodos de pago permitidos cuando el cliente recoge en local.
+          </p>
+        </div>
+
+        <div class="rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">
+          Pickup
+        </div>
+      </div>
+
+      <div class="mt-6 space-y-4">
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="pickupCash"
+              checked={payments.pickup.cashEnabled}
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Efectivo habilitado</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Permite cobrar en caja cuando el cliente recoge el pedido.
+              </p>
+            </div>
+          </div>
+        </label>
+
+        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="flex items-start gap-3">
+            <input
+              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+              type="checkbox"
+              name="pickupCard"
+              checked={payments.pickup.cardEnabled}
+            />
+            <div>
+              <div class="text-sm font-semibold text-white">Tarjeta habilitada</div>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Permite cobro con tarjeta para pedidos de recogida.
+              </p>
+            </div>
+          </div>
+        </label>
+      </div>
+    </article>
+
+    <div class="xl:col-span-2 flex flex-wrap gap-3">
+      <button
+        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+        type="submit"
+      >
+        Guardar métodos de pago
+      </button>
+
+      <a
+        href="/admin"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Volver al dashboard
+      </a>
     </div>
-
-    <button class="rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
-      Guardar
-    </button>
   </form>
-</SiteLayout>
+</AdminLayout>

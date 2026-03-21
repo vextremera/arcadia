@@ -1,0 +1,472 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, Ingredient, ProductIngredient, CategoryIngredient, inArray } from "astro:db";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function moneyInput(cents: number) {
+  return (Number(cents ?? 0) / 100).toFixed(2);
+}
+
+type IngredientSummary = {
+  id: number;
+  name: string;
+  slug: string;
+  addPriceDeltaCents: number;
+  isCommon: boolean;
+  active: boolean;
+  sortOrder: number;
+  productCount: number;
+  categoryCount: number;
+};
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") === "1";
+const error = url.searchParams.get("error") ?? "";
+
+const rows = await db
+  .select({
+    id: Ingredient.id,
+    name: Ingredient.name,
+    slug: Ingredient.slug,
+    addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+    isCommon: Ingredient.isCommon,
+    active: Ingredient.active,
+    sortOrder: Ingredient.sortOrder,
+  })
+  .from(Ingredient)
+  .orderBy(Ingredient.sortOrder, Ingredient.name);
+
+const ingredientIds = rows.map((row) => row.id);
+
+const productLinks = ingredientIds.length
+  ? await db
+      .select({
+        ingredientId: ProductIngredient.ingredientId,
+      })
+      .from(ProductIngredient)
+      .where(inArray(ProductIngredient.ingredientId, ingredientIds))
+  : [];
+
+const categoryLinks = ingredientIds.length
+  ? await db
+      .select({
+        ingredientId: CategoryIngredient.ingredientId,
+      })
+      .from(CategoryIngredient)
+      .where(inArray(CategoryIngredient.ingredientId, ingredientIds))
+  : [];
+
+const productCountByIngredient = new Map<number, number>();
+for (const row of productLinks) {
+  productCountByIngredient.set(
+    row.ingredientId,
+    (productCountByIngredient.get(row.ingredientId) ?? 0) + 1
+  );
+}
+
+const categoryCountByIngredient = new Map<number, number>();
+for (const row of categoryLinks) {
+  categoryCountByIngredient.set(
+    row.ingredientId,
+    (categoryCountByIngredient.get(row.ingredientId) ?? 0) + 1
+  );
+}
+
+const ingredients: IngredientSummary[] = rows.map((row) => ({
+  ...row,
+  productCount: productCountByIngredient.get(row.id) ?? 0,
+  categoryCount: categoryCountByIngredient.get(row.id) ?? 0,
+}));
+
+const totalIngredients = ingredients.length;
+const activeIngredients = ingredients.filter((ingredient) => ingredient.active).length;
+const commonIngredients = ingredients.filter((ingredient) => ingredient.isCommon).length;
+const linkedIngredients = ingredients.filter((ingredient) => ingredient.productCount > 0).length;
+
+const errorMessage =
+  error === "missing-name"
+    ? "El nombre es obligatorio."
+    : error === "invalid-slug"
+      ? "El slug no es válido."
+      : error === "invalid-price"
+        ? "El precio adicional no es válido."
+        : error === "duplicate-slug"
+          ? "Ya existe otro ingrediente con ese slug."
+          : error === "invalid-ingredient"
+            ? "El ingrediente indicado no es válido."
+            : error === "not-found"
+              ? "El ingrediente ya no existe."
+              : error === "in-use-products"
+                ? "No se puede borrar porque sigue vinculado a productos."
+                : error === "in-use-categories"
+                  ? "No se puede borrar porque sigue vinculado a compatibilidades de categoría."
+                  : error === "invalid-intent"
+                    ? "Acción no válida."
+                    : "";
+---
+
+<AdminLayout
+  title="Ingredientes · Admin · Arcadia"
+  heading="Ingredientes"
+  description="Catálogo global de ingredientes reutilizable por producto. Aquí se gestionan nombre, slug, precio adicional, orden y estado."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin/catalogo/modificadores"
+        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+      >
+        Ver modificadores
+      </a>
+
+      <a
+        href="/admin/catalogo/productos"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Ver productos
+      </a>
+    </div>
+  </Fragment>
+
+  {saved ? (
+    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      Ingredientes actualizados correctamente.
+    </section>
+  ) : null}
+
+  {errorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {errorMessage}
+    </section>
+  ) : null}
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Total</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalIngredients}</div>
+      <p class="mt-2 text-sm text-slate-400">Ingredientes globales registrados</p>
+    </article>
+
+    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">Activos</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeIngredients}</div>
+      <p class="mt-2 text-sm text-emerald-100/70">Disponibles para vincular a producto</p>
+    </article>
+
+    <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">Comunes</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{commonIngredients}</div>
+      <p class="mt-2 text-sm text-cyan-100/70">Marcados como base frecuente del catálogo</p>
+    </article>
+
+    <article class="rounded-[28px] border border-indigo-400/15 bg-indigo-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-200/80">En uso</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{linkedIngredients}</div>
+      <p class="mt-2 text-sm text-indigo-100/70">Ya vinculados a uno o más productos</p>
+    </article>
+  </section>
+
+  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px]">
+    <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="border-b border-white/10 px-6 py-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+              Catálogo base
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Listado global de ingredientes
+            </h2>
+          </div>
+
+          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+            {ingredients.filter((ingredient) => ingredient.productCount === 0).length} sin uso
+          </div>
+        </div>
+      </div>
+
+      {ingredients.length === 0 ? (
+        <div class="px-6 py-12 text-center">
+          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+            <div class="text-lg font-semibold text-white">No hay ingredientes</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              El catálogo global aún no tiene ingredientes registrados.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div class="space-y-4 px-6 py-6">
+          {ingredients.map((ingredient) => {
+            const canDelete = ingredient.productCount === 0 && ingredient.categoryCount === 0;
+
+            return (
+              <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <div class="text-base font-semibold text-white">{ingredient.name}</div>
+                    <div class="mt-1">
+                      <code class="rounded-xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-300">
+                        {ingredient.slug}
+                      </code>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap gap-2">
+                    <span class:list={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      ingredient.active
+                        ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                        : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                    ]}>
+                      {ingredient.active ? "Activo" : "Inactivo"}
+                    </span>
+
+                    {ingredient.isCommon ? (
+                      <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                        Común
+                      </span>
+                    ) : null}
+
+                    <span class="inline-flex items-center rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-indigo-300">
+                      {ingredient.productCount} productos
+                    </span>
+
+                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                      {ingredient.categoryCount} compatibilidades
+                    </span>
+                  </div>
+                </div>
+
+                <form method="post" action="/api/admin/ingredients" class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_180px_140px]">
+                  <input type="hidden" name="intent" value="update" />
+                  <input type="hidden" name="ingredientId" value={ingredient.id} />
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="text"
+                      name="name"
+                      value={ingredient.name}
+                      required
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Slug</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="text"
+                      name="slug"
+                      value={ingredient.slug}
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Extra</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="addPriceDeltaEur"
+                      min="0"
+                      step="0.01"
+                      value={moneyInput(ingredient.addPriceDeltaCents)}
+                    />
+                  </label>
+
+                  <label class="grid gap-2 text-sm text-slate-300">
+                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="sortOrder"
+                      step="1"
+                      value={ingredient.sortOrder}
+                    />
+                  </label>
+
+                  <div class="flex flex-wrap items-center gap-6 lg:col-span-3">
+                    <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                      <input
+                        class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                        type="checkbox"
+                        name="isCommon"
+                        checked={ingredient.isCommon}
+                      />
+                      Común
+                    </label>
+
+                    <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                      <input
+                        class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                        type="checkbox"
+                        name="active"
+                        checked={ingredient.active}
+                      />
+                      Activo
+                    </label>
+
+                    <div class="text-sm text-slate-500">
+                      Precio actual: <span class="font-semibold text-slate-300">{money(ingredient.addPriceDeltaCents)}</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end">
+                    <button
+                      type="submit"
+                      class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                </form>
+
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                  <p class="text-sm text-slate-500">
+                    {canDelete
+                      ? "Se puede borrar porque no tiene dependencias activas."
+                      : "No se puede borrar mientras siga vinculado a productos o compatibilidades de categoría."}
+                  </p>
+
+                  <form method="post" action="/api/admin/ingredients">
+                    <input type="hidden" name="intent" value="delete" />
+                    <input type="hidden" name="ingredientId" value={ingredient.id} />
+                    <button
+                      type="submit"
+                      disabled={!canDelete}
+                      class:list={[
+                        "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                        canDelete
+                          ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
+                          : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                      ]}
+                    >
+                      Borrar ingrediente
+                    </button>
+                  </form>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </article>
+
+    <aside class="space-y-6">
+      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Alta</div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Nuevo ingrediente</h2>
+
+        <form method="post" action="/api/admin/ingredients" class="mt-6 grid gap-4">
+          <input type="hidden" name="intent" value="create" />
+
+          <label class="grid gap-2 text-sm text-slate-300">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="text"
+              name="name"
+              placeholder="Cebolla caramelizada"
+              required
+            />
+          </label>
+
+          <label class="grid gap-2 text-sm text-slate-300">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Slug</span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="text"
+              name="slug"
+              placeholder="Se genera automáticamente si lo dejas vacío"
+            />
+          </label>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-2 text-sm text-slate-300">
+              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Extra</span>
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                type="number"
+                name="addPriceDeltaEur"
+                min="0"
+                step="0.01"
+                value="0.00"
+              />
+            </label>
+
+            <label class="grid gap-2 text-sm text-slate-300">
+              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                type="number"
+                name="sortOrder"
+                step="1"
+                value={ingredients.length}
+              />
+            </label>
+          </div>
+
+          <div class="flex flex-wrap gap-6">
+            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <input
+                class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                type="checkbox"
+                name="isCommon"
+              />
+              Común
+            </label>
+
+            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <input
+                class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                type="checkbox"
+                name="active"
+                checked
+              />
+              Activo
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+          >
+            Crear ingrediente
+          </button>
+        </form>
+      </section>
+
+      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Criterio</div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Qué resuelve este módulo</h2>
+
+        <div class="mt-6 space-y-4">
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Base global real</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Centraliza ingredientes para no tener que depender de altas solo desde producto.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
+            <div class="text-sm font-semibold text-amber-200">Importante</div>
+            <p class="mt-2 text-sm leading-6 text-amber-100/80">
+              Borrar un ingrediente se bloquea si sigue enlazado a productos o a compatibilidades de categoría.
+            </p>
+          </div>
+
+          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+            <div class="text-sm font-semibold text-white">Siguiente capa</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Los alérgenos se quedan fuera por ahora porque el schema los describe como catálogo fijo de 14.
+            </p>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </section>
+</AdminLayout>

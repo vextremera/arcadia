@@ -2,7 +2,9 @@
 import { db, Order, OrderItem, eq } from "astro:db";
 
 const publicId = String(Astro.params.publicId ?? "").trim();
-if (!publicId) return new Response("Missing publicId", { status: 400 });
+if (!publicId) {
+  return new Response("Missing publicId", { status: 400 });
+}
 
 const [order] = await db
   .select()
@@ -10,7 +12,9 @@ const [order] = await db
   .where(eq(Order.publicId, publicId))
   .limit(1);
 
-if (!order) return new Response("Pedido no encontrado", { status: 404 });
+if (!order) {
+  return new Response("Pedido no encontrado", { status: 404 });
+}
 
 const items = await db
   .select()
@@ -18,12 +22,40 @@ const items = await db
   .where(eq(OrderItem.orderId, order.id))
   .orderBy(OrderItem.id);
 
+  type OrderItemModifierEntry = {
+  name?: string;
+  priceDeltaCents?: number;
+};
+
+const decoratedItems = items.map((it) => {
+  const modifiers = (it.modifiers ?? {}) as Record<string, unknown>;
+
+  const opts = (
+    Array.isArray(modifiers.modifierOptions) ? modifiers.modifierOptions : []
+  ) as OrderItemModifierEntry[];
+
+  const adds = (
+    Array.isArray(modifiers.ingredientsAdded) ? modifiers.ingredientsAdded : []
+  ) as OrderItemModifierEntry[];
+
+  const rems = (
+    Array.isArray(modifiers.ingredientsRemoved) ? modifiers.ingredientsRemoved : []
+  ) as OrderItemModifierEntry[];
+
+  return {
+    ...it,
+    opts,
+    adds,
+    rems,
+  };
+});
+
 function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
 }
 
-function fmtDate(d: any) {
-  const date = new Date(d);
+function formatDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
   return new Intl.DateTimeFormat("es-ES", {
     timeZone: "Europe/Madrid",
     year: "numeric",
@@ -35,17 +67,21 @@ function fmtDate(d: any) {
   }).format(date);
 }
 
-const meta: any = (order as any).addressSnapshot ?? {};
-const paymentMethod = meta?.paymentMethod ?? null; // CASH | CARD
-const forcedPickup = !!meta?.forcedPickup;
-const forcedReason = meta?.forcedReason ?? null;
-const address = meta?.address ?? null;
+const meta = (order.addressSnapshot ?? {}) as Record<string, unknown>;
+const paymentMethod = String(meta.paymentMethod ?? "").toUpperCase() || null;
+const forcedPickup = Boolean(meta.forcedPickup);
+const forcedReason = String(meta.forcedReason ?? "").trim();
+const address = (meta.address ?? null) as
+  | {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      postalCode?: string;
+      notes?: string;
+    }
+  | null;
 
-const isDelivery = order.type === "DELIVERY";
-const deliveryFeeCents = Number(order.deliveryFeeCents ?? 0);
-
-const url = new URL(Astro.request.url);
-const autoPrint = url.searchParams.get("print") === "1";
+const autoPrint = new URL(Astro.request.url).searchParams.get("print") === "1";
 ---
 
 <html lang="es">
@@ -56,75 +92,73 @@ const autoPrint = url.searchParams.get("print") === "1";
 
     <style>
       :root {
-        --receipt-w: 80mm;
+        --receipt-width: 80mm;
       }
 
-      /* Impresión tipo ticket 80mm */
       @page {
-        size: var(--receipt-w) auto;
+        size: var(--receipt-width) auto;
         margin: 4mm;
       }
 
       html,
       body {
-        padding: 0;
         margin: 0;
+        padding: 0;
       }
 
       body {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-variant-numeric: tabular-nums;
-        background: #f4f4f5; /* zinc-100 */
+        background: #f4f4f5;
         color: #000;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-variant-numeric: tabular-nums;
       }
 
-      .no-print {
-        background: #fff;
-        border-bottom: 1px solid #e4e4e7;
+      .toolbar {
         position: sticky;
         top: 0;
         z-index: 10;
+        border-bottom: 1px solid #e4e4e7;
+        background: #fff;
       }
 
-      .topbar {
-        max-width: 900px;
+      .toolbarInner {
         margin: 0 auto;
-        padding: 10px 16px;
         display: flex;
+        max-width: 900px;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: 12px;
+        padding: 12px 16px;
       }
 
       .btn {
+        border: 1px solid #d4d4d8;
         border-radius: 12px;
+        background: #fff;
+        color: #111;
         padding: 10px 14px;
         font-size: 14px;
         font-weight: 700;
-        border: 1px solid #d4d4d8;
-        background: #fff;
-        color: #111;
         text-decoration: none;
         cursor: pointer;
       }
 
       .btnPrimary {
-        background: #111;
         border-color: #111;
+        background: #111;
         color: #fff;
       }
 
-      .receiptWrap {
+      .wrap {
         padding: 16px 0 32px;
       }
 
-      .receipt {
-        width: var(--receipt-w);
+      .ticket {
+        width: var(--receipt-width);
         margin: 0 auto;
-        background: #fff;
         border-radius: 12px;
-        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.08);
+        background: #fff;
+        box-shadow: 0 8px 26px rgba(0, 0, 0, 0.08);
         padding: 12px;
       }
 
@@ -135,18 +169,18 @@ const autoPrint = url.searchParams.get("print") === "1";
       .title {
         font-size: 18px;
         font-weight: 900;
-        letter-spacing: 0.2px;
+        letter-spacing: 0.3px;
       }
 
       .sub {
-        font-size: 11px;
-        color: #333;
         margin-top: 2px;
+        font-size: 11px;
+        color: #3f3f46;
       }
 
       .sep {
-        border-top: 1px dashed #000;
         margin: 10px 0;
+        border-top: 1px dashed #000;
       }
 
       .row {
@@ -156,16 +190,16 @@ const autoPrint = url.searchParams.get("print") === "1";
         gap: 12px;
       }
 
-      .muted {
-        color: #333;
+      .sm {
+        font-size: 11px;
       }
 
       .xs {
         font-size: 10px;
       }
 
-      .sm {
-        font-size: 11px;
+      .muted {
+        color: #3f3f46;
       }
 
       .b {
@@ -174,14 +208,6 @@ const autoPrint = url.searchParams.get("print") === "1";
 
       .bb {
         font-weight: 900;
-      }
-
-      .wrap {
-        word-break: break-word;
-      }
-
-      .indent {
-        padding-left: 10px;
       }
 
       .badge {
@@ -194,10 +220,10 @@ const autoPrint = url.searchParams.get("print") === "1";
       }
 
       .noteBox {
+        margin-top: 10px;
         border: 1px dashed #000;
         border-radius: 10px;
         padding: 8px;
-        margin-top: 10px;
         font-size: 11px;
       }
 
@@ -206,18 +232,28 @@ const autoPrint = url.searchParams.get("print") === "1";
         font-weight: 900;
       }
 
-      /* Print: sin sombras, sin fondo, sin redondeo */
+      .indent {
+        padding-left: 10px;
+      }
+
+      .prewrap {
+        white-space: pre-wrap;
+      }
+
       @media print {
         body {
           background: #fff;
         }
-        .no-print {
+
+        .toolbar {
           display: none !important;
         }
-        .receiptWrap {
+
+        .wrap {
           padding: 0;
         }
-        .receipt {
+
+        .ticket {
           border-radius: 0;
           box-shadow: none;
           padding: 0;
@@ -227,17 +263,15 @@ const autoPrint = url.searchParams.get("print") === "1";
   </head>
 
   <body>
-    {/* Barra superior solo pantalla */}
-    <div class="no-print">
-      <div class="topbar">
+    <div class="toolbar">
+      <div class="toolbarInner">
         <a class="btn" href={`/admin/pedidos/${order.publicId}`}>← Volver al pedido</a>
         <button class="btn btnPrimary" type="button" onclick="window.print()">Imprimir</button>
       </div>
     </div>
 
-    <div class="receiptWrap">
-      <main class="receipt">
-        {/* Header */}
+    <div class="wrap">
+      <main class="ticket">
         <div class="center">
           <div class="title">ARCADIA</div>
           <div class="sub">Lloret de Mar</div>
@@ -245,146 +279,146 @@ const autoPrint = url.searchParams.get("print") === "1";
 
         <div class="sep"></div>
 
-        {/* Meta pedido */}
         <div class="row">
           <div class="b">Pedido</div>
           <div class="bb">{order.publicId}</div>
         </div>
 
-        <div class="row sm muted" style="margin-top: 4px;">
-          <div>{fmtDate(order.createdAt)}</div>
+        <div class="row sm muted" style="margin-top:4px;">
+          <div>{formatDate(order.createdAt)}</div>
           <div class="badge">{order.type}</div>
         </div>
 
-        <div class="row sm muted" style="margin-top: 4px;">
-          <div>Pago</div>
-          <div class="b">{paymentMethod ?? "—"}</div>
+        <div class="row sm muted" style="margin-top:4px;">
+          <div>Estado</div>
+          <div>{order.status}</div>
         </div>
 
-        {forcedPickup ? (
-          <div class="noteBox">
-            <div class="b">Forzado a RECOGIDA</div>
-            <div class="sm muted">{forcedReason ?? ""}</div>
-          </div>
-        ) : null}
+        <div class="row sm muted" style="margin-top:4px;">
+          <div>Pago</div>
+          <div>{paymentMethod ?? "—"} / {order.paymentStatus}</div>
+        </div>
 
         <div class="sep"></div>
 
-        {/* Cliente */}
-        <div class="b">Cliente</div>
-        <div class="sm muted" style="margin-top: 4px;">
-          {(order as any).customerName} · {(order as any).customerPhone}
-        </div>
+        <div class="sm b">Cliente</div>
+        <div class="sm" style="margin-top:4px;">{order.customerName ?? "Sin nombre"}</div>
+        <div class="sm">{order.customerPhone ?? "Sin teléfono"}</div>
+        {order.customerEmail ? <div class="sm">{order.customerEmail}</div> : null}
 
-        {isDelivery && address ? (
-          <div style="margin-top: 8px;">
-            <div class="b">Dirección</div>
-            <div class="sm muted wrap" style="margin-top: 4px;">
-              {address.line1}{address.line2 ? `, ${address.line2}` : ""}<br />
-              {address.postalCode} {address.city}
-              {address.notes ? (
-                <>
-                  <br />
-                  <span class="b">Notas:</span> {address.notes}
-                </>
-              ) : null}
+        {order.type === "DELIVERY" && address ? (
+          <>
+            <div class="sep"></div>
+            <div class="sm b">Entrega</div>
+            <div class="sm" style="margin-top:4px;">{address.line1 ?? "—"}</div>
+            {address.line2 ? <div class="sm">{address.line2}</div> : null}
+            {(address.postalCode || address.city) ? (
+              <div class="sm">{address.postalCode ?? ""}{address.postalCode && address.city ? " · " : ""}{address.city ?? ""}</div>
+            ) : null}
+            {address.notes ? <div class="sm" style="margin-top:4px;">Notas dirección: {address.notes}</div> : null}
+          </>
+        ) : null}
+
+        {forcedPickup ? (
+          <div class="noteBox">
+            <div class="b">Force pickup</div>
+            <div style="margin-top:4px;">
+              Este pedido fue forzado a recogida.
+              {forcedReason ? ` Motivo: ${forcedReason}` : ""}
             </div>
           </div>
         ) : null}
 
+        {order.notes ? (
+          <div class="noteBox">
+            <div class="b">Notas del pedido</div>
+            <div class="prewrap" style="margin-top:4px;">{order.notes}</div>
+          </div>
+        ) : null}
+
         <div class="sep"></div>
 
-        {/* Items */}
-        <div class="b">Items</div>
+        <div class="sm b">Items</div>
 
-        <div style="margin-top: 8px;">
-          {items.map((it) => {
-            const m: any = (it as any).modifiers ?? {};
-            const opts = m.modifierOptions ?? [];
-            const adds = m.ingredientsAdded ?? [];
-            const rems = m.ingredientsRemoved ?? [];
-
+        <div style="margin-top:6px;">
+          {decoratedItems.map((item) => {
             return (
-              <div style="margin-bottom: 10px;">
-                <div class="row">
-                  <div class="b wrap" style="flex: 1;">
-                    {it.qty}× {it.nameSnapshot}
-                    {it.variantSnapshot ? (
-                      <span class="sm muted"> ({it.variantSnapshot})</span>
-                    ) : null}
-                  </div>
-                  <div class="b">{money(it.lineTotalCents)}</div>
+              <div style="margin-top:10px;">
+                <div class="row sm">
+                  <div class="bb">{item.qty}× {item.nameSnapshot}</div>
+                  <div class="bb">{money(item.lineTotalCents)}</div>
                 </div>
 
-                {opts.length ? (
-                  <div class="sm muted indent wrap" style="margin-top: 4px;">
-                    + Extras: {opts.map((x: any) => x.name).join(", ")}
+                {item.variantSnapshot ? (
+                  <div class="xs muted indent" style="margin-top:2px;">Variante: {item.variantSnapshot}</div>
+                ) : null}
+
+                {item.opts.length ? (
+                  <div class="xs muted indent" style="margin-top:2px;">
+                    Extras: {item.opts.map((o) => `${String(o.name ?? "")} (+${money(Number(o.priceDeltaCents ?? 0))})`).join(", ")}
                   </div>
                 ) : null}
 
-                {adds.length ? (
-                  <div class="sm muted indent wrap" style="margin-top: 3px;">
-                    + Añadir: {adds.map((x: any) => x.name).join(", ")}
+                {item.adds.length ? (
+                  <div class="xs muted indent" style="margin-top:2px;">
+                    Añadidos: {item.adds.map((a) => `${String(a.name ?? "")} (+${money(Number(a.priceDeltaCents ?? 0))})`).join(", ")}
                   </div>
                 ) : null}
 
-                {rems.length ? (
-                  <div class="sm muted indent wrap" style="margin-top: 3px;">
-                    - Quitar: {rems.map((x: any) => x.name).join(", ")}
+                {item.rems.length ? (
+                  <div class="xs muted indent" style="margin-top:2px;">
+                    Quitados: {item.rems.map((r) => String(r.name ?? "")).join(", ")}
                   </div>
                 ) : null}
 
-                <div class="sep" style="margin: 8px 0 0;"></div>
+                {item.notes ? (
+                  <div class="xs muted indent" style="margin-top:2px;">
+                    Nota línea: {item.notes}
+                  </div>
+                ) : null}
               </div>
             );
           })}
         </div>
 
-        {/* Notas pedido */}
-        {(order as any).notes ? (
-          <div class="noteBox">
-            <div class="b">NOTAS</div>
-            <div class="sm wrap" style="margin-top: 4px;">
-              {(order as any).notes}
-            </div>
-          </div>
-        ) : null}
-
         <div class="sep"></div>
 
-        {/* Totales */}
-        <div class="row">
-          <div class="muted">Subtotal</div>
-          <div class="b">{money((order as any).subtotalCents)}</div>
+        <div class="row sm">
+          <div>Subtotal</div>
+          <div>{money(order.subtotalCents)}</div>
         </div>
 
-        {isDelivery ? (
-          <div class="row" style="margin-top: 4px;">
-            <div class="muted">Delivery</div>
-            <div class="b">{money(deliveryFeeCents)}</div>
+        {Number(order.deliveryFeeCents ?? 0) > 0 ? (
+          <div class="row sm" style="margin-top:4px;">
+            <div>Delivery</div>
+            <div>{money(order.deliveryFeeCents)}</div>
           </div>
         ) : null}
 
-        <div class="row" style="margin-top: 8px;">
-          <div class="bb bigTotal">TOTAL</div>
-          <div class="bb bigTotal">{money((order as any).totalCents)}</div>
+        {Number(order.discountCents ?? 0) > 0 ? (
+          <div class="row sm" style="margin-top:4px;">
+            <div>Descuento</div>
+            <div>-{money(order.discountCents)}</div>
+          </div>
+        ) : null}
+
+        <div class="row sm" style="margin-top:4px;">
+          <div>Impuestos</div>
+          <div>{money(order.taxCents)}</div>
         </div>
 
         <div class="sep"></div>
 
-        <div class="center xs muted">
-          Gracias por tu pedido ❤️
+        <div class="row bigTotal">
+          <div>TOTAL</div>
+          <div>{money(order.totalCents)}</div>
         </div>
       </main>
     </div>
 
     {autoPrint ? (
       <script is:inline>
-        {`
-          window.addEventListener("load", () => {
-            setTimeout(() => window.print(), 50);
-          });
-        `}
+        {`window.addEventListener("load", () => window.print());`}
       </script>
     ) : null}
   </body>

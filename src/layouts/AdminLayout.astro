@@ -1,0 +1,125 @@
+---
+import "@/styles/global.css";
+import AdminSidebar from "@/components/admin/AdminSidebar.astro";
+
+type UserLike = {
+  name?: string | null;
+  email?: string | null;
+  role?: string | null;
+};
+
+type Props = {
+  title?: string;
+  heading?: string;
+  description?: string;
+  actions?: boolean;
+};
+
+const {
+  title = "Admin · Arcadia",
+  heading,
+  description,
+  actions = false,
+} = Astro.props as Props;
+
+const user = Astro.locals.user as UserLike | null;
+const pathname = Astro.url.pathname;
+const pageHeading = heading ?? "Admin";
+const pageDescription = description ?? "";
+const pageTitle = title;
+
+function initialsFromUser(value: UserLike | null) {
+  const base = value?.name?.trim() || value?.email?.trim() || "A";
+  const clean = base.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, "").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+
+  return clean.slice(0, 2).toUpperCase() || "A";
+}
+
+const userInitials = initialsFromUser(user);
+const displayName = user?.name?.trim() || user?.email?.trim() || "Sesión admin";
+const displayRole = user?.role?.trim() || "STAFF";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/ARCADIA_LOGO.svg" />
+    <title>{pageTitle}</title>
+  </head>
+
+  <body class="min-h-dvh bg-[#0b1120] text-slate-100 antialiased">
+    <div class="min-h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#0b1120_0%,#111827_100%)]">
+      <div class="mx-auto flex w-full max-w-420 gap-6 px-4 py-4 sm:px-6 sm:py-6 2xl:px-8">
+        <AdminSidebar currentPath={pathname} user={user} />
+
+        <div class="min-w-0 flex-1">
+          <header class="sticky top-4 z-20 mb-6 rounded-[28px] border border-white/10 bg-slate-950/70 px-5 py-4 backdrop-blur xl:px-6">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="min-w-0">
+                <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Arcadia · Administración
+                </div>
+                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+                  {pageHeading}
+                </h1>
+                {
+                  pageDescription ? (
+                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                      {pageDescription}
+                    </p>
+                  ) : null
+                }
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex md:items-center md:gap-3">
+                  <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-400/15 text-sm font-bold text-sky-300 ring-1 ring-sky-300/15">
+                    {userInitials}
+                  </div>
+
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-semibold text-white">
+                      {displayName}
+                    </div>
+                    <div class="text-xs uppercase tracking-[0.16em] text-slate-400">
+                      {displayRole}
+                    </div>
+                  </div>
+                </div>
+
+                <form method="post" action="/api/admin/logout">
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+                  >
+                    Cerrar sesión
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {
+              actions ? (
+                <div class="mt-4">
+                  <slot name="actions" />
+                </div>
+              ) : null
+            }
+          </header>
+
+          <main class="pb-10">
+            <slot />
+          </main>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

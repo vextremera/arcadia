@@ -74,6 +74,43 @@ async function getPaymentsSettings() {
   return (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 }
 
+function buildForcedPickupReason(
+  availability: Awaited<ReturnType<typeof getArcadiaAvailability>>
+) {
+  const start = availability.windows.delivery.start;
+  const end = availability.windows.delivery.end;
+  const source = availability.sources.delivery;
+  const note = availability.sourceNotes.delivery?.trim() || null;
+
+  if (availability.forcePickup) {
+    return note
+      ? `Delivery desactivado temporalmente desde operativa. ${note}`
+      : "Delivery desactivado temporalmente desde operativa.";
+  }
+
+  if (source === "SPECIAL_DATE_CLOSED") {
+    return note
+      ? `Delivery no disponible hoy por una excepción operativa. ${note}`
+      : "Delivery no disponible hoy por una excepción operativa.";
+  }
+
+  if (source === "SPECIAL_DATE") {
+    return note
+      ? `Fuera de la franja especial de reparto de hoy (${start}–${end}). ${note}`
+      : `Fuera de la franja especial de reparto de hoy (${start}–${end}).`;
+  }
+
+  if (source === "OPENING_HOUR_CLOSED") {
+    return "Delivery no disponible hoy según el horario semanal.";
+  }
+
+  if (source === "OPENING_HOUR") {
+    return `Fuera de la franja semanal de reparto (${start}–${end}).`;
+  }
+
+  return `Fuera de horario de reparto (${start}–${end}).`;
+}
+
 type OrderItemInsert = {
   orderId: number;
   productId: number | null;
@@ -90,7 +127,6 @@ type OrderItemInsert = {
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
 
-  // ✅ si hay usuario logueado, lo vinculamos al pedido (solo CUSTOMER)
   const authUser = (await session.get("user")) as SessionUser | undefined;
 
   const availability = await getArcadiaAvailability();
@@ -102,8 +138,12 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!availability.isOpen) {
-    return json({ error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` }, 400);
+    return json(
+      { error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` },
+      400
+    );
   }
+
   if (!availability.kitchenOpen) {
     return json(
       {
@@ -119,8 +159,8 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const payments = await getPaymentsSettings();
 
-  const requestedType = safeStr(body.type).toUpperCase(); // DELIVERY | PICKUP
-  const paymentMethod = safeStr(body.paymentMethod).toUpperCase(); // CASH | CARD
+  const requestedType = safeStr(body.type).toUpperCase();
+  const paymentMethod = safeStr(body.paymentMethod).toUpperCase();
   const orderNotes = safeStr(body.orderNotes);
 
   const customerName = safeStr(body.customerName);
@@ -137,19 +177,16 @@ export const POST: APIRoute = async ({ request, session }) => {
     notes: safeStr(body.address?.notes),
   };
 
-  // ✅ Nuevo: flag guardar dirección
   const saveAddress = !!body.saveAddress;
   const saveAddressDefault = !!body.saveAddressDefault;
-  const saveAddressLabel = typeof body.saveAddressLabel === "string" ? body.saveAddressLabel.trim() : "";
+  const saveAddressLabel =
+    typeof body.saveAddressLabel === "string" ? body.saveAddressLabel.trim() : "";
 
-  // ✅ Nuevo: flag guardar perfil (best-effort)
   const saveProfile = !!body.saveProfile;
 
-  // carrito desde sesión
   const cart = ((await session.get("cart")) as CartItemSession[] | undefined) ?? [];
   if (cart.length === 0) return json({ error: "EMPTY_CART" }, 400);
 
-  // Forzar recogida si fuera de horario delivery
   let type: "DELIVERY" | "PICKUP" = requestedType === "DELIVERY" ? "DELIVERY" : "PICKUP";
   let forcedPickup = false;
   let forcedReason: string | null = null;
@@ -157,19 +194,23 @@ export const POST: APIRoute = async ({ request, session }) => {
   if (type === "DELIVERY" && !availability.deliveryAvailable) {
     type = "PICKUP";
     forcedPickup = true;
-    forcedReason = `Fuera de horario de reparto (${availability.windows.delivery.start}–${availability.windows.delivery.end}).`;
+    forcedReason = buildForcedPickupReason(availability);
   }
 
   const pm: "CARD" | "CASH" = paymentMethod === "CARD" ? "CARD" : "CASH";
 
-  const allowedCash = type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-  const allowedCard = type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
+  const allowedCash =
+    type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
+  const allowedCard =
+    type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
 
   if (!allowedCash && !allowedCard) {
     return json(
       {
         error: "NO_PAYMENT_METHODS",
-        message: `No hay métodos de pago disponibles para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+        message: `No hay métodos de pago disponibles para ${
+          type === "DELIVERY" ? "delivery" : "recogida"
+        }.`,
       },
       400
     );
@@ -179,7 +220,9 @@ export const POST: APIRoute = async ({ request, session }) => {
     return json(
       {
         error: "PAYMENT_METHOD_DISABLED",
-        message: `El pago en efectivo no está disponible para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+        message: `El pago en efectivo no está disponible para ${
+          type === "DELIVERY" ? "delivery" : "recogida"
+        }.`,
       },
       400
     );
@@ -189,34 +232,42 @@ export const POST: APIRoute = async ({ request, session }) => {
     return json(
       {
         error: "PAYMENT_METHOD_DISABLED",
-        message: `El pago con tarjeta no está disponible para ${type === "DELIVERY" ? "delivery" : "recogida"}.`,
+        message: `El pago con tarjeta no está disponible para ${
+          type === "DELIVERY" ? "delivery" : "recogida"
+        }.`,
       },
       400
     );
   }
 
-  // Validación mínima datos cliente
   if (!customerName || !customerPhone) {
-    return json({ error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." }, 400);
+    return json(
+      { error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." },
+      400
+    );
   }
 
   if (type === "DELIVERY") {
     if (!address.line1 || !address.city || !address.postalCode) {
       return json(
-        { error: "MISSING_ADDRESS", message: "Dirección, ciudad y código postal son obligatorios." },
+        {
+          error: "MISSING_ADDRESS",
+          message: "Dirección, ciudad y código postal son obligatorios.",
+        },
         400
       );
     }
   }
 
-  // Cargar productos/variantes/opciones/ingredientes necesarios
   const productIds = [...new Set(cart.map((i) => i.productId))];
   const variantIds = [
     ...new Set(cart.map((i) => i.variantId).filter((x): x is number => Number.isFinite(x))),
   ];
   const optionIds = [...new Set(cart.flatMap((i) => i.modifierOptionIds ?? []))];
   const ingredientIds = [
-    ...new Set(cart.flatMap((i) => [...(i.addedIngredientIds ?? []), ...(i.removedIngredientIds ?? [])])),
+    ...new Set(
+      cart.flatMap((i) => [...(i.addedIngredientIds ?? []), ...(i.removedIngredientIds ?? [])])
+    ),
   ];
 
   const products = await db
@@ -231,39 +282,39 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const variants = variantIds.length
     ? await db
-      .select({
-        id: ProductVariant.id,
-        productId: ProductVariant.productId,
-        name: ProductVariant.name, // ✅ para variantSnapshot
-        priceDeltaCents: ProductVariant.priceDeltaCents,
-        active: ProductVariant.active,
-      })
-      .from(ProductVariant)
-      .where(inArray(ProductVariant.id, variantIds))
+        .select({
+          id: ProductVariant.id,
+          productId: ProductVariant.productId,
+          name: ProductVariant.name,
+          priceDeltaCents: ProductVariant.priceDeltaCents,
+          active: ProductVariant.active,
+        })
+        .from(ProductVariant)
+        .where(inArray(ProductVariant.id, variantIds))
     : [];
 
   const options = optionIds.length
     ? await db
-      .select({
-        id: ModifierOption.id,
-        name: ModifierOption.name,
-        priceDeltaCents: ModifierOption.priceDeltaCents,
-        active: ModifierOption.active,
-      })
-      .from(ModifierOption)
-      .where(inArray(ModifierOption.id, optionIds))
+        .select({
+          id: ModifierOption.id,
+          name: ModifierOption.name,
+          priceDeltaCents: ModifierOption.priceDeltaCents,
+          active: ModifierOption.active,
+        })
+        .from(ModifierOption)
+        .where(inArray(ModifierOption.id, optionIds))
     : [];
 
   const ingredients = ingredientIds.length
     ? await db
-      .select({
-        id: Ingredient.id,
-        name: Ingredient.name,
-        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-        active: Ingredient.active,
-      })
-      .from(Ingredient)
-      .where(inArray(Ingredient.id, ingredientIds))
+        .select({
+          id: Ingredient.id,
+          name: Ingredient.name,
+          addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+          active: Ingredient.active,
+        })
+        .from(Ingredient)
+        .where(inArray(Ingredient.id, ingredientIds))
     : [];
 
   const productById = new Map(products.map((p) => [p.id, p]));
@@ -271,7 +322,6 @@ export const POST: APIRoute = async ({ request, session }) => {
   const optionById = new Map(options.map((o) => [o.id, o]));
   const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
 
-  // Construir items snapshot
   let subtotalCents = 0;
   const itemsToInsert: OrderItemInsert[] = [];
 
@@ -309,18 +359,13 @@ export const POST: APIRoute = async ({ request, session }) => {
     subtotalCents += lineTotalCents;
 
     itemsToInsert.push({
-      orderId: 0, // placeholder; se setea al insertar
+      orderId: 0,
       productId: p.id,
       variantId: v?.id ?? null,
-
-      // ✅ columnas NOT NULL / snapshot real
       nameSnapshot: p.name,
       variantSnapshot: v?.name ?? null,
-
       unitPriceCents: unitCents,
       qty,
-
-      // ✅ esto reemplaza el antiguo `snapshot`
       modifiers: {
         modifierOptions: chosenOptions.map((o) => ({
           id: o.id,
@@ -334,13 +379,11 @@ export const POST: APIRoute = async ({ request, session }) => {
         })),
         ingredientsRemoved: removed.map((r) => ({ id: r.id, name: r.name })),
       },
-
       lineTotalCents,
       notes: null,
     });
   }
 
-  // Fee fijo (solo delivery)
   const feeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
 
   const discountCents = 0;
@@ -351,33 +394,29 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   await db.insert(Order).values({
     publicId,
-
-    // ✅ vincular pedido al CUSTOMER si existe
     userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
-
     type,
     status: "PENDING",
     paymentStatus: "UNPAID",
-
     currency: "EUR",
     subtotalCents,
     deliveryFeeCents: feeCents,
     discountCents,
     taxCents,
     totalCents,
-
     customerName,
     customerPhone,
     customerEmail: customerEmail || null,
-
     notes: orderNotes || null,
-
     addressSnapshot: {
       paymentMethod: pm,
       forcedPickup,
       forcedReason,
+      deliveryResolutionSource: availability.sources.delivery,
+      deliveryResolutionNote: availability.sourceNotes.delivery ?? null,
       address: type === "DELIVERY" ? address : null,
       now: availability.now,
+      dateISO: availability.todayDateISO,
     },
   });
 
@@ -398,16 +437,20 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   let savedAddressId: number | null = null;
 
-  // ✅ Guardar dirección si procede (best-effort)
   if (saveAddress && type === "DELIVERY" && authUser?.role === "CUSTOMER") {
     try {
       const userId = authUser.id;
 
-      // “match” simple para evitar duplicados
       const existing = await db
         .select({ id: Address.id, isDefault: Address.isDefault })
         .from(Address)
-        .where(and(eq(Address.userId, userId), eq(Address.line1, address.line1), eq(Address.postalCode, address.postalCode)))
+        .where(
+          and(
+            eq(Address.userId, userId),
+            eq(Address.line1, address.line1),
+            eq(Address.postalCode, address.postalCode)
+          )
+        )
         .limit(1);
 
       const patch = {
@@ -429,8 +472,13 @@ export const POST: APIRoute = async ({ request, session }) => {
         addressId = existing[0].id;
         await db.update(Address).set(patch).where(eq(Address.id, addressId));
       } else {
-        const any = await db.select({ id: Address.id }).from(Address).where(eq(Address.userId, userId)).limit(1);
-        const isDefault = any.length === 0; // primera dirección => default
+        const any = await db
+          .select({ id: Address.id })
+          .from(Address)
+          .where(eq(Address.userId, userId))
+          .limit(1);
+
+        const isDefault = any.length === 0;
 
         const inserted = await db
           .insert(Address)
@@ -453,7 +501,6 @@ export const POST: APIRoute = async ({ request, session }) => {
         addressId = inserted[0]?.id ?? null;
       }
 
-      // ✅ Default si procede
       if (saveAddressDefault && addressId) {
         await db.update(Address).set({ isDefault: false }).where(eq(Address.userId, userId));
         await db
@@ -462,24 +509,20 @@ export const POST: APIRoute = async ({ request, session }) => {
           .where(and(eq(Address.userId, userId), eq(Address.id, addressId)));
       }
 
-      // ✅ devolver id guardado (fix del bug)
       savedAddressId = addressId;
     } catch {
       // best-effort
     }
   }
 
-  // ✅ Guardar PERFIL (best-effort)
   if (saveProfile && authUser?.role === "CUSTOMER") {
     try {
       const userId = authUser.id;
 
-      // Nombre (User.name)
       if (customerName && customerName.length <= 120) {
         await db.update(User).set({ name: customerName }).where(eq(User.id, userId));
       }
 
-      // Asegurar UserProfile (lazy create)
       const existingProfile = await db
         .select({ userId: UserProfile.userId })
         .from(UserProfile)
@@ -496,9 +539,11 @@ export const POST: APIRoute = async ({ request, session }) => {
         });
       }
 
-      // Teléfono (UserProfile.phone)
       if (customerPhone && customerPhone.length <= 40) {
-        await db.update(UserProfile).set({ phone: customerPhone }).where(eq(UserProfile.userId, userId));
+        await db
+          .update(UserProfile)
+          .set({ phone: customerPhone })
+          .where(eq(UserProfile.userId, userId));
       }
     } catch {
       // best-effort
