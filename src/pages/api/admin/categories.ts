@@ -13,11 +13,6 @@ function parseSortOrder(value: FormDataEntryValue | null, fallback = 0) {
   return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : fallback;
 }
 
-function toNullableText(value: FormDataEntryValue | null) {
-  const s = String(value ?? "").trim();
-  return s ? s : null;
-}
-
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -55,7 +50,6 @@ export const POST: APIRoute = async (context) => {
     const slugInput = String(form.get("slug") ?? "").trim();
     const slug = slugify(slugInput || name);
     const sortOrder = parseSortOrder(form.get("sortOrder"), 0);
-    const imageUrl = toNullableText(form.get("imageUrl"));
     const active = form.get("active") === "on";
 
     if (!name) {
@@ -85,7 +79,6 @@ export const POST: APIRoute = async (context) => {
       slug,
       sortOrder,
       active,
-      imageUrl,
     });
 
     return context.redirect(withQuery(REDIRECT_PATH, { saved: "1" }));
@@ -114,7 +107,6 @@ export const POST: APIRoute = async (context) => {
     const slugInput = String(form.get("slug") ?? "").trim();
     const slug = slugify(slugInput || name);
     const sortOrder = parseSortOrder(form.get("sortOrder"), 0);
-    const imageUrl = toNullableText(form.get("imageUrl"));
     const active = form.get("active") === "on";
 
     if (!name) {
@@ -142,7 +134,6 @@ export const POST: APIRoute = async (context) => {
         slug,
         sortOrder,
         active,
-        imageUrl,
       })
       .where(eq(Category.id, categoryId));
 

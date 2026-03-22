@@ -8,6 +8,7 @@ import {
   ProductModifierGroup,
   ProductIngredient,
   ProductAllergen,
+  Allergen,
   eq,
   inArray,
 } from "astro:db";
@@ -29,21 +30,24 @@ const quickLinks: QuickLink[] = [
     href: "/admin/catalogo/productos/nuevo",
     eyebrow: "Alta",
     title: "Nuevo producto",
-    description: "Crear una ficha nueva y empezar a trabajar variantes, ingredientes y grupos.",
+    description:
+      "Crear una ficha nueva y empezar a trabajar variantes, ingredientes y grupos.",
     tone: "sky",
   },
   {
     href: "/admin/catalogo/ingredientes",
     eyebrow: "Base global",
     title: "Ingredientes",
-    description: "Gestionar ingredientes reutilizables, precio extra, orden y estado.",
+    description:
+      "Gestionar ingredientes reutilizables, precio extra, orden y estado.",
     tone: "cyan",
   },
   {
     href: "/admin/catalogo/modificadores",
     eyebrow: "Configuración",
     title: "Modificadores",
-    description: "Definir grupos y opciones globales antes de enlazarlos a productos.",
+    description:
+      "Definir grupos y opciones globales antes de enlazarlos a productos.",
     tone: "violet",
   },
   {
@@ -179,10 +183,17 @@ const allergenRows = productIds.length
   ? await db
       .select({
         productId: ProductAllergen.productId,
-        id: ProductAllergen.id,
+        relationId: ProductAllergen.id,
+        allergenId: Allergen.id,
+        allergenName: Allergen.name,
+        allergenSlug: Allergen.slug,
+        allergenIconUrl: Allergen.iconUrl,
+        allergenSortOrder: Allergen.sortOrder,
       })
       .from(ProductAllergen)
+      .innerJoin(Allergen, eq(ProductAllergen.allergenId, Allergen.id))
       .where(inArray(ProductAllergen.productId, productIds))
+      .orderBy(ProductAllergen.productId, Allergen.sortOrder, Allergen.name)
   : [];
 
 const activeVariantCountByProduct = new Map<number, number>();
@@ -190,7 +201,7 @@ for (const row of variantRows) {
   if (!row.active) continue;
   activeVariantCountByProduct.set(
     row.productId,
-    (activeVariantCountByProduct.get(row.productId) ?? 0) + 1
+    (activeVariantCountByProduct.get(row.productId) ?? 0) + 1,
   );
 }
 
@@ -198,7 +209,7 @@ const modifierGroupCountByProduct = new Map<number, number>();
 for (const row of modifierGroupRows) {
   modifierGroupCountByProduct.set(
     row.productId,
-    (modifierGroupCountByProduct.get(row.productId) ?? 0) + 1
+    (modifierGroupCountByProduct.get(row.productId) ?? 0) + 1,
   );
 }
 
@@ -207,36 +218,58 @@ for (const row of removableIngredientRows) {
   if (!row.defaultIncluded || !row.removable) continue;
   removableCountByProduct.set(
     row.productId,
-    (removableCountByProduct.get(row.productId) ?? 0) + 1
+    (removableCountByProduct.get(row.productId) ?? 0) + 1,
   );
 }
 
-const allergenCountByProduct = new Map<number, number>();
+const allergenPreviewByProduct = new Map<
+  number,
+  Array<{
+    id: number;
+    name: string;
+    slug: string;
+    iconUrl: string | null;
+  }>
+>();
+
 for (const row of allergenRows) {
-  allergenCountByProduct.set(
-    row.productId,
-    (allergenCountByProduct.get(row.productId) ?? 0) + 1
-  );
+  if (!allergenPreviewByProduct.has(row.productId)) {
+    allergenPreviewByProduct.set(row.productId, []);
+  }
+
+  allergenPreviewByProduct.get(row.productId)?.push({
+    id: row.allergenId,
+    name: row.allergenName,
+    slug: row.allergenSlug,
+    iconUrl: row.allergenIconUrl
+      ? String(row.allergenIconUrl).trim() || null
+      : null,
+  });
 }
 
 const products = productsSorted.map((row) => {
   const variantCount = activeVariantCountByProduct.get(row.id) ?? 0;
   const modifierGroupCount = modifierGroupCountByProduct.get(row.id) ?? 0;
   const removableCount = removableCountByProduct.get(row.id) ?? 0;
-  const allergenCount = allergenCountByProduct.get(row.id) ?? 0;
+  const allergenPreview = (allergenPreviewByProduct.get(row.id) ?? []).slice(
+    0,
+    4,
+  );
 
   return {
     ...row,
     variantCount,
     modifierGroupCount,
     removableCount,
-    allergenCount,
-    isConfigurable: variantCount > 0 || modifierGroupCount > 0 || removableCount > 0,
+    allergenPreview,
+    isConfigurable:
+      variantCount > 0 || modifierGroupCount > 0 || removableCount > 0,
   };
 });
 
 const filteredProducts = products.filter((product) => {
-  if (categoryFilter && String(product.categoryId) !== categoryFilter) return false;
+  if (categoryFilter && String(product.categoryId) !== categoryFilter)
+    return false;
 
   if (statusFilter === "active" && !product.active) return false;
   if (statusFilter === "inactive" && product.active) return false;
@@ -244,8 +277,17 @@ const filteredProducts = products.filter((product) => {
 
   if (channelFilter === "delivery" && !product.deliveryEnabled) return false;
   if (channelFilter === "pickup" && !product.pickupEnabled) return false;
-  if (channelFilter === "both" && (!product.deliveryEnabled || !product.pickupEnabled)) return false;
-  if (channelFilter === "restricted" && product.deliveryEnabled && product.pickupEnabled) return false;
+  if (
+    channelFilter === "both" &&
+    (!product.deliveryEnabled || !product.pickupEnabled)
+  )
+    return false;
+  if (
+    channelFilter === "restricted" &&
+    product.deliveryEnabled &&
+    product.pickupEnabled
+  )
+    return false;
 
   if (q) {
     const haystack = [
@@ -266,8 +308,12 @@ const filteredProducts = products.filter((product) => {
 
 const totalProducts = products.length;
 const activeProducts = products.filter((product) => product.active).length;
-const configurableProducts = products.filter((product) => product.isConfigurable).length;
-const imageProducts = products.filter((product) => Boolean(product.imageUrl)).length;
+const configurableProducts = products.filter(
+  (product) => product.isConfigurable,
+).length;
+const imageProducts = products.filter((product) =>
+  Boolean(product.imageUrl),
+).length;
 
 const statusMessage =
   error === "invalid-id"
@@ -339,51 +385,79 @@ const statusMessage =
   }
 
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+    <article
+      class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+      >
         Total productos
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
         {totalProducts}
       </div>
-      <p class="mt-2 text-sm text-slate-400">Todos los productos del catálogo</p>
+      <p class="mt-2 text-sm text-slate-400">
+        Todos los productos del catálogo
+      </p>
     </article>
 
-    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
+    <article
+      class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80"
+      >
         Activos
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
         {activeProducts}
       </div>
-      <p class="mt-2 text-sm text-emerald-100/70">Disponibles para la app pública</p>
+      <p class="mt-2 text-sm text-emerald-100/70">
+        Disponibles para la app pública
+      </p>
     </article>
 
-    <article class="rounded-[28px] border border-violet-400/15 bg-violet-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80">
+    <article
+      class="rounded-[28px] border border-violet-400/15 bg-violet-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80"
+      >
         Configurables
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
         {configurableProducts}
       </div>
-      <p class="mt-2 text-sm text-violet-100/70">Con variantes, grupos o ingredientes removibles</p>
+      <p class="mt-2 text-sm text-violet-100/70">
+        Con variantes, grupos o ingredientes removibles
+      </p>
     </article>
 
-    <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">
+    <article
+      class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80"
+      >
         Con imagen
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
         {imageProducts}
       </div>
-      <p class="mt-2 text-sm text-cyan-100/70">Productos con `imageUrl` informada</p>
+      <p class="mt-2 text-sm text-cyan-100/70">
+        Productos con `imageUrl` informada
+      </p>
     </article>
   </section>
 
-  <section class="mt-6 rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+  <section
+    class="mt-6 rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+  >
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
+        >
           Accesos rápidos
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -391,42 +465,57 @@ const statusMessage =
         </h2>
       </div>
 
-      <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+      <div
+        class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300"
+      >
         Productos, base global y estructura
       </div>
     </div>
 
     <div class="mt-6 grid gap-4 xl:grid-cols-4">
-      {quickLinks.map((link) => {
-        const styles = quickLinkClasses(link.tone);
+      {
+        quickLinks.map((link) => {
+          const styles = quickLinkClasses(link.tone);
 
-        return (
-          <a
-            href={link.href}
-            class:list={[
-              "rounded-[28px] border p-5 transition",
-              styles.card,
-            ]}
-          >
-            <div class:list={["text-[11px] font-semibold uppercase tracking-[0.22em]", styles.eyebrow]}>
-              {link.eyebrow}
-            </div>
-            <div class:list={["mt-3 text-lg font-semibold tracking-tight", styles.title]}>
-              {link.title}
-            </div>
-            <p class:list={["mt-2 text-sm leading-6", styles.text]}>
-              {link.description}
-            </p>
-          </a>
-        );
-      })}
+          return (
+            <a
+              href={link.href}
+              class:list={["rounded-[28px] border p-5 transition", styles.card]}
+            >
+              <div
+                class:list={[
+                  "text-[11px] font-semibold uppercase tracking-[0.22em]",
+                  styles.eyebrow,
+                ]}
+              >
+                {link.eyebrow}
+              </div>
+              <div
+                class:list={[
+                  "mt-3 text-lg font-semibold tracking-tight",
+                  styles.title,
+                ]}
+              >
+                {link.title}
+              </div>
+              <p class:list={["mt-2 text-sm leading-6", styles.text]}>
+                {link.description}
+              </p>
+            </a>
+          );
+        })
+      }
     </div>
   </section>
 
-  <section class="mt-6 rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+  <section
+    class="mt-6 rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+  >
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
+        >
           Filtros
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -435,9 +524,14 @@ const statusMessage =
       </div>
     </div>
 
-    <form class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_260px_220px_220px_auto]" method="get">
+    <form
+      class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_260px_220px_220px_auto]"
+      method="get"
+    >
       <label class="block">
-        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span
+          class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+        >
           Buscar
         </span>
         <input
@@ -449,7 +543,9 @@ const statusMessage =
       </label>
 
       <label class="block">
-        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span
+          class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+        >
           Categoría
         </span>
         <select
@@ -457,16 +553,23 @@ const statusMessage =
           name="category"
         >
           <option value="">Todas</option>
-          {categories.map((category) => (
-            <option value={String(category.id)} selected={String(category.id) === categoryFilter}>
-              {category.name}
-            </option>
-          ))}
+          {
+            categories.map((category) => (
+              <option
+                value={String(category.id)}
+                selected={String(category.id) === categoryFilter}
+              >
+                {category.name}
+              </option>
+            ))
+          }
         </select>
       </label>
 
       <label class="block">
-        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span
+          class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+        >
           Estado
         </span>
         <select
@@ -474,14 +577,23 @@ const statusMessage =
           name="status"
         >
           <option value="" selected={statusFilter === ""}>Todos</option>
-          <option value="active" selected={statusFilter === "active"}>Activos</option>
-          <option value="inactive" selected={statusFilter === "inactive"}>Inactivos</option>
-          <option value="configurable" selected={statusFilter === "configurable"}>Configurables</option>
+          <option value="active" selected={statusFilter === "active"}
+            >Activos</option
+          >
+          <option value="inactive" selected={statusFilter === "inactive"}
+            >Inactivos</option
+          >
+          <option
+            value="configurable"
+            selected={statusFilter === "configurable"}>Configurables</option
+          >
         </select>
       </label>
 
       <label class="block">
-        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        <span
+          class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+        >
           Canal
         </span>
         <select
@@ -489,10 +601,17 @@ const statusMessage =
           name="channel"
         >
           <option value="" selected={channelFilter === ""}>Todos</option>
-          <option value="delivery" selected={channelFilter === "delivery"}>Delivery</option>
-          <option value="pickup" selected={channelFilter === "pickup"}>Pickup</option>
-          <option value="both" selected={channelFilter === "both"}>Ambos</option>
-          <option value="restricted" selected={channelFilter === "restricted"}>Canal restringido</option>
+          <option value="delivery" selected={channelFilter === "delivery"}
+            >Delivery</option
+          >
+          <option value="pickup" selected={channelFilter === "pickup"}
+            >Pickup</option
+          >
+          <option value="both" selected={channelFilter === "both"}>Ambos</option
+          >
+          <option value="restricted" selected={channelFilter === "restricted"}
+            >Canal restringido</option
+          >
         </select>
       </label>
 
@@ -514,15 +633,21 @@ const statusMessage =
     </form>
   </section>
 
-  <section class="mt-6 rounded-[30px] border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+  <section
+    class="mt-6 rounded-[30px] border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+  >
     <div class="border-b border-white/10 px-6 py-5">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          <div
+            class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
             Resultado
           </div>
           <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-            {filteredProducts.length} producto{filteredProducts.length === 1 ? "" : "s"}
+            {filteredProducts.length} producto{
+              filteredProducts.length === 1 ? "" : "s"
+            }
           </h2>
         </div>
 
@@ -532,174 +657,248 @@ const statusMessage =
       </div>
     </div>
 
-    {filteredProducts.length === 0 ? (
-      <div class="px-6 py-12 text-center">
-        <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
-          <div class="text-lg font-semibold text-white">No hay productos con esos filtros</div>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Ajusta la búsqueda o revisa la categoría y los filtros de canal.
-          </p>
+    {
+      filteredProducts.length === 0 ? (
+        <div class="px-6 py-12 text-center">
+          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+            <div class="text-lg font-semibold text-white">
+              No hay productos con esos filtros
+            </div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Ajusta la búsqueda o revisa la categoría y los filtros de canal.
+            </p>
+          </div>
         </div>
-      </div>
-    ) : (
-      <div class="overflow-x-auto">
-        <table class="min-w-full border-collapse">
-          <thead>
-            <tr class="border-b border-white/10 text-left">
-              <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Producto</th>
-              <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Categoría</th>
-              <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Precio</th>
-              <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Canales</th>
-              <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Configuración</th>
-              <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Acciones</th>
-            </tr>
-          </thead>
+      ) : (
+        <div class="overflow-x-auto">
+          <table class="min-w-full border-collapse">
+            <thead>
+              <tr class="border-b border-white/10 text-left">
+                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Producto
+                </th>
+                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Categoría
+                </th>
+                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Precio
+                </th>
+                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Canales
+                </th>
+                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Configuración
+                </th>
+                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
 
-          <tbody>
-            {filteredProducts.map((product) => (
-              <tr class="border-b border-white/5 transition hover:bg-white/3">
-                <td class="px-6 py-4 align-top">
-                  <div class="flex items-start gap-4">
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        class="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/10"
-                      />
-                    ) : (
-                      <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        Sin img
+            <tbody>
+              {filteredProducts.map((product) => (
+                <tr class="border-b border-white/5 transition hover:bg-white/3">
+                  <td class="px-6 py-4 align-top">
+                    <div class="flex items-start gap-4">
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          class="h-14 w-14 rounded-2xl object-cover ring-1 ring-white/10"
+                        />
+                      ) : (
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Sin img
+                        </div>
+                      )}
+
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="text-sm font-semibold text-white">
+                            {product.name}
+                          </div>
+
+                          <span
+                            class:list={[
+                              "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                              product.active
+                                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                                : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                            ]}
+                          >
+                            {product.active ? "Activo" : "Inactivo"}
+                          </span>
+                        </div>
+
+                        <div class="mt-1 text-xs text-slate-500">
+                          {product.slug}
+                        </div>
+
+                        {product.description ? (
+                          <div class="mt-2 max-w-xl text-xs text-slate-400">
+                            {product.description}
+                          </div>
+                        ) : null}
                       </div>
-                    )}
+                    </div>
+                  </td>
 
-                    <div class="min-w-0">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <div class="text-sm font-semibold text-white">{product.name}</div>
+                  <td class="px-6 py-4 align-top">
+                    <div class="text-sm font-medium text-slate-200">
+                      {product.categoryName}
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      {product.categorySlug}
+                    </div>
+                  </td>
 
-                        <span class:list={[
-                          "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                          product.active
-                            ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                            : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                        ]}>
-                          {product.active ? "Activo" : "Inactivo"}
+                  <td class="px-6 py-4 align-top">
+                    <div class="text-sm font-semibold text-white">
+                      {money(product.priceCents)}
+                    </div>
+                  </td>
+
+                  <td class="px-6 py-4 align-top">
+                    <div class="flex flex-wrap gap-2">
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                          product.deliveryEnabled
+                            ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
+                            : "border-white/10 bg-white/5 text-slate-500",
+                        ]}
+                      >
+                        Delivery
+                      </span>
+
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                          product.pickupEnabled
+                            ? "border-indigo-400/20 bg-indigo-400/10 text-indigo-300"
+                            : "border-white/10 bg-white/5 text-slate-500",
+                        ]}
+                      >
+                        Pickup
+                      </span>
+
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                          product.dineInEnabled
+                            ? "border-violet-400/20 bg-violet-400/10 text-violet-300"
+                            : "border-white/10 bg-white/5 text-slate-500",
+                        ]}
+                      >
+                        Sala
+                      </span>
+                    </div>
+                  </td>
+
+                  <td class="px-6 py-4 align-top">
+                    <div class="flex flex-wrap gap-2">
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                          product.isConfigurable
+                            ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
+                            : "border-white/10 bg-white/5 text-slate-500",
+                        ]}
+                      >
+                        {product.isConfigurable ? "Configurable" : "Simple"}
+                      </span>
+
+                      {product.variantCount > 0 ? (
+                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                          Variantes {product.variantCount}
                         </span>
-                      </div>
+                      ) : null}
 
-                      <div class="mt-1 text-xs text-slate-500">{product.slug}</div>
+                      {product.modifierGroupCount > 0 ? (
+                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                          Grupos {product.modifierGroupCount}
+                        </span>
+                      ) : null}
 
-                      {product.description ? (
-                        <div class="mt-2 max-w-xl text-xs text-slate-400">
-                          {product.description}
+                      {product.allergenPreview.length > 0 ? (
+                        <div class="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1.5">
+                          <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-300">
+                            Alérgenos
+                          </span>
+
+                          <div class="flex items-center -space-x-2">
+                            {product.allergenPreview.map((allergen) =>
+                              allergen.iconUrl ? (
+                                <img
+                                  src={allergen.iconUrl}
+                                  alt={allergen.name}
+                                  title={allergen.name}
+                                  class="h-6 w-6 rounded-full object-cover ring-1 ring-[#111827]"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <span
+                                  title={allergen.name}
+                                  class="flex h-6 w-6 items-center justify-center rounded-full border border-amber-300/20 bg-amber-300/15 text-[10px] font-bold uppercase text-amber-100 ring-1 ring-[#111827]"
+                                >
+                                  {allergen.name.slice(0, 1)}
+                                </span>
+                              ),
+                            )}
+                          </div>
                         </div>
                       ) : null}
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                <td class="px-6 py-4 align-top">
-                  <div class="text-sm font-medium text-slate-200">{product.categoryName}</div>
-                  <div class="mt-1 text-xs text-slate-500">{product.categorySlug}</div>
-                </td>
-
-                <td class="px-6 py-4 align-top">
-                  <div class="text-sm font-semibold text-white">{money(product.priceCents)}</div>
-                </td>
-
-                <td class="px-6 py-4 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      product.deliveryEnabled
-                        ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
-                        : "border-white/10 bg-white/5 text-slate-500",
-                    ]}>
-                      Delivery
-                    </span>
-
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      product.pickupEnabled
-                        ? "border-indigo-400/20 bg-indigo-400/10 text-indigo-300"
-                        : "border-white/10 bg-white/5 text-slate-500",
-                    ]}>
-                      Pickup
-                    </span>
-
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      product.dineInEnabled
-                        ? "border-violet-400/20 bg-violet-400/10 text-violet-300"
-                        : "border-white/10 bg-white/5 text-slate-500",
-                    ]}>
-                      Sala
-                    </span>
-                  </div>
-                </td>
-
-                <td class="px-6 py-4 align-top">
-                  <div class="flex flex-wrap gap-2">
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      product.isConfigurable
-                        ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
-                        : "border-white/10 bg-white/5 text-slate-500",
-                    ]}>
-                      {product.isConfigurable ? "Configurable" : "Simple"}
-                    </span>
-
-                    {product.variantCount > 0 ? (
-                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                        Variantes {product.variantCount}
-                      </span>
-                    ) : null}
-
-                    {product.modifierGroupCount > 0 ? (
-                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                        Grupos {product.modifierGroupCount}
-                      </span>
-                    ) : null}
-
-                    {product.allergenCount > 0 ? (
-                      <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">
-                        Alérgenos {product.allergenCount}
-                      </span>
-                    ) : null}
-                  </div>
-                </td>
-
-                <td class="px-6 py-4 align-top">
-                  <div class="flex justify-end gap-2">
-                    <form method="post" action={`/api/admin/products/${product.id}`}>
-                      <input type="hidden" name="intent" value="toggle-active" />
-                      <input type="hidden" name="nextActive" value={product.active ? "false" : "true"} />
-                      <input type="hidden" name="redirectTo" value={Astro.url.pathname + Astro.url.search} />
-                      <button
-                        class:list={[
-                          "inline-flex items-center justify-center rounded-xl border px-3 py-2 text-xs font-semibold transition",
-                          product.active
-                            ? "border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
-                            : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:border-emerald-400/30 hover:bg-emerald-400/15",
-                        ]}
-                        type="submit"
+                  <td class="px-6 py-4 align-top">
+                    <div class="flex justify-end gap-2">
+                      <form
+                        method="post"
+                        action={`/api/admin/products/${product.id}`}
                       >
-                        {product.active ? "Desactivar" : "Activar"}
-                      </button>
-                    </form>
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="toggle-active"
+                        />
+                        <input
+                          type="hidden"
+                          name="nextActive"
+                          value={product.active ? "false" : "true"}
+                        />
+                        <input
+                          type="hidden"
+                          name="redirectTo"
+                          value={Astro.url.pathname + Astro.url.search}
+                        />
+                        <button
+                          class:list={[
+                            "inline-flex items-center justify-center rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                            product.active
+                              ? "border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
+                              : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:border-emerald-400/30 hover:bg-emerald-400/15",
+                          ]}
+                          type="submit"
+                        >
+                          {product.active ? "Desactivar" : "Activar"}
+                        </button>
+                      </form>
 
-                    <a
-                      href={`/admin/catalogo/productos/${product.id}`}
-                      class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-                    >
-                      Editar
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
+                      <a
+                        href={`/admin/catalogo/productos/${product.id}`}
+                        class="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+                      >
+                        Editar
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
   </section>
 </AdminLayout>

@@ -2,18 +2,12 @@
 import AdminLayout from "@/layouts/AdminLayout.astro";
 import { db, Category, Product, CategoryIngredient, inArray } from "astro:db";
 
-function toNullableText(value: string | null | undefined) {
-  const s = String(value ?? "").trim();
-  return s ? s : null;
-}
-
 type CategorySummary = {
   id: number;
   name: string;
   slug: string;
   sortOrder: number;
   active: boolean;
-  imageUrl: string | null;
   productCount: number;
   activeProductCount: number;
   inactiveProductCount: number;
@@ -31,7 +25,6 @@ const categoryRows = await db
     slug: Category.slug,
     sortOrder: Category.sortOrder,
     active: Category.active,
-    imageUrl: Category.imageUrl,
   })
   .from(Category)
   .orderBy(Category.sortOrder, Category.name);
@@ -90,7 +83,6 @@ for (const row of compatibilityRows) {
 
 const categories: CategorySummary[] = categoryRows.map((row) => ({
   ...row,
-  imageUrl: toNullableText(row.imageUrl),
   productCount: productCountByCategory.get(row.id) ?? 0,
   activeProductCount: activeProductCountByCategory.get(row.id) ?? 0,
   inactiveProductCount: inactiveProductCountByCategory.get(row.id) ?? 0,
@@ -125,7 +117,7 @@ const errorMessage =
 <AdminLayout
   title="Categorías · Admin · Arcadia"
   heading="Categorías"
-  description="CRUD mínimo y real sobre Category. Solo edita nombre, slug, orden, estado e imagen, sin inventar flags que no existen en el schema."
+  description="CRUD mínimo y real sobre Category. Solo edita nombre, slug, orden y estado, sin campos que no aportan al negocio actual."
   actions={true}
 >
   <Fragment slot="actions">
@@ -168,7 +160,7 @@ const errorMessage =
     <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
       <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">Activas</div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeCategories}</div>
-      <p class="mt-2 text-sm text-emerald-100/70">Disponibles en el catálogo</p>
+      <p class="mt-2 text-sm text-emerald-100/70">Disponibles en catálogo</p>
     </article>
 
     <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
@@ -198,7 +190,7 @@ const errorMessage =
           </div>
 
           <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
-            {categories.filter((category) => !category.imageUrl).length} sin imagen
+            Sin campo de imagen en la operativa
           </div>
         </div>
       </div>
@@ -215,34 +207,19 @@ const errorMessage =
       ) : (
         <div class="space-y-4 px-6 py-6">
           {categories.map((category) => {
-            const canDelete = category.productCount === 0 && category.ingredientCompatibilityCount === 0;
+            const canDelete =
+              category.productCount === 0 &&
+              category.ingredientCompatibilityCount === 0;
 
             return (
               <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
                 <div class="flex flex-wrap items-start justify-between gap-4">
-                  <div class="flex items-start gap-4">
-                    <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
-                      {category.imageUrl ? (
-                        <img
-                          src={category.imageUrl}
-                          alt={category.name}
-                          class="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Sin imagen
-                        </span>
-                      )}
-                    </div>
-
-                    <div>
-                      <div class="text-base font-semibold text-white">{category.name}</div>
-                      <div class="mt-1">
-                        <code class="rounded-xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-300">
-                          {category.slug}
-                        </code>
-                      </div>
+                  <div>
+                    <div class="text-base font-semibold text-white">{category.name}</div>
+                    <div class="mt-1">
+                      <code class="rounded-xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-300">
+                        {category.slug}
+                      </code>
                     </div>
                   </div>
 
@@ -303,26 +280,6 @@ const errorMessage =
                     />
                   </label>
 
-                  <label class="grid gap-2 text-sm text-slate-300 lg:col-span-2">
-                    <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Imagen</span>
-                    <input
-                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                      type="text"
-                      name="imageUrl"
-                      value={category.imageUrl ?? ""}
-                      placeholder="/images/categorias/tapas.webp"
-                    />
-                  </label>
-
-                  <div class="flex items-end justify-end">
-                    <button
-                      type="submit"
-                      class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-
                   <div class="flex flex-wrap items-center gap-6 lg:col-span-2">
                     <label class="inline-flex items-center gap-3 text-sm text-slate-300">
                       <input
@@ -340,6 +297,15 @@ const errorMessage =
                   </div>
 
                   <div class="flex items-end justify-end">
+                    <button
+                      type="submit"
+                      class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                    >
+                      Guardar
+                    </button>
+                  </div>
+
+                  <div class="flex items-end justify-end lg:col-span-3">
                     <a
                       href={`/admin/catalogo/productos?category=${category.id}`}
                       class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
@@ -409,29 +375,17 @@ const errorMessage =
             />
           </label>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <label class="grid gap-2 text-sm text-slate-300">
-              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                type="number"
-                name="sortOrder"
-                min="0"
-                step="1"
-                value={categories.length}
-              />
-            </label>
-
-            <label class="grid gap-2 text-sm text-slate-300">
-              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Imagen</span>
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                type="text"
-                name="imageUrl"
-                placeholder="/images/categorias/bocadillos.webp"
-              />
-            </label>
-          </div>
+          <label class="grid gap-2 text-sm text-slate-300">
+            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="number"
+              name="sortOrder"
+              min="0"
+              step="1"
+              value={categories.length}
+            />
+          </label>
 
           <label class="inline-flex items-center gap-3 text-sm text-slate-300">
             <input
@@ -458,23 +412,23 @@ const errorMessage =
 
         <div class="mt-6 space-y-4">
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
-            <div class="text-sm font-semibold text-white">Solo schema real</div>
+            <div class="text-sm font-semibold text-white">Solo negocio real</div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              Edita únicamente nombre, slug, orden, estado e imagen porque son los únicos campos reales de <code>Category</code>.
+              Categorías sin imagen. La UI se centra en nombre, slug, orden y estado porque es lo que de verdad aporta operativa al catálogo.
             </p>
           </div>
 
           <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
-            <div class="text-sm font-semibold text-amber-200">Borrado protegido</div>
+            <div class="text-sm font-semibold text-amber-200">Sin migración</div>
             <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              La categoría no se puede borrar si sigue teniendo productos o compatibilidades en <code>CategoryIngredient</code>.
+              No se toca el schema ni se borran datos existentes. Simplemente se deja de exponer <code>imageUrl</code> en el admin.
             </p>
           </div>
 
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
-            <div class="text-sm font-semibold text-white">Sin humo</div>
+            <div class="text-sm font-semibold text-white">Borrado protegido</div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              No se añaden flags de delivery o pickup a nivel categoría porque no existen en la base de datos real.
+              La categoría no se puede borrar si sigue teniendo productos o compatibilidades en <code>CategoryIngredient</code>.
             </p>
           </div>
         </div>

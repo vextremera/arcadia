@@ -56,23 +56,56 @@ const displayRole = user?.role?.trim() || "STAFF";
   </head>
 
   <body class="min-h-dvh bg-[#0b1120] text-slate-100 antialiased">
-    <div class="min-h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#0b1120_0%,#111827_100%)]">
-      <div class="mx-auto flex w-full max-w-420 gap-6 px-4 py-4 sm:px-6 sm:py-6 2xl:px-8">
+    <div
+      id="admin-shell"
+      data-sidebar-collapsed="false"
+      class="min-h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#0b1120_0%,#111827_100%)]"
+    >
+      <div class="mx-auto flex w-full max-w-480 gap-6 px-4 py-4 sm:px-6 sm:py-6 2xl:px-8">
         <AdminSidebar currentPath={pathname} user={user} />
 
         <div class="min-w-0 flex-1">
           <header class="sticky top-4 z-20 mb-6 rounded-[28px] border border-white/10 bg-slate-950/70 px-5 py-4 backdrop-blur xl:px-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div class="min-w-0">
-                <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Arcadia · Administración
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    id="admin-sidebar-toggle"
+                    class="hidden xl:inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+                    aria-label="Contraer o expandir sidebar"
+                    aria-pressed="false"
+                    title="Contraer o expandir sidebar"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      class="h-5 w-5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 6h16"></path>
+                      <path d="M4 12h16"></path>
+                      <path d="M4 18h16"></path>
+                    </svg>
+                  </button>
+
+                  <div class="min-w-0">
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Arcadia · Administración
+                    </div>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+                      {pageHeading}
+                    </h1>
+                  </div>
                 </div>
-                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
-                  {pageHeading}
-                </h1>
+
                 {
                   pageDescription ? (
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                    <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
                       {pageDescription}
                     </p>
                   ) : null
@@ -121,5 +154,98 @@ const displayRole = user?.role?.trim() || "STAFF";
         </div>
       </div>
     </div>
+
+    <style is:global>
+      @media (min-width: 1280px) {
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar] {
+          width: 6rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-brand-text],
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-session],
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-group-title],
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-copy],
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-footer-text] {
+          display: none;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-nav] {
+          padding-left: 0.75rem;
+          padding-right: 0.75rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item] {
+          padding-left: 0.75rem;
+          padding-right: 0.75rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-row] {
+          justify-content: center;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-dot] {
+          margin-top: 0;
+          height: 0.75rem;
+          width: 0.75rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-top] {
+          padding-left: 1rem;
+          padding-right: 1rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-footer] {
+          padding: 1rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-logo-wrap] {
+          justify-content: center;
+        }
+      }
+    </style>
+
+    <script is:inline>
+      (() => {
+        const root = document.getElementById("admin-shell");
+        const toggle = document.getElementById("admin-sidebar-toggle");
+        if (!root || !toggle) return;
+
+        const storageKey = "arcadia-admin-sidebar-collapsed";
+
+        function readState() {
+          try {
+            return window.localStorage.getItem(storageKey) === "1";
+          } catch {
+            return false;
+          }
+        }
+
+        function writeState(collapsed) {
+          try {
+            window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
+          } catch {
+            // noop
+          }
+        }
+
+        function applyState(collapsed) {
+          root.setAttribute("data-sidebar-collapsed", collapsed ? "true" : "false");
+          toggle.setAttribute("aria-pressed", collapsed ? "true" : "false");
+          toggle.setAttribute(
+            "title",
+            collapsed ? "Expandir sidebar" : "Contraer sidebar"
+          );
+        }
+
+        let collapsed = readState();
+        applyState(collapsed);
+
+        toggle.addEventListener("click", () => {
+          collapsed = !collapsed;
+          writeState(collapsed);
+          applyState(collapsed);
+        });
+      })();
+    </script>
   </body>
 </html>

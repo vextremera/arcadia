@@ -130,8 +130,12 @@ const allIngredients = await db
   .where(eq(Ingredient.active, true))
   .orderBy(Ingredient.sortOrder, Ingredient.name);
 
-const linkedIngredientIds = new Set(ingredientRows.map((row) => row.ingredientId));
-const availableIngredients = allIngredients.filter((ingredient) => !linkedIngredientIds.has(ingredient.id));
+const linkedIngredientIds = new Set(
+  ingredientRows.map((row) => row.ingredientId),
+);
+const availableIngredients = allIngredients.filter(
+  (ingredient) => !linkedIngredientIds.has(ingredient.id),
+);
 
 const productModifierGroupLinks = await db
   .select({
@@ -159,7 +163,7 @@ const allModifierGroups = await db
   .orderBy(ModifierGroup.sortOrder, ModifierGroup.name);
 
 const availableModifierGroups = allModifierGroups.filter(
-  (group) => group.active && !linkedGroupIds.includes(group.id)
+  (group) => group.active && !linkedGroupIds.includes(group.id),
 );
 
 const optionRowsForAllGroups = allModifierGroups.length
@@ -173,7 +177,12 @@ const optionRowsForAllGroups = allModifierGroups.length
         active: ModifierOption.active,
       })
       .from(ModifierOption)
-      .where(inArray(ModifierOption.groupId, allModifierGroups.map((group) => group.id)))
+      .where(
+        inArray(
+          ModifierOption.groupId,
+          allModifierGroups.map((group) => group.id),
+        ),
+      )
       .orderBy(ModifierOption.sortOrder, ModifierOption.name)
   : [];
 
@@ -182,7 +191,7 @@ for (const option of optionRowsForAllGroups) {
   if (!option.active) continue;
   optionCountByGroup.set(
     option.groupId,
-    (optionCountByGroup.get(option.groupId) ?? 0) + 1
+    (optionCountByGroup.get(option.groupId) ?? 0) + 1,
   );
 }
 
@@ -239,11 +248,17 @@ const allAllergens = await db
   .orderBy(Allergen.sortOrder, Allergen.name);
 
 const linkedAllergenIds = new Set(allergenRows.map((row) => row.allergenId));
-const availableAllergens = allAllergens.filter((allergen) => !linkedAllergenIds.has(allergen.id));
+const availableAllergens = allAllergens.filter(
+  (allergen) => !linkedAllergenIds.has(allergen.id),
+);
 
 const variantCount = variants.filter((variant) => variant.active).length;
-const modifierGroupCount = linkedModifierGroups.filter((group) => group?.active).length;
-const removableCount = ingredientRows.filter((row) => row.defaultIncluded && row.removable).length;
+const modifierGroupCount = linkedModifierGroups.filter(
+  (group) => group?.active,
+).length;
+const removableCount = ingredientRows.filter(
+  (row) => row.defaultIncluded && row.removable,
+).length;
 const allergenCount = allergenRows.filter((row) => row.active).length;
 
 const errorMessage =
@@ -351,557 +366,1220 @@ const modifierOptionErrorMessage =
     </div>
   </Fragment>
 
-  {saved ? <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">Cambios guardados correctamente.</section> : null}
-  {errorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{errorMessage}</section> : null}
-  {variantSaved ? <section class="mb-6 rounded-3xl border border-sky-400/20 bg-sky-400/10 px-5 py-4 text-sm text-sky-200">Variantes actualizadas correctamente.</section> : null}
-  {variantErrorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{variantErrorMessage}</section> : null}
-  {ingredientSaved ? <section class="mb-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-4 text-sm text-cyan-200">Ingredientes actualizados correctamente.</section> : null}
-  {ingredientErrorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{ingredientErrorMessage}</section> : null}
-  {allergenSaved ? <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-200">Alérgenos actualizados correctamente.</section> : null}
-  {allergenErrorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{allergenErrorMessage}</section> : null}
-  {modifierGroupSaved ? <section class="mb-6 rounded-3xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-sm text-violet-200">Modifier groups actualizados correctamente.</section> : null}
-  {modifierGroupErrorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{modifierGroupErrorMessage}</section> : null}
-  {modifierOptionSaved ? <section class="mb-6 rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/10 px-5 py-4 text-sm text-fuchsia-200">Opciones actualizadas correctamente.</section> : null}
-  {modifierOptionErrorMessage ? <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">{modifierOptionErrorMessage}</section> : null}
+  {
+    saved ? (
+      <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+        Cambios guardados correctamente.
+      </section>
+    ) : null
+  }
+  {
+    errorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {errorMessage}
+      </section>
+    ) : null
+  }
+  {
+    variantSaved ? (
+      <section class="mb-6 rounded-3xl border border-sky-400/20 bg-sky-400/10 px-5 py-4 text-sm text-sky-200">
+        Variantes actualizadas correctamente.
+      </section>
+    ) : null
+  }
+  {
+    variantErrorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {variantErrorMessage}
+      </section>
+    ) : null
+  }
+  {
+    ingredientSaved ? (
+      <section class="mb-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 px-5 py-4 text-sm text-cyan-200">
+        Ingredientes actualizados correctamente.
+      </section>
+    ) : null
+  }
+  {
+    ingredientErrorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {ingredientErrorMessage}
+      </section>
+    ) : null
+  }
+  {
+    allergenSaved ? (
+      <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-200">
+        Alérgenos actualizados correctamente.
+      </section>
+    ) : null
+  }
+  {
+    allergenErrorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {allergenErrorMessage}
+      </section>
+    ) : null
+  }
+  {
+    modifierGroupSaved ? (
+      <section class="mb-6 rounded-3xl border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-sm text-violet-200">
+        Modifier groups actualizados correctamente.
+      </section>
+    ) : null
+  }
+  {
+    modifierGroupErrorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {modifierGroupErrorMessage}
+      </section>
+    ) : null
+  }
+  {
+    modifierOptionSaved ? (
+      <section class="mb-6 rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/10 px-5 py-4 text-sm text-fuchsia-200">
+        Opciones actualizadas correctamente.
+      </section>
+    ) : null
+  }
+  {
+    modifierOptionErrorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {modifierOptionErrorMessage}
+      </section>
+    ) : null
+  }
 
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Estado</div>
+    <article
+      class="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+      >
+        Estado
+      </div>
       <div class="mt-3">
-        <span class:list={["inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]", product.active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-rose-400/20 bg-rose-400/10 text-rose-300"]}>
+        <span
+          class:list={[
+            "inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]",
+            product.active
+              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+              : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+          ]}
+        >
           {product.active ? "Activo" : "Inactivo"}
         </span>
       </div>
       <p class="mt-3 text-sm text-slate-400">Estado global del producto</p>
     </article>
 
-    <article class="rounded-3xl border border-violet-400/20 bg-violet-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200">Variantes</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{variantCount}</div>
+    <article
+      class="rounded-3xl border border-violet-400/20 bg-violet-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200"
+      >
+        Variantes
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {variantCount}
+      </div>
       <p class="mt-2 text-sm text-violet-100/80">Variantes activas</p>
     </article>
 
-    <article class="rounded-3xl border border-sky-400/20 bg-sky-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200">Grupos</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{modifierGroupCount}</div>
+    <article
+      class="rounded-3xl border border-sky-400/20 bg-sky-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200"
+      >
+        Grupos
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {modifierGroupCount}
+      </div>
       <p class="mt-2 text-sm text-sky-100/80">Modifier groups activos</p>
     </article>
 
-    <article class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200">Alérgenos</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{allergenCount}</div>
-      <p class="mt-2 text-sm text-amber-100/80">Relaciones activas</p>
+    <article
+      class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200"
+      >
+        Alérgenos
+      </div>
+
+      {
+        allergenRows.length > 0 ? (
+          <div class="mt-3 flex flex-wrap gap-2">
+            {allergenRows.slice(0, 6).map((allergen) =>
+              allergen.iconUrl ? (
+                <img
+                  src={allergen.iconUrl}
+                  alt={allergen.name}
+                  title={allergen.name}
+                  class="h-9 w-9 rounded-2xl object-cover ring-1 ring-white/10"
+                  loading="lazy"
+                />
+              ) : (
+                <div
+                  title={allergen.name}
+                  class="flex h-9 w-9 items-center justify-center rounded-2xl border border-amber-300/20 bg-amber-300/15 text-[11px] font-bold uppercase text-amber-100"
+                >
+                  {allergen.name.slice(0, 1)}
+                </div>
+              ),
+            )}
+          </div>
+        ) : (
+          <div class="mt-3 text-sm font-semibold text-white">Sin alérgenos</div>
+        )
+      }
+
+      <p class="mt-3 text-sm text-amber-100/80">
+        {
+          allergenRows.length > 0
+            ? "Representación visual real con iconos del catálogo de alérgenos."
+            : "Este producto todavía no tiene alérgenos asociados."
+        }
+      </p>
     </article>
   </section>
 
   <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div class="space-y-6">
-      <form method="post" action={`/api/admin/products/${product.id}`} class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <form
+        method="post"
+        action={`/api/admin/products/${product.id}`}
+        class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
         <input type="hidden" name="intent" value="save-base" />
 
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">Edición base</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Datos principales</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300"
+            >
+              Edición base
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Datos principales
+            </h2>
           </div>
-          <div class="text-sm text-slate-400">Actualizado: {formatDate(product.updatedAt)}</div>
+          <div class="text-sm text-slate-400">
+            Actualizado: {formatDate(product.updatedAt)}
+          </div>
         </div>
 
         <div class="mt-6 grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)]">
           <div>
-            {product.imageUrl ? (
-              <img src={product.imageUrl} alt={product.name} class="h-56 w-full rounded-3xl object-cover ring-1 ring-white/10" />
-            ) : (
-              <div class="flex h-56 w-full items-center justify-center rounded-3xl border border-white/10 bg-slate-950/50 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Sin imagen
-              </div>
-            )}
+            {
+              product.imageUrl ? (
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  class="h-56 w-full rounded-3xl object-cover ring-1 ring-white/10"
+                />
+              ) : (
+                <div class="flex h-56 w-full items-center justify-center rounded-3xl border border-white/10 bg-slate-950/50 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Sin imagen
+                </div>
+              )
+            }
           </div>
 
           <div class="grid gap-4">
             <div class="grid gap-4 md:grid-cols-2">
               <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nombre</span>
-                <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" value={product.name} required />
+                <span
+                  class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                  >Nombre</span
+                >
+                <input
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                  type="text"
+                  name="name"
+                  value={product.name}
+                  required
+                />
               </label>
 
               <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Slug</span>
-                <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="slug" value={product.slug} required />
+                <span
+                  class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                  >Slug</span
+                >
+                <input
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                  type="text"
+                  name="slug"
+                  value={product.slug}
+                  required
+                />
               </label>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
               <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Categoría</span>
-                <select class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" name="categoryId">
-                  {categories.map((category) => (
-                    <option value={category.id} selected={category.id === product.categoryId}>{category.name}</option>
-                  ))}
+                <span
+                  class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                  >Categoría</span
+                >
+                <select
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                  name="categoryId"
+                >
+                  {
+                    categories.map((category) => (
+                      <option
+                        value={category.id}
+                        selected={category.id === product.categoryId}
+                      >
+                        {category.name}
+                      </option>
+                    ))
+                  }
                 </select>
               </label>
 
               <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Precio (€)</span>
-                <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="number" step="0.01" min="0" name="priceEur" value={(Number(product.priceCents) / 100).toFixed(2)} required />
+                <span
+                  class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                  >Precio (€)</span
+                >
+                <input
+                  class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="priceEur"
+                  value={(Number(product.priceCents) / 100).toFixed(2)}
+                  required
+                />
               </label>
             </div>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Image URL</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none" type="text" name="imageUrl" value={product.imageUrl ?? ""} placeholder="/images/productos/ejemplo.webp" />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                >Image URL</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
+                type="text"
+                name="imageUrl"
+                value={product.imageUrl ?? ""}
+                placeholder="/images/productos/ejemplo.webp"
+              />
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Description</span>
-              <textarea class="min-h-27.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none" name="description">{product.description ?? ""}</textarea>
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                >Description</span
+              >
+              <textarea
+                class="min-h-27.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
+                name="description">{product.description ?? ""}</textarea
+              >
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Details</span>
-              <textarea class="min-h-37.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none" name="details">{product.details ?? ""}</textarea>
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                >Details</span
+              >
+              <textarea
+                class="min-h-37.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
+                name="details">{product.details ?? ""}</textarea
+              >
             </label>
           </div>
         </div>
 
         <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4">
+          <label
+            class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4"
+          >
             <div class="flex items-start gap-3">
-              <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked={product.active} />
+              <input
+                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                type="checkbox"
+                name="active"
+                checked={product.active}
+              />
               <div>
                 <div class="text-sm font-semibold text-white">Activo</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en catálogo</p>
+                <p class="mt-1 text-sm leading-6 text-slate-400">
+                  Disponible en catálogo
+                </p>
               </div>
             </div>
           </label>
 
-          <label class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4">
+          <label
+            class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4"
+          >
             <div class="flex items-start gap-3">
-              <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="deliveryEnabled" checked={product.deliveryEnabled} />
+              <input
+                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                type="checkbox"
+                name="deliveryEnabled"
+                checked={product.deliveryEnabled}
+              />
               <div>
                 <div class="text-sm font-semibold text-white">Delivery</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible a domicilio</p>
+                <p class="mt-1 text-sm leading-6 text-slate-400">
+                  Disponible a domicilio
+                </p>
               </div>
             </div>
           </label>
 
-          <label class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4">
+          <label
+            class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4"
+          >
             <div class="flex items-start gap-3">
-              <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="pickupEnabled" checked={product.pickupEnabled} />
+              <input
+                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                type="checkbox"
+                name="pickupEnabled"
+                checked={product.pickupEnabled}
+              />
               <div>
                 <div class="text-sm font-semibold text-white">Pickup</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible para recogida</p>
+                <p class="mt-1 text-sm leading-6 text-slate-400">
+                  Disponible para recogida
+                </p>
               </div>
             </div>
           </label>
 
-          <label class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4">
+          <label
+            class="block rounded-3xl border border-white/10 bg-slate-950/50 p-4"
+          >
             <div class="flex items-start gap-3">
-              <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="dineInEnabled" checked={product.dineInEnabled} />
+              <input
+                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                type="checkbox"
+                name="dineInEnabled"
+                checked={product.dineInEnabled}
+              />
               <div>
                 <div class="text-sm font-semibold text-white">Sala</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en consumo local</p>
+                <p class="mt-1 text-sm leading-6 text-slate-400">
+                  Disponible en consumo local
+                </p>
               </div>
             </div>
           </label>
         </div>
 
         <div class="mt-6 flex flex-wrap gap-3">
-          <button class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400" type="submit">
+          <button
+            class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+            type="submit"
+          >
             Guardar producto
           </button>
 
-          <a href="/admin/catalogo/productos" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white">
+          <a
+            href="/admin/catalogo/productos"
+            class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+          >
             Volver al listado
           </a>
         </div>
       </form>
 
-      <section id="grupos" class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section
+        id="grupos"
+        class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+      >
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Modifier groups</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Vincular grupos al producto</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Modifier groups
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Vincular grupos al producto
+            </h2>
           </div>
 
-          <div class="text-sm text-slate-400">Vinculados: {linkedModifierGroups.length}</div>
+          <div class="text-sm text-slate-400">
+            Vinculados: {linkedModifierGroups.length}
+          </div>
         </div>
 
-        <form method="post" action={`/api/admin/products/${product.id}/modifier-groups`} class="mt-6 rounded-3xl border border-violet-400/20 bg-violet-400/10 p-5">
+        <form
+          method="post"
+          action={`/api/admin/products/${product.id}/modifier-groups`}
+          class="mt-6 rounded-3xl border border-violet-400/20 bg-violet-400/10 p-5"
+        >
           <input type="hidden" name="intent" value="create" />
 
           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto]">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80">Grupo</span>
-              <select class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none" name="groupId" required>
-                {availableModifierGroups.length === 0 ? (
-                  <option value="">No quedan grupos disponibles</option>
-                ) : (
-                  availableModifierGroups.map((group) => (
-                    <option value={group.id}>{group.name} · min {group.minSelect} · max {group.maxSelect}</option>
-                  ))
-                )}
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80"
+                >Grupo</span
+              >
+              <select
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                name="groupId"
+                required
+              >
+                {
+                  availableModifierGroups.length === 0 ? (
+                    <option value="">No quedan grupos disponibles</option>
+                  ) : (
+                    availableModifierGroups.map((group) => (
+                      <option value={group.id}>
+                        {group.name} · min {group.minSelect} · max{" "}
+                        {group.maxSelect}
+                      </option>
+                    ))
+                  )
+                }
               </select>
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80">Orden</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none" type="number" name="sortOrder" step="1" value={linkedModifierGroups.length} />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80"
+                >Orden</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
+                type="number"
+                name="sortOrder"
+                step="1"
+                value={linkedModifierGroups.length}
+              />
             </label>
 
             <div class="flex items-end">
-              <button class="inline-flex w-full items-center justify-center rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={availableModifierGroups.length === 0}>
+              <button
+                class="inline-flex w-full items-center justify-center rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300 disabled:cursor-not-allowed disabled:opacity-50"
+                type="submit"
+                disabled={availableModifierGroups.length === 0}
+              >
                 Añadir grupo
               </button>
             </div>
           </div>
         </form>
 
-        <div class="mt-4 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100/90">
-          Las opciones de cada grupo son compartidas entre todos los productos que usen ese grupo.
+        <div
+          class="mt-4 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100/90"
+        >
+          Las opciones de cada grupo son compartidas entre todos los productos
+          que usen ese grupo.
         </div>
 
         <div class="mt-6 space-y-4">
-          {linkedModifierGroups.length === 0 ? (
-            <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene modifier groups vinculados.
-            </div>
-          ) : (
-            linkedModifierGroups.map((group) => (
-              <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-                <form method="post" action={`/api/admin/products/${product.id}/modifier-groups`} class="grid gap-4">
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="productModifierGroupId" value={group!.linkId} />
+          {
+            linkedModifierGroups.length === 0 ? (
+              <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
+                Este producto no tiene modifier groups vinculados.
+              </div>
+            ) : (
+              linkedModifierGroups.map((group) => (
+                <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/modifier-groups`}
+                    class="grid gap-4"
+                  >
+                    <input type="hidden" name="intent" value="update" />
+                    <input
+                      type="hidden"
+                      name="productModifierGroupId"
+                      value={group!.linkId}
+                    />
 
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div class="text-sm font-semibold text-white">{group!.name}</div>
-                      <div class="mt-1 text-xs text-slate-500">min {group!.minSelect} · max {group!.maxSelect} · opciones activas {group!.options.filter((option) => option.active).length}</div>
-                    </div>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div class="text-sm font-semibold text-white">
+                          {group!.name}
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          min {group!.minSelect} · max {group!.maxSelect} ·
+                          opciones activas{" "}
+                          {
+                            group!.options.filter((option) => option.active)
+                              .length
+                          }
+                        </div>
+                      </div>
 
-                    <div class="flex flex-wrap gap-2">
-                      <span class:list={["inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]", group!.required ? "border-rose-400/20 bg-rose-400/10 text-rose-300" : "border-white/10 bg-white/5 text-slate-300"]}>
-                        {group!.required ? "Obligatorio" : "Opcional"}
-                      </span>
+                      <div class="flex flex-wrap gap-2">
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                            group!.required
+                              ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
+                              : "border-white/10 bg-white/5 text-slate-300",
+                          ]}
+                        >
+                          {group!.required ? "Obligatorio" : "Opcional"}
+                        </span>
 
-                      <span class:list={["inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]", group!.active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-amber-400/20 bg-amber-400/10 text-amber-300"]}>
-                        {group!.active ? "Grupo activo" : "Grupo inactivo"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orden en producto</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-400/40 focus:outline-none" type="number" name="sortOrder" step="1" value={group!.productSortOrder} />
-                    </label>
-
-                    <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Opciones del grupo</div>
-                      <div class="mt-3 flex flex-wrap gap-2">
-                        {group!.options.length === 0 ? (
-                          <span class="text-sm text-slate-500">Sin opciones</span>
-                        ) : (
-                          group!.options.map((option) => (
-                            <span class:list={["inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold", option.active ? "border-white/10 bg-slate-950/60 text-slate-300" : "border-white/10 bg-white/5 text-slate-500"]}>
-                              {option.name} · {money(option.priceDeltaCents)}
-                            </span>
-                          ))
-                        )}
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                            group!.active
+                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                              : "border-amber-400/20 bg-amber-400/10 text-amber-300",
+                          ]}
+                        >
+                          {group!.active ? "Grupo activo" : "Grupo inactivo"}
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  <div class="flex flex-wrap gap-3">
-                    <button class="inline-flex items-center justify-center rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300" type="submit">
-                      Guardar grupo
-                    </button>
-                  </div>
-                </form>
+                    <div class="grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Orden en producto
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-400/40 focus:outline-none"
+                          type="number"
+                          name="sortOrder"
+                          step="1"
+                          value={group!.productSortOrder}
+                        />
+                      </label>
 
-                <section class="mt-4 rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-5">
-                  <div class="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">Opciones</div>
-                      <div class="mt-2 text-sm font-semibold text-white">Crear y editar opciones del grupo</div>
+                      <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Opciones del grupo
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                          {group!.options.length === 0 ? (
+                            <span class="text-sm text-slate-500">
+                              Sin opciones
+                            </span>
+                          ) : (
+                            group!.options.map((option) => (
+                              <span
+                                class:list={[
+                                  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+                                  option.active
+                                    ? "border-white/10 bg-slate-950/60 text-slate-300"
+                                    : "border-white/10 bg-white/5 text-slate-500",
+                                ]}
+                              >
+                                {option.name} · {money(option.priceDeltaCents)}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  <form method="post" action={`/api/admin/modifier-groups/${group!.groupId}/options`} class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto]">
-                    <input type="hidden" name="intent" value="create" />
-                    <input type="hidden" name="redirectTo" value={`/admin/catalogo/productos/${product.id}#grupos`} />
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">Nombre</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none" type="text" name="name" placeholder="Ej. Extra queso" required />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">Δ precio (€)</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none" type="number" name="priceDeltaEur" step="0.01" value="0.00" required />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">Orden</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none" type="number" name="sortOrder" step="1" value={group!.options.length} />
-                    </label>
-
-                    <div class="flex items-end">
-                      <button class="inline-flex w-full items-center justify-center rounded-2xl bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300" type="submit">
-                        Añadir opción
+                    <div class="flex flex-wrap gap-3">
+                      <button
+                        class="inline-flex items-center justify-center rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300"
+                        type="submit"
+                      >
+                        Guardar grupo
                       </button>
                     </div>
                   </form>
 
-                  <label class="mt-4 block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
-                    <div class="flex items-start gap-3">
-                      <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400" type="checkbox" form={`create-option-${group!.groupId}`} checked />
+                  <section class="mt-4 rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-5">
+                    <div class="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <div class="text-sm font-semibold text-white">Activa por defecto</div>
-                        <p class="mt-1 text-sm leading-6 text-slate-300">Marca la opción como disponible al crearla.</p>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
+                          Opciones
+                        </div>
+                        <div class="mt-2 text-sm font-semibold text-white">
+                          Crear y editar opciones del grupo
+                        </div>
                       </div>
                     </div>
-                  </label>
 
-                  <div class="mt-4 space-y-4">
-                    {group!.options.length === 0 ? (
-                      <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-300">
-                        Este grupo todavía no tiene opciones.
+                    <form
+                      method="post"
+                      action={`/api/admin/modifier-groups/${group!.groupId}/options`}
+                      class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto]"
+                    >
+                      <input type="hidden" name="intent" value="create" />
+                      <input
+                        type="hidden"
+                        name="redirectTo"
+                        value={`/admin/catalogo/productos/${product.id}#grupos`}
+                      />
+
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
+                          Nombre
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
+                          type="text"
+                          name="name"
+                          placeholder="Ej. Extra queso"
+                          required
+                        />
+                      </label>
+
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
+                          Δ precio (€)
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
+                          type="number"
+                          name="priceDeltaEur"
+                          step="0.01"
+                          value="0.00"
+                          required
+                        />
+                      </label>
+
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
+                          Orden
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
+                          type="number"
+                          name="sortOrder"
+                          step="1"
+                          value={group!.options.length}
+                        />
+                      </label>
+
+                      <div class="flex items-end">
+                        <button
+                          class="inline-flex w-full items-center justify-center rounded-2xl bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300"
+                          type="submit"
+                        >
+                          Añadir opción
+                        </button>
                       </div>
-                    ) : (
-                      group!.options.map((option) => (
-                        <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-                          <form method="post" action={`/api/admin/modifier-groups/${group!.groupId}/options`} class="grid gap-4">
-                            <input type="hidden" name="intent" value="update" />
-                            <input type="hidden" name="optionId" value={option.id} />
-                            <input type="hidden" name="redirectTo" value={`/admin/catalogo/productos/${product.id}#grupos`} />
+                    </form>
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px]">
-                              <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nombre</span>
-                                <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none" type="text" name="name" value={option.name} required />
-                              </label>
+                    <label class="mt-4 block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                      <div class="flex items-start gap-3">
+                        <input
+                          class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400"
+                          type="checkbox"
+                          form={`create-option-${group!.groupId}`}
+                          checked
+                        />
+                        <div>
+                          <div class="text-sm font-semibold text-white">
+                            Activa por defecto
+                          </div>
+                          <p class="mt-1 text-sm leading-6 text-slate-300">
+                            Marca la opción como disponible al crearla.
+                          </p>
+                        </div>
+                      </div>
+                    </label>
 
-                              <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Δ precio (€)</span>
-                                <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none" type="number" name="priceDeltaEur" step="0.01" value={(Number(option.priceDeltaCents) / 100).toFixed(2)} required />
-                              </label>
+                    <div class="mt-4 space-y-4">
+                      {group!.options.length === 0 ? (
+                        <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-300">
+                          Este grupo todavía no tiene opciones.
+                        </div>
+                      ) : (
+                        group!.options.map((option) => (
+                          <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+                            <form
+                              method="post"
+                              action={`/api/admin/modifier-groups/${group!.groupId}/options`}
+                              class="grid gap-4"
+                            >
+                              <input
+                                type="hidden"
+                                name="intent"
+                                value="update"
+                              />
+                              <input
+                                type="hidden"
+                                name="optionId"
+                                value={option.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="redirectTo"
+                                value={`/admin/catalogo/productos/${product.id}#grupos`}
+                              />
 
-                              <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orden</span>
-                                <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none" type="number" name="sortOrder" step="1" value={option.sortOrder} />
-                              </label>
-                            </div>
+                              <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px]">
+                                <label class="block">
+                                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    Nombre
+                                  </span>
+                                  <input
+                                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                                    type="text"
+                                    name="name"
+                                    value={option.name}
+                                    required
+                                  />
+                                </label>
 
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                              <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                                <div class="flex items-start gap-3">
-                                  <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400" type="checkbox" name="active" checked={option.active} />
-                                  <div>
-                                    <div class="text-sm font-semibold text-white">Activa</div>
-                                    <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en todos los productos que usan este grupo</p>
+                                <label class="block">
+                                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    Δ precio (€)
+                                  </span>
+                                  <input
+                                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                                    type="number"
+                                    name="priceDeltaEur"
+                                    step="0.01"
+                                    value={(
+                                      Number(option.priceDeltaCents) / 100
+                                    ).toFixed(2)}
+                                    required
+                                  />
+                                </label>
+
+                                <label class="block">
+                                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    Orden
+                                  </span>
+                                  <input
+                                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                                    type="number"
+                                    name="sortOrder"
+                                    step="1"
+                                    value={option.sortOrder}
+                                  />
+                                </label>
+                              </div>
+
+                              <div class="flex flex-wrap items-center justify-between gap-3">
+                                <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
+                                  <div class="flex items-start gap-3">
+                                    <input
+                                      class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400"
+                                      type="checkbox"
+                                      name="active"
+                                      checked={option.active}
+                                    />
+                                    <div>
+                                      <div class="text-sm font-semibold text-white">
+                                        Activa
+                                      </div>
+                                      <p class="mt-1 text-sm leading-6 text-slate-400">
+                                        Disponible en todos los productos que
+                                        usan este grupo
+                                      </p>
+                                    </div>
                                   </div>
-                                </div>
-                              </label>
+                                </label>
 
-                              <button class="inline-flex items-center justify-center rounded-2xl bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300" type="submit">
-                                Guardar opción
+                                <button
+                                  class="inline-flex items-center justify-center rounded-2xl bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300"
+                                  type="submit"
+                                >
+                                  Guardar opción
+                                </button>
+                              </div>
+                            </form>
+
+                            <form
+                              method="post"
+                              action={`/api/admin/modifier-groups/${group!.groupId}/options`}
+                              class="mt-3"
+                            >
+                              <input
+                                type="hidden"
+                                name="intent"
+                                value="delete"
+                              />
+                              <input
+                                type="hidden"
+                                name="optionId"
+                                value={option.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="redirectTo"
+                                value={`/admin/catalogo/productos/${product.id}#grupos`}
+                              />
+                              <button
+                                class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                                type="submit"
+                              >
+                                Eliminar opción
                               </button>
-                            </div>
-                          </form>
+                            </form>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </section>
 
-                          <form method="post" action={`/api/admin/modifier-groups/${group!.groupId}/options`} class="mt-3">
-                            <input type="hidden" name="intent" value="delete" />
-                            <input type="hidden" name="optionId" value={option.id} />
-                            <input type="hidden" name="redirectTo" value={`/admin/catalogo/productos/${product.id}#grupos`} />
-                            <button class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15" type="submit">
-                              Eliminar opción
-                            </button>
-                          </form>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </section>
-
-                <form method="post" action={`/api/admin/products/${product.id}/modifier-groups`} class="mt-3">
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="productModifierGroupId" value={group!.linkId} />
-                  <button class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15" type="submit">
-                    Quitar grupo
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/modifier-groups`}
+                    class="mt-3"
+                  >
+                    <input type="hidden" name="intent" value="delete" />
+                    <input
+                      type="hidden"
+                      name="productModifierGroupId"
+                      value={group!.linkId}
+                    />
+                    <button
+                      class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                      type="submit"
+                    >
+                      Quitar grupo
+                    </button>
+                  </form>
+                </article>
+              ))
+            )
+          }
         </div>
       </section>
 
-      <section id="variantes" class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section
+        id="variantes"
+        class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+      >
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Variantes</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Crear y editar variantes</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Variantes
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Crear y editar variantes
+            </h2>
           </div>
-          <div class="text-sm text-slate-400">Precio base: {money(product.priceCents)}</div>
+          <div class="text-sm text-slate-400">
+            Precio base: {money(product.priceCents)}
+          </div>
         </div>
 
-        <form method="post" action={`/api/admin/products/${product.id}/variants`} class="mt-6 rounded-3xl border border-sky-400/20 bg-sky-400/10 p-5">
+        <form
+          method="post"
+          action={`/api/admin/products/${product.id}/variants`}
+          class="mt-6 rounded-3xl border border-sky-400/20 bg-sky-400/10 p-5"
+        >
           <input type="hidden" name="intent" value="create" />
 
           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px_auto]">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">Nombre</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none" type="text" name="name" placeholder="Ej. Grande" required />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80"
+                >Nombre</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
+                type="text"
+                name="name"
+                placeholder="Ej. Grande"
+                required
+              />
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">Δ precio (€)</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none" type="number" name="priceDeltaEur" step="0.01" value="0.00" required />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80"
+                >Δ precio (€)</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
+                type="number"
+                name="priceDeltaEur"
+                step="0.01"
+                value="0.00"
+                required
+              />
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">Orden</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none" type="number" name="sortOrder" step="1" value={variants.length} />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80"
+                >Orden</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
+                type="number"
+                name="sortOrder"
+                step="1"
+                value={variants.length}
+              />
             </label>
 
             <div class="flex items-end">
-              <button class="inline-flex w-full items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400" type="submit">
+              <button
+                class="inline-flex w-full items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                type="submit"
+              >
                 Añadir variante
               </button>
             </div>
           </div>
 
-          <label class="mt-4 block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+          <label
+            class="mt-4 block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+          >
             <div class="flex items-start gap-3">
-              <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked />
+              <input
+                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                type="checkbox"
+                name="active"
+                checked
+              />
               <div>
                 <div class="text-sm font-semibold text-white">Activa</div>
-                <p class="mt-1 text-sm leading-6 text-slate-300">La variante quedará disponible al crearla.</p>
+                <p class="mt-1 text-sm leading-6 text-slate-300">
+                  La variante quedará disponible al crearla.
+                </p>
               </div>
             </div>
           </label>
         </form>
 
         <div class="mt-6 space-y-4">
-          {variants.length === 0 ? (
-            <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene variantes.
-            </div>
-          ) : (
-            variants.map((variant) => (
-              <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-                <form method="post" action={`/api/admin/products/${product.id}/variants`} class="grid gap-4">
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="variantId" value={variant.id} />
+          {
+            variants.length === 0 ? (
+              <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
+                Este producto no tiene variantes.
+              </div>
+            ) : (
+              variants.map((variant) => (
+                <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/variants`}
+                    class="grid gap-4"
+                  >
+                    <input type="hidden" name="intent" value="update" />
+                    <input type="hidden" name="variantId" value={variant.id} />
 
-                  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px]">
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nombre</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" value={variant.name} required />
-                    </label>
+                    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_160px]">
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Nombre
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                          type="text"
+                          name="name"
+                          value={variant.name}
+                          required
+                        />
+                      </label>
 
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Δ precio (€)</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="number" name="priceDeltaEur" step="0.01" value={(Number(variant.priceDeltaCents) / 100).toFixed(2)} required />
-                    </label>
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Δ precio (€)
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                          type="number"
+                          name="priceDeltaEur"
+                          step="0.01"
+                          value={(
+                            Number(variant.priceDeltaCents) / 100
+                          ).toFixed(2)}
+                          required
+                        />
+                      </label>
 
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orden</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="number" name="sortOrder" step="1" value={variant.sortOrder} />
-                    </label>
-                  </div>
-
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                      <div class="flex items-start gap-3">
-                        <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked={variant.active} />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Activa</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">Disponible para el configurador</p>
-                        </div>
-                      </div>
-                    </label>
-
-                    <div class="flex flex-wrap gap-3">
-                      <button class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400" type="submit">
-                        Guardar variante
-                      </button>
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Orden
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                          type="number"
+                          name="sortOrder"
+                          step="1"
+                          value={variant.sortOrder}
+                        />
+                      </label>
                     </div>
-                  </div>
-                </form>
 
-                <form method="post" action={`/api/admin/products/${product.id}/variants`} class="mt-3">
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="variantId" value={variant.id} />
-                  <button class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15" type="submit">
-                    Eliminar variante
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div class="flex items-start gap-3">
+                          <input
+                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                            type="checkbox"
+                            name="active"
+                            checked={variant.active}
+                          />
+                          <div>
+                            <div class="text-sm font-semibold text-white">
+                              Activa
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-slate-400">
+                              Disponible para el configurador
+                            </p>
+                          </div>
+                        </div>
+                      </label>
+
+                      <div class="flex flex-wrap gap-3">
+                        <button
+                          class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                          type="submit"
+                        >
+                          Guardar variante
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/variants`}
+                    class="mt-3"
+                  >
+                    <input type="hidden" name="intent" value="delete" />
+                    <input type="hidden" name="variantId" value={variant.id} />
+                    <button
+                      class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                      type="submit"
+                    >
+                      Eliminar variante
+                    </button>
+                  </form>
+                </article>
+              ))
+            )
+          }
         </div>
       </section>
 
-      <section id="ingredientes" class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <section
+        id="ingredientes"
+        class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+      >
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Ingredientes</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Vincular y configurar ingredientes</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Ingredientes
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Vincular y configurar ingredientes
+            </h2>
           </div>
 
-          <div class="text-sm text-slate-400">Vinculados: {ingredientRows.length}</div>
+          <div class="text-sm text-slate-400">
+            Vinculados: {ingredientRows.length}
+          </div>
         </div>
 
-        <form method="post" action={`/api/admin/products/${product.id}/ingredients`} class="mt-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-5">
+        <form
+          method="post"
+          action={`/api/admin/products/${product.id}/ingredients`}
+          class="mt-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-5"
+        >
           <input type="hidden" name="intent" value="create" />
 
           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto]">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">Ingrediente</span>
-              <select class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none" name="ingredientId" required>
-                {availableIngredients.length === 0 ? (
-                  <option value="">No quedan ingredientes disponibles</option>
-                ) : (
-                  availableIngredients.map((ingredient) => (
-                    <option value={ingredient.id}>
-                      {ingredient.name} · {ingredient.addPriceDeltaCents > 0 ? `+${money(ingredient.addPriceDeltaCents)}` : "sin extra"}
-                    </option>
-                  ))
-                )}
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80"
+                >Ingrediente</span
+              >
+              <select
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
+                name="ingredientId"
+                required
+              >
+                {
+                  availableIngredients.length === 0 ? (
+                    <option value="">No quedan ingredientes disponibles</option>
+                  ) : (
+                    availableIngredients.map((ingredient) => (
+                      <option value={ingredient.id}>
+                        {ingredient.name} ·{" "}
+                        {ingredient.addPriceDeltaCents > 0
+                          ? `+${money(ingredient.addPriceDeltaCents)}`
+                          : "sin extra"}
+                      </option>
+                    ))
+                  )
+                }
               </select>
             </label>
 
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">Orden</span>
-              <input class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none" type="number" name="sortOrder" step="1" value={ingredientRows.length} />
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80"
+                >Orden</span
+              >
+              <input
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
+                type="number"
+                name="sortOrder"
+                step="1"
+                value={ingredientRows.length}
+              />
             </label>
 
             <div class="flex items-end">
-              <button class="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={availableIngredients.length === 0}>
+              <button
+                class="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                type="submit"
+                disabled={availableIngredients.length === 0}
+              >
                 Añadir ingrediente
               </button>
             </div>
           </div>
 
           <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+            <label
+              class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+            >
               <div class="flex items-start gap-3">
-                <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="defaultIncluded" checked />
+                <input
+                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                  type="checkbox"
+                  name="defaultIncluded"
+                  checked
+                />
                 <div>
-                  <div class="text-sm font-semibold text-white">Va por defecto</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">Sale incluido en la configuración inicial.</p>
+                  <div class="text-sm font-semibold text-white">
+                    Va por defecto
+                  </div>
+                  <p class="mt-1 text-sm leading-6 text-slate-300">
+                    Sale incluido en la configuración inicial.
+                  </p>
                 </div>
               </div>
             </label>
 
-            <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+            <label
+              class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+            >
               <div class="flex items-start gap-3">
-                <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="removable" checked />
+                <input
+                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                  type="checkbox"
+                  name="removable"
+                  checked
+                />
                 <div>
                   <div class="text-sm font-semibold text-white">Removible</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">El cliente lo puede quitar desde el configurador.</p>
+                  <p class="mt-1 text-sm leading-6 text-slate-300">
+                    El cliente lo puede quitar desde el configurador.
+                  </p>
                 </div>
               </div>
             </label>
@@ -909,94 +1587,156 @@ const modifierOptionErrorMessage =
         </form>
 
         <div class="mt-6 space-y-4">
-          {ingredientRows.length === 0 ? (
-            <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene ingredientes vinculados.
-            </div>
-          ) : (
-            ingredientRows.map((ingredient) => (
-              <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-                <form method="post" action={`/api/admin/products/${product.id}/ingredients`} class="grid gap-4">
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="productIngredientId" value={ingredient.id} />
+          {
+            ingredientRows.length === 0 ? (
+              <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
+                Este producto no tiene ingredientes vinculados.
+              </div>
+            ) : (
+              ingredientRows.map((ingredient) => (
+                <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/ingredients`}
+                    class="grid gap-4"
+                  >
+                    <input type="hidden" name="intent" value="update" />
+                    <input
+                      type="hidden"
+                      name="productIngredientId"
+                      value={ingredient.id}
+                    />
 
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div class="text-sm font-semibold text-white">{ingredient.name}</div>
-                      <div class="mt-1 text-xs text-slate-500">{ingredient.slug}</div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-2">
-                      {ingredient.isCommon ? (
-                        <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                          Common
-                        </span>
-                      ) : null}
-
-                      {ingredient.addPriceDeltaCents > 0 ? (
-                        <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
-                          +{money(ingredient.addPriceDeltaCents)}
-                        </span>
-                      ) : (
-                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                          Sin extra
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div class="grid gap-4 lg:grid-cols-[160px_1fr_1fr]">
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Orden</span>
-                      <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="number" name="sortOrder" step="1" value={ingredient.sortOrder} />
-                    </label>
-
-                    <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                      <div class="flex items-start gap-3">
-                        <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="defaultIncluded" checked={ingredient.defaultIncluded} />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Va por defecto</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">Incluido de base al abrir el producto</p>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div class="text-sm font-semibold text-white">
+                          {ingredient.name}
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          {ingredient.slug}
                         </div>
                       </div>
-                    </label>
 
-                    <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                      <div class="flex items-start gap-3">
-                        <input class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="removable" checked={ingredient.removable} />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Removible</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">El cliente lo puede quitar</p>
-                        </div>
+                      <div class="flex flex-wrap gap-2">
+                        {ingredient.isCommon ? (
+                          <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                            Common
+                          </span>
+                        ) : null}
+
+                        {ingredient.addPriceDeltaCents > 0 ? (
+                          <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
+                            +{money(ingredient.addPriceDeltaCents)}
+                          </span>
+                        ) : (
+                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                            Sin extra
+                          </span>
+                        )}
                       </div>
-                    </label>
-                  </div>
+                    </div>
 
-                  <div class="flex flex-wrap gap-3">
-                    <button class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300" type="submit">
-                      Guardar ingrediente
+                    <div class="grid gap-4 lg:grid-cols-[160px_1fr_1fr]">
+                      <label class="block">
+                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Orden
+                        </span>
+                        <input
+                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                          type="number"
+                          name="sortOrder"
+                          step="1"
+                          value={ingredient.sortOrder}
+                        />
+                      </label>
+
+                      <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div class="flex items-start gap-3">
+                          <input
+                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                            type="checkbox"
+                            name="defaultIncluded"
+                            checked={ingredient.defaultIncluded}
+                          />
+                          <div>
+                            <div class="text-sm font-semibold text-white">
+                              Va por defecto
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-slate-400">
+                              Incluido de base al abrir el producto
+                            </p>
+                          </div>
+                        </div>
+                      </label>
+
+                      <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
+                        <div class="flex items-start gap-3">
+                          <input
+                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                            type="checkbox"
+                            name="removable"
+                            checked={ingredient.removable}
+                          />
+                          <div>
+                            <div class="text-sm font-semibold text-white">
+                              Removible
+                            </div>
+                            <p class="mt-1 text-sm leading-6 text-slate-400">
+                              El cliente lo puede quitar
+                            </p>
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                      <button
+                        class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                        type="submit"
+                      >
+                        Guardar ingrediente
+                      </button>
+                    </div>
+                  </form>
+
+                  <form
+                    method="post"
+                    action={`/api/admin/products/${product.id}/ingredients`}
+                    class="mt-3"
+                  >
+                    <input type="hidden" name="intent" value="delete" />
+                    <input
+                      type="hidden"
+                      name="productIngredientId"
+                      value={ingredient.id}
+                    />
+                    <button
+                      class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                      type="submit"
+                    >
+                      Quitar ingrediente
                     </button>
-                  </div>
-                </form>
-
-                <form method="post" action={`/api/admin/products/${product.id}/ingredients`} class="mt-3">
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="productIngredientId" value={ingredient.id} />
-                  <button class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15" type="submit">
-                    Quitar ingrediente
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
+                  </form>
+                </article>
+              ))
+            )
+          }
         </div>
       </section>
     </div>
 
     <aside class="space-y-6 xl:sticky xl:top-28 xl:h-fit">
-      <article class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Metadatos</div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Contexto del registro</h2>
+      <article
+        class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
+          Metadatos
+        </div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+          Contexto del registro
+        </h2>
 
         <div class="mt-6 space-y-4 text-sm">
           <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -1006,13 +1746,19 @@ const modifierOptionErrorMessage =
 
           <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
             <div class="text-slate-400">Creado</div>
-            <div class="mt-1 font-semibold text-white">{formatDate(product.createdAt)}</div>
+            <div class="mt-1 font-semibold text-white">
+              {formatDate(product.createdAt)}
+            </div>
           </div>
 
           <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
             <div class="text-slate-400">Categoría</div>
-            <div class="mt-1 font-semibold text-white">{product.categoryName}</div>
-            <div class="mt-1 text-xs text-slate-500">{product.categorySlug}</div>
+            <div class="mt-1 font-semibold text-white">
+              {product.categoryName}
+            </div>
+            <div class="mt-1 text-xs text-slate-500">
+              {product.categorySlug}
+            </div>
           </div>
 
           <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -1022,35 +1768,96 @@ const modifierOptionErrorMessage =
         </div>
       </article>
 
-      <section id="alergenos" class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <section
+        id="alergenos"
+        class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Alérgenos</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Vincular alérgenos</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Alérgenos
+            </div>
+            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+              Vincular alérgenos
+            </h2>
           </div>
 
-          <div class="text-sm text-slate-400">Asociados: {allergenRows.length}</div>
+          <div class="flex flex-wrap items-center gap-2">
+            {
+              allergenRows.length === 0 ? (
+                <div class="text-sm text-slate-400">
+                  Sin alérgenos asociados
+                </div>
+              ) : (
+                <>
+                  <div class="text-sm text-slate-400">Iconos asociados</div>
+                  <div class="flex items-center -space-x-2">
+                    {allergenRows.slice(0, 5).map((allergen) =>
+                      allergen.iconUrl ? (
+                        <img
+                          src={allergen.iconUrl}
+                          alt={allergen.name}
+                          title={allergen.name}
+                          class="h-8 w-8 rounded-full object-cover ring-2 ring-[#0f172a]"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div
+                          title={allergen.name}
+                          class="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-slate-900 text-[10px] font-bold uppercase text-slate-200 ring-2 ring-[#0f172a]"
+                        >
+                          {allergen.name.slice(0, 1)}
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </>
+              )
+            }
+          </div>
         </div>
 
-        <form method="post" action={`/api/admin/products/${product.id}/allergens`} class="mt-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5">
+        <form
+          method="post"
+          action={`/api/admin/products/${product.id}/allergens`}
+          class="mt-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5"
+        >
           <input type="hidden" name="intent" value="create" />
 
           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">Alérgeno</span>
-              <select class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none" name="allergenId" required>
-                {availableAllergens.length === 0 ? (
-                  <option value="">No quedan alérgenos disponibles</option>
-                ) : (
-                  availableAllergens.map((allergen) => (
-                    <option value={allergen.id}>{allergen.name}</option>
-                  ))
-                )}
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80"
+                >Alérgeno</span
+              >
+              <select
+                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none"
+                name="allergenId"
+                required
+              >
+                {
+                  availableAllergens.length === 0 ? (
+                    <option value="">No quedan alérgenos disponibles</option>
+                  ) : (
+                    availableAllergens.map((allergen) => (
+                      <option value={allergen.id}>
+                        {allergen.name}
+                        {allergen.slug ? ` · ${allergen.slug}` : ""}
+                      </option>
+                    ))
+                  )
+                }
               </select>
             </label>
 
             <div class="flex items-end">
-              <button class="inline-flex w-full items-center justify-center rounded-2xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={availableAllergens.length === 0}>
+              <button
+                class="inline-flex w-full items-center justify-center rounded-2xl bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                type="submit"
+                disabled={availableAllergens.length === 0}
+              >
                 Añadir alérgeno
               </button>
             </div>
@@ -1058,40 +1865,60 @@ const modifierOptionErrorMessage =
         </form>
 
         <div class="mt-6 space-y-4">
-          {allergenRows.length === 0 ? (
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
-              Sin alérgenos asociados.
-            </div>
-          ) : (
-            allergenRows.map((allergen) => (
-              <article class="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-3">
-                    {allergen.iconUrl ? (
-                      <img src={allergen.iconUrl} alt={allergen.name} class="h-10 w-10 rounded-2xl object-cover ring-1 ring-white/10" />
-                    ) : (
-                      <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        ALG
+          {
+            allergenRows.length === 0 ? (
+              <div class="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
+                Sin alérgenos asociados.
+              </div>
+            ) : (
+              allergenRows.map((allergen) => (
+                <article class="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex min-w-0 items-center gap-3">
+                      {allergen.iconUrl ? (
+                        <img
+                          src={allergen.iconUrl}
+                          alt={allergen.name}
+                          class="h-10 w-10 rounded-2xl object-cover ring-1 ring-white/10"
+                        />
+                      ) : (
+                        <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          ALG
+                        </div>
+                      )}
+
+                      <div class="min-w-0">
+                        <div class="text-sm font-semibold text-white">
+                          {allergen.name}
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          {allergen.slug}
+                        </div>
                       </div>
-                    )}
-
-                    <div class="min-w-0">
-                      <div class="text-sm font-semibold text-white">{allergen.name}</div>
-                      <div class="mt-1 text-xs text-slate-500">{allergen.slug}</div>
                     </div>
-                  </div>
 
-                  <form method="post" action={`/api/admin/products/${product.id}/allergens`}>
-                    <input type="hidden" name="intent" value="delete" />
-                    <input type="hidden" name="productAllergenId" value={allergen.id} />
-                    <button class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15" type="submit">
-                      Quitar
-                    </button>
-                  </form>
-                </div>
-              </article>
-            ))
-          )}
+                    <form
+                      method="post"
+                      action={`/api/admin/products/${product.id}/allergens`}
+                    >
+                      <input type="hidden" name="intent" value="delete" />
+                      <input
+                        type="hidden"
+                        name="productAllergenId"
+                        value={allergen.id}
+                      />
+                      <button
+                        class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                        type="submit"
+                      >
+                        Quitar
+                      </button>
+                    </form>
+                  </div>
+                </article>
+              ))
+            )
+          }
         </div>
       </section>
     </aside>

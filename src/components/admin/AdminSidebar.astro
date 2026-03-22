@@ -84,7 +84,7 @@ const navGroups: NavGroup[] = [
       },
       {
         href: "/admin/menu",
-        label: "Menús",
+        label: "Menú",
         description: "Diario y festivo",
       },
       {
@@ -120,12 +120,18 @@ const displayName = user?.name?.trim() || user?.email?.trim() || "Sesión admin"
 const displayRole = user?.role?.trim() || "STAFF";
 ---
 
-<aside class="hidden xl:flex xl:w-72 xl:flex-col">
-  <div class="sticky top-6 flex h-[calc(100dvh-3rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-slate-100 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-    <div class="border-b border-white/10 px-6 py-6">
+<aside
+  data-admin-sidebar
+  class="hidden xl:flex xl:w-72 xl:flex-col xl:transition-[width] xl:duration-200 xl:ease-out"
+>
+  <div class="sticky top-4 flex h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#111827] text-slate-100 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+    <div
+      data-admin-sidebar-top
+      class="border-b border-white/10 px-6 py-6 transition-all duration-200"
+    >
       <a href="/admin" class="block">
-        <div class="flex items-center gap-3">
-          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+        <div data-admin-sidebar-logo-wrap class="flex items-center gap-3">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
             <img
               src="/ARCADIA_LOGO_WHITE.svg"
               alt="Arcadia"
@@ -133,7 +139,7 @@ const displayRole = user?.role?.trim() || "STAFF";
             />
           </div>
 
-          <div class="min-w-0">
+          <div data-admin-sidebar-brand-text class="min-w-0">
             <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
               Arcadia
             </div>
@@ -145,7 +151,10 @@ const displayRole = user?.role?.trim() || "STAFF";
       </a>
     </div>
 
-    <div class="border-b border-white/10 px-6 py-5">
+    <div
+      data-admin-sidebar-session
+      class="border-b border-white/10 px-6 py-5 transition-all duration-200"
+    >
       <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           Sesión activa
@@ -160,11 +169,17 @@ const displayRole = user?.role?.trim() || "STAFF";
       </div>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-4 py-5">
+    <nav
+      data-admin-sidebar-nav
+      class="flex-1 overflow-y-auto px-4 py-5 transition-all duration-200"
+    >
       <div class="space-y-6">
         {navGroups.map((group) => (
           <section>
-            <div class="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div
+              data-admin-sidebar-group-title
+              class="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
               {group.title}
             </div>
 
@@ -174,25 +189,31 @@ const displayRole = user?.role?.trim() || "STAFF";
 
                 return (
                   <a
+                    data-admin-sidebar-item
                     href={item.href}
+                    title={item.label}
                     class:list={[
-                      "group block rounded-2xl border px-4 py-3 transition",
+                      "group block rounded-2xl border px-4 py-3 transition-all duration-200",
                       active
                         ? "border-sky-400/30 bg-sky-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                         : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/5",
                     ]}
                   >
-                    <div class="flex items-start gap-3">
+                    <div
+                      data-admin-sidebar-item-row
+                      class="flex items-start gap-3 transition-all duration-200"
+                    >
                       <span
+                        data-admin-sidebar-item-dot
                         class:list={[
-                          "mt-1 h-2.5 w-2.5 rounded-full transition",
+                          "mt-1 h-2.5 w-2.5 shrink-0 rounded-full transition-all duration-200",
                           active
                             ? "bg-sky-300 shadow-[0_0_0_5px_rgba(125,211,252,0.08)]"
                             : "bg-slate-600 group-hover:bg-slate-400",
                         ]}
                       ></span>
 
-                      <div class="min-w-0">
+                      <div data-admin-sidebar-item-copy class="min-w-0">
                         <div
                           class:list={[
                             "text-sm font-semibold transition",
@@ -224,12 +245,16 @@ const displayRole = user?.role?.trim() || "STAFF";
       </div>
     </nav>
 
-    <div class="border-t border-white/10 p-4">
+    <div
+      data-admin-sidebar-footer
+      class="border-t border-white/10 p-4 transition-all duration-200"
+    >
       <a
         href="/"
         class="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        title="Volver a la web pública"
       >
-        Volver a la web pública
+        <span data-admin-sidebar-footer-text>Volver a la web pública</span>
       </a>
     </div>
   </div>
