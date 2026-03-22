@@ -9,7 +9,34 @@ import {
   UserProfile,
 } from "astro:db";
 
-const ALLOWED_STATUS = new Set([
+type OrderStatus =
+  | "PENDING"
+  | "PAID"
+  | "ACCEPTED"
+  | "PREPARING"
+  | "READY"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "CANCELLED";
+
+type OrderPaymentStatus =
+  | "UNPAID"
+  | "AUTH"
+  | "PAID"
+  | "FAILED"
+  | "REFUNDED"
+  | "PARTIALLY_REFUNDED";
+
+type StoredAdminEvent = {
+  id: string;
+  kind: "STATUS" | "PAYMENT" | "NOTE";
+  title: string;
+  detail: string;
+  by?: string | null;
+  at: string;
+};
+
+const ALLOWED_STATUS = new Set<OrderStatus>([
   "PENDING",
   "PAID",
   "ACCEPTED",
@@ -20,7 +47,7 @@ const ALLOWED_STATUS = new Set([
   "CANCELLED",
 ]);
 
-const ALLOWED_PAYMENT = new Set([
+const ALLOWED_PAYMENT = new Set<OrderPaymentStatus>([
   "UNPAID",
   "AUTH",
   "PAID",
@@ -36,11 +63,60 @@ function safeRedirectTo(value: FormDataEntryValue | null, fallback: string) {
   return raw;
 }
 
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
+
+function readSnapshot(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {} as Record<string, unknown>;
+  }
+  return { ...(value as Record<string, unknown>) };
+}
+
 function getPaymentMethod(order: unknown): "CASH" | "CARD" | null {
   const meta = ((order as Record<string, unknown> | null)?.addressSnapshot ?? {}) as Record<string, unknown>;
   const pm = String(meta.paymentMethod ?? "").toUpperCase();
   if (pm === "CASH" || pm === "CARD") return pm;
   return null;
+}
+
+function readAdminEvents(snapshot: Record<string, unknown>) {
+  const raw = snapshot.adminEvents;
+  if (!Array.isArray(raw)) return [] as StoredAdminEvent[];
+
+  return raw
+    .filter((entry) => entry && typeof entry === "object")
+    .map((entry) => {
+      const obj = entry as Record<string, unknown>;
+
+      return {
+        id: String(obj.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`),
+        kind:
+          obj.kind === "STATUS" || obj.kind === "PAYMENT" || obj.kind === "NOTE"
+            ? obj.kind
+            : "NOTE",
+        title: String(obj.title ?? "Evento"),
+        detail: String(obj.detail ?? ""),
+        by: typeof obj.by === "string" ? obj.by : null,
+        at: typeof obj.at === "string" ? obj.at : new Date().toISOString(),
+      } satisfies StoredAdminEvent;
+    });
+}
+
+function appendAdminEvent(
+  snapshot: Record<string, unknown>,
+  event: Omit<StoredAdminEvent, "id" | "at">
+) {
+  const list = readAdminEvents(snapshot);
+
+  list.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    at: new Date().toISOString(),
+    ...event,
+  });
+
+  snapshot.adminEvents = list.slice(-60);
 }
 
 function calcPointsFromSubtotal(subtotalCents: number) {
@@ -183,62 +259,126 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
   const redirectTo = safeRedirectTo(form.get("redirectTo"), `/admin/pedidos/${publicId}`);
+  const intent = safeText(form.get("intent"));
 
-  const statusRaw = String(form.get("status") ?? "").trim().toUpperCase();
-  const paymentRaw = String(form.get("paymentStatus") ?? "").trim().toUpperCase();
+  const statusRaw = safeText(form.get("status")).toUpperCase();
+  const paymentRaw = safeText(form.get("paymentStatus")).toUpperCase();
+  const note = safeText(form.get("note")).slice(0, 1000);
+  const adminInternalNote = safeText(form.get("adminInternalNote")).slice(0, 4000);
 
   const patch: {
     status?: OrderStatus;
     paymentStatus?: OrderPaymentStatus;
+    addressSnapshot?: Record<string, unknown>;
     updatedAt?: Date;
   } = {};
 
-  type OrderStatus =
-    | "PENDING"
-    | "PAID"
-    | "ACCEPTED"
-    | "PREPARING"
-    | "READY"
-    | "OUT_FOR_DELIVERY"
-    | "DELIVERED"
-    | "CANCELLED";
+  let nextStatus = String(order.status) as OrderStatus;
+  let nextPayment = String(order.paymentStatus) as OrderPaymentStatus;
+  let snapshotChanged = false;
 
-  type OrderPaymentStatus =
-    | "UNPAID"
-    | "AUTH"
-    | "PAID"
-    | "FAILED"
-    | "REFUNDED"
-    | "PARTIALLY_REFUNDED";
-
-  let nextStatus = String(order.status);
-  let nextPayment = String(order.paymentStatus);
-
-  if (statusRaw) {
-    if (!ALLOWED_STATUS.has(statusRaw)) {
-      return new Response("Invalid status", { status: 400 });
-    }
-    patch.status = statusRaw as OrderStatus;
-    nextStatus = statusRaw;
-  }
-
-  if (paymentRaw) {
-    if (!ALLOWED_PAYMENT.has(paymentRaw)) {
-      return new Response("Invalid payment status", { status: 400 });
-    }
-    patch.paymentStatus = paymentRaw as OrderPaymentStatus;
-    nextPayment = paymentRaw;
-  }
+  const snapshot = readSnapshot(order.addressSnapshot);
+  const actor =
+  typeof user?.name === "string" && user.name.trim()
+    ? user.name.trim()
+    : typeof user?.email === "string" && user.email.trim()
+      ? user.email.trim()
+      : "staff";
 
   const method = getPaymentMethod(order);
 
-  if (method === "CASH" && nextStatus === "DELIVERED" && nextPayment !== "PAID") {
-    patch.paymentStatus = "PAID";
-    nextPayment = "PAID";
+  if (intent === "save-admin-note") {
+    snapshot.adminInternalNote = adminInternalNote || null;
+    snapshotChanged = true;
+
+    appendAdminEvent(snapshot, {
+      kind: "NOTE",
+      title: "Nota interna actualizada",
+      detail: adminInternalNote ? "Se ha actualizado la nota interna del staff." : "Se ha vaciado la nota interna del staff.",
+      by: actor,
+    });
   }
 
-  if (Object.keys(patch).length === 0) {
+  if (intent === "add-activity-note") {
+    if (note) {
+      appendAdminEvent(snapshot, {
+        kind: "NOTE",
+        title: "Anotación manual",
+        detail: note,
+        by: actor,
+      });
+      snapshotChanged = true;
+    }
+  }
+
+  if (intent === "update-status" || (!intent && statusRaw)) {
+    if (!statusRaw || !ALLOWED_STATUS.has(statusRaw as OrderStatus)) {
+      return new Response("Invalid status", { status: 400 });
+    }
+
+    const previous = String(order.status) as OrderStatus;
+    const requested = statusRaw as OrderStatus;
+
+    if (requested !== previous) {
+      patch.status = requested;
+      nextStatus = requested;
+
+      appendAdminEvent(snapshot, {
+        kind: "STATUS",
+        title: "Cambio de estado",
+        detail: note
+          ? `${previous} → ${requested}. ${note}`
+          : `${previous} → ${requested}`,
+        by: actor,
+      });
+      snapshotChanged = true;
+    }
+  }
+
+  if (intent === "update-payment" || (!intent && paymentRaw)) {
+    if (!paymentRaw || !ALLOWED_PAYMENT.has(paymentRaw as OrderPaymentStatus)) {
+      return new Response("Invalid payment status", { status: 400 });
+    }
+
+    const previous = String(order.paymentStatus) as OrderPaymentStatus;
+    const requested = paymentRaw as OrderPaymentStatus;
+
+    if (requested !== previous) {
+      patch.paymentStatus = requested;
+      nextPayment = requested;
+
+      appendAdminEvent(snapshot, {
+        kind: "PAYMENT",
+        title: "Cambio de pago",
+        detail: note
+          ? `${previous} → ${requested}. ${note}`
+          : `${previous} → ${requested}`,
+        by: actor,
+      });
+      snapshotChanged = true;
+    }
+  }
+
+  if (method === "CASH" && nextStatus === "DELIVERED" && nextPayment !== "PAID") {
+    const previous = nextPayment;
+    patch.paymentStatus = "PAID";
+    nextPayment = "PAID";
+
+    appendAdminEvent(snapshot, {
+      kind: "PAYMENT",
+      title: "Auto cierre de cobro",
+      detail: `${previous} → PAID por entrega en efectivo`,
+      by: actor,
+    });
+    snapshotChanged = true;
+  }
+
+  if (!snapshotChanged && Object.keys(patch).length === 0) {
     return context.redirect(redirectTo);
+  }
+
+  if (snapshotChanged) {
+    patch.addressSnapshot = snapshot;
   }
 
   patch.updatedAt = new Date();

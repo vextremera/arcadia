@@ -1,6 +1,28 @@
 ---
 import { db, Order, OrderItem, eq } from "astro:db";
 
+type OrderItemModifierEntry = {
+  name?: string;
+  priceDeltaCents?: number;
+};
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function formatDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 const publicId = String(Astro.params.publicId ?? "").trim();
 if (!publicId) {
   return new Response("Missing publicId", { status: 400 });
@@ -21,11 +43,6 @@ const items = await db
   .from(OrderItem)
   .where(eq(OrderItem.orderId, order.id))
   .orderBy(OrderItem.id);
-
-  type OrderItemModifierEntry = {
-  name?: string;
-  priceDeltaCents?: number;
-};
 
 const decoratedItems = items.map((it) => {
   const modifiers = (it.modifiers ?? {}) as Record<string, unknown>;
@@ -50,27 +67,14 @@ const decoratedItems = items.map((it) => {
   };
 });
 
-function money(cents: number) {
-  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
-}
-
-function formatDate(value: Date | string) {
-  const date = value instanceof Date ? value : new Date(value);
-  return new Intl.DateTimeFormat("es-ES", {
-    timeZone: "Europe/Madrid",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
 const meta = (order.addressSnapshot ?? {}) as Record<string, unknown>;
 const paymentMethod = String(meta.paymentMethod ?? "").toUpperCase() || null;
 const forcedPickup = Boolean(meta.forcedPickup);
 const forcedReason = String(meta.forcedReason ?? "").trim();
+const couponCode = String(meta.couponCode ?? "").trim();
+const couponAppliedMessage = String(meta.couponAppliedMessage ?? "").trim();
+const adminInternalNote = String(meta.adminInternalNote ?? "").trim();
+
 const address = (meta.address ?? null) as
   | {
       line1?: string;
@@ -265,160 +269,175 @@ const autoPrint = new URL(Astro.request.url).searchParams.get("print") === "1";
   <body>
     <div class="toolbar">
       <div class="toolbarInner">
-        <a class="btn" href={`/admin/pedidos/${order.publicId}`}>← Volver al pedido</a>
-        <button class="btn btnPrimary" type="button" onclick="window.print()">Imprimir</button>
+        <a href={`/admin/pedidos/${order.publicId}`} class="btn">Volver al pedido</a>
+        <button class="btn btnPrimary" onclick="window.print()">Imprimir</button>
       </div>
     </div>
 
     <div class="wrap">
-      <main class="ticket">
+      <div class="ticket">
         <div class="center">
           <div class="title">ARCADIA</div>
-          <div class="sub">Lloret de Mar</div>
+          <div class="sub">Ticket operativo</div>
+          <div class="sub">{order.publicId}</div>
         </div>
 
         <div class="sep"></div>
 
-        <div class="row">
-          <div class="b">Pedido</div>
-          <div class="bb">{order.publicId}</div>
+        <div class="row sm">
+          <span class="muted">Fecha</span>
+          <span class="b">{formatDate(order.createdAt)}</span>
         </div>
 
-        <div class="row sm muted" style="margin-top:4px;">
-          <div>{formatDate(order.createdAt)}</div>
-          <div class="badge">{order.type}</div>
+        <div class="row sm">
+          <span class="muted">Tipo</span>
+          <span class="b">{order.type}</span>
         </div>
 
-        <div class="row sm muted" style="margin-top:4px;">
-          <div>Estado</div>
-          <div>{order.status}</div>
+        <div class="row sm">
+          <span class="muted">Estado</span>
+          <span class="b">{order.status}</span>
         </div>
 
-        <div class="row sm muted" style="margin-top:4px;">
-          <div>Pago</div>
-          <div>{paymentMethod ?? "—"} / {order.paymentStatus}</div>
+        <div class="row sm">
+          <span class="muted">Pago</span>
+          <span class="b">{paymentMethod ?? "—"} · {order.paymentStatus}</span>
         </div>
 
         <div class="sep"></div>
 
-        <div class="sm b">Cliente</div>
-        <div class="sm" style="margin-top:4px;">{order.customerName ?? "Sin nombre"}</div>
+        <div class="sm b">CLIENTE</div>
+        <div class="sm">{order.customerName ?? "Sin nombre"}</div>
         <div class="sm">{order.customerPhone ?? "Sin teléfono"}</div>
         {order.customerEmail ? <div class="sm">{order.customerEmail}</div> : null}
 
         {order.type === "DELIVERY" && address ? (
           <>
             <div class="sep"></div>
-            <div class="sm b">Entrega</div>
-            <div class="sm" style="margin-top:4px;">{address.line1 ?? "—"}</div>
+            <div class="sm b">ENTREGA</div>
+            <div class="sm">{address.line1 ?? "—"}</div>
             {address.line2 ? <div class="sm">{address.line2}</div> : null}
             {(address.postalCode || address.city) ? (
               <div class="sm">{address.postalCode ?? ""}{address.postalCode && address.city ? " · " : ""}{address.city ?? ""}</div>
             ) : null}
-            {address.notes ? <div class="sm" style="margin-top:4px;">Notas dirección: {address.notes}</div> : null}
+            {address.notes ? <div class="sm">Notas: {address.notes}</div> : null}
           </>
         ) : null}
 
         {forcedPickup ? (
           <div class="noteBox">
-            <div class="b">Force pickup</div>
-            <div style="margin-top:4px;">
-              Este pedido fue forzado a recogida.
-              {forcedReason ? ` Motivo: ${forcedReason}` : ""}
-            </div>
-          </div>
-        ) : null}
-
-        {order.notes ? (
-          <div class="noteBox">
-            <div class="b">Notas del pedido</div>
-            <div class="prewrap" style="margin-top:4px;">{order.notes}</div>
+            <div class="bb xs">FORCED PICKUP</div>
+            <div class="sm">{forcedReason || "Cambio operativo aplicado"}</div>
           </div>
         ) : null}
 
         <div class="sep"></div>
 
-        <div class="sm b">Items</div>
+        <div class="sm b">ITEMS</div>
 
-        <div style="margin-top:6px;">
-          {decoratedItems.map((item) => {
-            return (
-              <div style="margin-top:10px;">
-                <div class="row sm">
-                  <div class="bb">{item.qty}× {item.nameSnapshot}</div>
-                  <div class="bb">{money(item.lineTotalCents)}</div>
-                </div>
+        {decoratedItems.map((item) => (
+          <div style="margin-top:8px;">
+            <div class="row sm">
+              <span class="b">{item.qty} × {item.nameSnapshot}</span>
+              <span class="b">{money(item.lineTotalCents)}</span>
+            </div>
 
-                {item.variantSnapshot ? (
-                  <div class="xs muted indent" style="margin-top:2px;">Variante: {item.variantSnapshot}</div>
-                ) : null}
+            {item.variantSnapshot ? (
+              <div class="sm muted indent">Variante: {item.variantSnapshot}</div>
+            ) : null}
 
-                {item.opts.length ? (
-                  <div class="xs muted indent" style="margin-top:2px;">
-                    Extras: {item.opts.map((o) => `${String(o.name ?? "")} (+${money(Number(o.priceDeltaCents ?? 0))})`).join(", ")}
-                  </div>
-                ) : null}
-
-                {item.adds.length ? (
-                  <div class="xs muted indent" style="margin-top:2px;">
-                    Añadidos: {item.adds.map((a) => `${String(a.name ?? "")} (+${money(Number(a.priceDeltaCents ?? 0))})`).join(", ")}
-                  </div>
-                ) : null}
-
-                {item.rems.length ? (
-                  <div class="xs muted indent" style="margin-top:2px;">
-                    Quitados: {item.rems.map((r) => String(r.name ?? "")).join(", ")}
-                  </div>
-                ) : null}
-
-                {item.notes ? (
-                  <div class="xs muted indent" style="margin-top:2px;">
-                    Nota línea: {item.notes}
-                  </div>
-                ) : null}
+            {item.opts.length ? (
+              <div class="sm muted indent">
+                Opciones: {item.opts.map((o) => `${String(o.name ?? "")} (+${money(Number(o.priceDeltaCents ?? 0))})`).join(", ")}
               </div>
-            );
-          })}
-        </div>
+            ) : null}
+
+            {item.adds.length ? (
+              <div class="sm muted indent">
+                Añadidos: {item.adds.map((a) => `${String(a.name ?? "")} (+${money(Number(a.priceDeltaCents ?? 0))})`).join(", ")}
+              </div>
+            ) : null}
+
+            {item.rems.length ? (
+              <div class="sm muted indent">
+                Quitados: {item.rems.map((r) => String(r.name ?? "")).join(", ")}
+              </div>
+            ) : null}
+
+            {item.notes ? (
+              <div class="sm muted indent">Notas línea: {item.notes}</div>
+            ) : null}
+          </div>
+        ))}
 
         <div class="sep"></div>
 
         <div class="row sm">
-          <div>Subtotal</div>
-          <div>{money(order.subtotalCents)}</div>
+          <span>Subtotal</span>
+          <span>{money(order.subtotalCents)}</span>
         </div>
 
         {Number(order.deliveryFeeCents ?? 0) > 0 ? (
-          <div class="row sm" style="margin-top:4px;">
-            <div>Delivery</div>
-            <div>{money(order.deliveryFeeCents)}</div>
+          <div class="row sm">
+            <span>Delivery fee</span>
+            <span>{money(order.deliveryFeeCents)}</span>
           </div>
         ) : null}
 
         {Number(order.discountCents ?? 0) > 0 ? (
-          <div class="row sm" style="margin-top:4px;">
-            <div>Descuento</div>
-            <div>-{money(order.discountCents)}</div>
+          <div class="row sm">
+            <span>Descuento</span>
+            <span>-{money(order.discountCents)}</span>
           </div>
         ) : null}
 
-        <div class="row sm" style="margin-top:4px;">
-          <div>Impuestos</div>
-          <div>{money(order.taxCents)}</div>
+        <div class="row sm">
+          <span>Impuestos</span>
+          <span>{money(order.taxCents)}</span>
         </div>
 
         <div class="sep"></div>
 
         <div class="row bigTotal">
-          <div>TOTAL</div>
-          <div>{money(order.totalCents)}</div>
+          <span>TOTAL</span>
+          <span>{money(order.totalCents)}</span>
         </div>
-      </main>
+
+        {couponCode ? (
+          <div class="noteBox">
+            <div class="bb xs">CUPÓN</div>
+            <div class="sm">{couponCode}</div>
+            {couponAppliedMessage ? <div class="sm muted">{couponAppliedMessage}</div> : null}
+          </div>
+        ) : null}
+
+        {order.notes ? (
+          <div class="noteBox">
+            <div class="bb xs">COMENTARIO CLIENTE</div>
+            <div class="sm prewrap">{order.notes}</div>
+          </div>
+        ) : null}
+
+        {adminInternalNote ? (
+          <div class="noteBox">
+            <div class="bb xs">NOTA INTERNA</div>
+            <div class="sm prewrap">{adminInternalNote}</div>
+          </div>
+        ) : null}
+
+        <div class="sep"></div>
+
+        <div class="center xs muted">
+          Ticket generado desde admin · Arcadia
+        </div>
+      </div>
     </div>
 
     {autoPrint ? (
       <script is:inline>
-        {`window.addEventListener("load", () => window.print());`}
+        window.addEventListener("load", () => {
+          window.print();
+        });
       </script>
     ) : null}
   </body>
