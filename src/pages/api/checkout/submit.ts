@@ -138,10 +138,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!availability.isOpen) {
-    return json(
-      { error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` },
-      400
-    );
+    return json({ error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` }, 400);
   }
 
   if (!availability.kitchenOpen) {
@@ -241,19 +238,13 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!customerName || !customerPhone) {
-    return json(
-      { error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." },
-      400
-    );
+    return json({ error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." }, 400);
   }
 
   if (type === "DELIVERY") {
     if (!address.line1 || !address.city || !address.postalCode) {
       return json(
-        {
-          error: "MISSING_ADDRESS",
-          message: "Dirección, ciudad y código postal son obligatorios.",
-        },
+        { error: "MISSING_ADDRESS", message: "Dirección, ciudad y código postal son obligatorios." },
         400
       );
     }
@@ -540,10 +531,7 @@ export const POST: APIRoute = async ({ request, session }) => {
       }
 
       if (customerPhone && customerPhone.length <= 40) {
-        await db
-          .update(UserProfile)
-          .set({ phone: customerPhone })
-          .where(eq(UserProfile.userId, userId));
+        await db.update(UserProfile).set({ phone: customerPhone }).where(eq(UserProfile.userId, userId));
       }
     } catch {
       // best-effort

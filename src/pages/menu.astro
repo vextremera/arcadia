@@ -2,234 +2,348 @@
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import MenuTabs from "@/islands/menu/MenuTabs";
 import {
-    db,
-    Menu as MenuTable,
-    MenuItem as MenuItemTable,
-    Product,
-    eq,
-    inArray,
+  db,
+  AppSetting,
+  MenuDish,
+  MenuDishAssignment,
+  Menu as LegacyMenu,
+  MenuItem as LegacyMenuItem,
+  Product,
+  eq,
+  inArray,
 } from "astro:db";
 
 type MenuKind = "DIARIO" | "FESTIVO";
 type DbCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
+type Course = "ENTRANTES" | "PRINCIPALES" | "POSTRES";
 
-type MenuRow = {
+type MenuData = {
+  id: number;
+  kind: MenuKind;
+  title: string;
+  priceText: string | null;
+  courses: Record<Course, Array<{ name: string; desc: string | null }>>;
+};
+
+type MenuConfig = Record<
+  MenuKind,
+  {
+    active: boolean;
+    priceCents: number;
+  }
+>;
+
+const DEFAULT_MENU_CONFIG: MenuConfig = {
+  DIARIO: { active: true, priceCents: 1350 },
+  FESTIVO: { active: true, priceCents: 1590 },
+};
+
+function centsToPriceText(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2).replace(".", ",")}€`;
+}
+
+function extractPriceText(title: string): string | null {
+  const m = title.match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
+  if (!m) return null;
+  return `${m[1].replace(".", ",")}€`;
+}
+
+function isWithin(
+  m: { validFrom: Date | null; validTo: Date | null },
+  now: Date,
+) {
+  if (m.validFrom && now < m.validFrom) return false;
+  if (m.validTo && now > m.validTo) return false;
+  return true;
+}
+
+function pickBest(kind: MenuKind, menus: Array<{
+  id: number;
+  title: string;
+  kind: MenuKind;
+  active: boolean;
+  validFrom: Date | null;
+  validTo: Date | null;
+}>, now: Date) {
+  const candidates = menus.filter((m) => m.kind === kind);
+  const within = candidates.filter((m) => isWithin(m, now));
+  const list = within.length ? within : candidates;
+  if (!list.length) return null;
+
+  return [...list].sort((a, b) => {
+    const ta = a.validFrom ? a.validFrom.getTime() : 0;
+    const tb = b.validFrom ? b.validFrom.getTime() : 0;
+    if (ta !== tb) return tb - ta;
+    return b.id - a.id;
+  })[0];
+}
+
+const heroStyle = {
+  backgroundImage:
+    "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+};
+
+async function getMenuConfig(): Promise<MenuConfig> {
+  const [row] = await db
+    .select({ value: AppSetting.value })
+    .from(AppSetting)
+    .where(eq(AppSetting.key, "menuConfigV2"))
+    .limit(1);
+
+  const value = row?.value as Partial<MenuConfig> | undefined;
+
+  return {
+    DIARIO: {
+      active: value?.DIARIO?.active ?? DEFAULT_MENU_CONFIG.DIARIO.active,
+      priceCents:
+        typeof value?.DIARIO?.priceCents === "number"
+          ? value.DIARIO.priceCents
+          : DEFAULT_MENU_CONFIG.DIARIO.priceCents,
+    },
+    FESTIVO: {
+      active: value?.FESTIVO?.active ?? DEFAULT_MENU_CONFIG.FESTIVO.active,
+      priceCents:
+        typeof value?.FESTIVO?.priceCents === "number"
+          ? value.FESTIVO.priceCents
+          : DEFAULT_MENU_CONFIG.FESTIVO.priceCents,
+    },
+  };
+}
+
+const v2Config = await getMenuConfig();
+
+const v2Rows = await db
+  .select({
+    kind: MenuDishAssignment.kind,
+    sortOrder: MenuDishAssignment.sortOrder,
+    dishId: MenuDish.id,
+    dishName: MenuDish.name,
+    dishDescription: MenuDish.description,
+    dishCourse: MenuDish.course,
+    dishActive: MenuDish.active,
+    dishSortOrder: MenuDish.sortOrder,
+  })
+  .from(MenuDishAssignment)
+  .innerJoin(MenuDish, eq(MenuDishAssignment.dishId, MenuDish.id));
+
+const v2Assignments = [...v2Rows].sort((a, b) => {
+  if (a.kind !== b.kind) return a.kind.localeCompare(b.kind, "es");
+
+  const courseOrder: Record<DbCourse, number> = {
+    PRIMERO: 1,
+    SEGUNDO: 2,
+    POSTRE: 3,
+  };
+
+  const c = courseOrder[a.dishCourse as DbCourse] - courseOrder[b.dishCourse as DbCourse];
+  if (c !== 0) return c;
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+  if (a.dishSortOrder !== b.dishSortOrder) return a.dishSortOrder - b.dishSortOrder;
+  return a.dishName.localeCompare(b.dishName, "es");
+});
+
+function buildV2MenuData(kind: MenuKind): MenuData | null {
+  const config = v2Config[kind];
+  if (!config.active) return null;
+
+  const rows = v2Assignments.filter(
+    (row) => row.kind === kind && row.dishActive
+  );
+
+  if (rows.length === 0) return null;
+
+  const grouped: Record<DbCourse, Array<{ name: string; desc: string | null }>> = {
+    PRIMERO: [],
+    SEGUNDO: [],
+    POSTRE: [],
+  };
+
+  for (const row of rows) {
+    grouped[row.dishCourse as DbCourse].push({
+      name: row.dishName,
+      desc: row.dishDescription ? String(row.dishDescription).trim() || null : null,
+    });
+  }
+
+  return {
+    id: kind === "DIARIO" ? 1 : 2,
+    kind,
+    title: kind === "DIARIO" ? "Menú diario" : "Menú festivo",
+    priceText: centsToPriceText(config.priceCents),
+    courses: {
+      ENTRANTES: grouped.PRIMERO,
+      PRINCIPALES: grouped.SEGUNDO,
+      POSTRES: grouped.POSTRE,
+    },
+  };
+}
+
+let diarioData = buildV2MenuData("DIARIO");
+let festivoData = buildV2MenuData("FESTIVO");
+
+const hasV2Menu = !!diarioData || !!festivoData;
+
+if (!hasV2Menu) {
+  type LegacyMenuRow = {
     id: number;
     title: string;
     kind: MenuKind;
     active: boolean;
     validFrom: Date | null;
     validTo: Date | null;
-};
+  };
 
-type MenuItemRow = {
+  type LegacyMenuItemRow = {
     id: number;
     menuId: number;
     productId: number;
     course: DbCourse;
     sortOrder: number | null;
-};
+  };
 
-type ProductRow = {
+  type ProductRow = {
     id: number;
     name: string;
     description: string | null;
     details: string | null;
-};
+  };
 
-function extractPriceText(title: string): string | null {
-    const m = title.match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
-    if (!m) return null;
-    return `${m[1].replace(".", ",")}€`;
-}
-
-function isWithin(
-    m: { validFrom: Date | null; validTo: Date | null },
-    now: Date,
-) {
-    if (m.validFrom && now < m.validFrom) return false;
-    if (m.validTo && now > m.validTo) return false;
-    return true;
-}
-
-function pickBest(kind: MenuKind, menus: MenuRow[], now: Date) {
-    const candidates = menus.filter((m) => m.kind === kind);
-    const within = candidates.filter((m) => isWithin(m, now));
-    const list = within.length ? within : candidates;
-    if (!list.length) return null;
-
-    return [...list].sort((a, b) => {
-        const ta = a.validFrom ? a.validFrom.getTime() : 0;
-        const tb = b.validFrom ? b.validFrom.getTime() : 0;
-        if (ta !== tb) return tb - ta;
-        return b.id - a.id;
-    })[0];
-}
-
-function courseLabel(course: DbCourse) {
-    return course === "PRIMERO"
-        ? "ENTRANTES"
-        : course === "SEGUNDO"
-          ? "PRINCIPALES"
-          : "POSTRES";
-}
-
-const heroStyle = {
-    backgroundImage:
-        "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-};
-
-// 1) menús activos
-const menusRaw = (await db
+  const menusRaw = (await db
     .select({
-        id: MenuTable.id,
-        title: MenuTable.title,
-        kind: MenuTable.kind,
-        active: MenuTable.active,
-        validFrom: MenuTable.validFrom,
-        validTo: MenuTable.validTo,
+      id: LegacyMenu.id,
+      title: LegacyMenu.title,
+      kind: LegacyMenu.kind,
+      active: LegacyMenu.active,
+      validFrom: LegacyMenu.validFrom,
+      validTo: LegacyMenu.validTo,
     })
-    .from(MenuTable)
-    .where(eq(MenuTable.active, true))) as unknown as MenuRow[];
+    .from(LegacyMenu)
+    .where(eq(LegacyMenu.active, true))) as unknown as LegacyMenuRow[];
 
-const now = new Date();
-const diario = pickBest("DIARIO", menusRaw, now);
-const festivo = pickBest("FESTIVO", menusRaw, now);
+  const now = new Date();
+  const diario = pickBest("DIARIO", menusRaw, now);
+  const festivo = pickBest("FESTIVO", menusRaw, now);
 
-const activeMenus = [diario, festivo].filter(Boolean) as MenuRow[];
-const menuIds = activeMenus.map((m) => m.id);
+  const activeMenus = [diario, festivo].filter(Boolean) as LegacyMenuRow[];
+  const menuIds = activeMenus.map((m) => m.id);
 
-// 2) items
-const items = menuIds.length
+  const items = menuIds.length
     ? ((await db
-          .select({
-              id: MenuItemTable.id,
-              menuId: MenuItemTable.menuId,
-              productId: MenuItemTable.productId,
-              course: MenuItemTable.course,
-              sortOrder: MenuItemTable.sortOrder,
-          })
-          .from(MenuItemTable)
-          .where(
-              inArray(MenuItemTable.menuId, menuIds),
-          )) as unknown as MenuItemRow[])
+        .select({
+          id: LegacyMenuItem.id,
+          menuId: LegacyMenuItem.menuId,
+          productId: LegacyMenuItem.productId,
+          course: LegacyMenuItem.course,
+          sortOrder: LegacyMenuItem.sortOrder,
+        })
+        .from(LegacyMenuItem)
+        .where(inArray(LegacyMenuItem.menuId, menuIds))) as unknown as LegacyMenuItemRow[])
     : [];
 
-const productIds = [...new Set(items.map((i) => i.productId))];
-const products = productIds.length
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const products = productIds.length
     ? ((await db
-          .select({
-              id: Product.id,
-              name: Product.name,
-              description: Product.description,
-              details: Product.details,
-          })
-          .from(Product)
-          .where(inArray(Product.id, productIds))) as unknown as ProductRow[])
+        .select({
+          id: Product.id,
+          name: Product.name,
+          description: Product.description,
+          details: Product.details,
+        })
+        .from(Product)
+        .where(inArray(Product.id, productIds))) as unknown as ProductRow[])
     : [];
 
-const productById = new Map(products.map((p) => [p.id, p]));
+  const productById = new Map(products.map((p) => [p.id, p]));
 
-function buildMenuData(menu: MenuRow | null) {
+  function buildLegacyMenuData(menu: LegacyMenuRow | null) {
     if (!menu) return null;
 
-    const grouped: Record<
-        DbCourse,
-        { name: string; desc: string | null; sort: number }[]
-    > = {
-        PRIMERO: [],
-        SEGUNDO: [],
-        POSTRE: [],
+    const grouped: Record<DbCourse, { name: string; desc: string | null; sort: number }[]> = {
+      PRIMERO: [],
+      SEGUNDO: [],
+      POSTRE: [],
     };
 
     const its = items
-        .filter((it) => it.menuId === menu.id)
-        .sort((a, b) => {
-            const sa = a.sortOrder ?? 0;
-            const sb = b.sortOrder ?? 0;
-            if (sa !== sb) return sa - sb;
-            return a.id - b.id;
-        });
+      .filter((it) => it.menuId === menu.id)
+      .sort((a, b) => {
+        const sa = a.sortOrder ?? 0;
+        const sb = b.sortOrder ?? 0;
+        if (sa !== sb) return sa - sb;
+        return a.id - b.id;
+      });
 
     for (const it of its) {
-        const p = productById.get(it.productId);
-        if (!p) continue;
-        const desc = (p.details ?? p.description ?? "").trim();
-        grouped[it.course].push({
-            name: p.name,
-            desc: desc || null,
-            sort: it.sortOrder ?? 0,
-        });
+      const p = productById.get(it.productId);
+      if (!p) continue;
+
+      const desc = (p.details ?? p.description ?? "").trim();
+      grouped[it.course].push({
+        name: p.name,
+        desc: desc || null,
+        sort: it.sortOrder ?? 0,
+      });
     }
 
     return {
-        id: menu.id,
-        kind: menu.kind,
-        title: menu.title,
-        priceText: extractPriceText(menu.title),
-        courses: {
-            ENTRANTES: grouped.PRIMERO.map((x) => ({
-                name: x.name,
-                desc: x.desc,
-            })),
-            PRINCIPALES: grouped.SEGUNDO.map((x) => ({
-                name: x.name,
-                desc: x.desc,
-            })),
-            POSTRES: grouped.POSTRE.map((x) => ({
-                name: x.name,
-                desc: x.desc,
-            })),
-        },
+      id: menu.id,
+      kind: menu.kind,
+      title: menu.title,
+      priceText: extractPriceText(menu.title),
+      courses: {
+        ENTRANTES: grouped.PRIMERO.map((x) => ({ name: x.name, desc: x.desc })),
+        PRINCIPALES: grouped.SEGUNDO.map((x) => ({ name: x.name, desc: x.desc })),
+        POSTRES: grouped.POSTRE.map((x) => ({ name: x.name, desc: x.desc })),
+      },
     };
-}
+  }
 
-const diarioData = buildMenuData(diario);
-const festivoData = buildMenuData(festivo);
+  diarioData = buildLegacyMenuData(diario);
+  festivoData = buildLegacyMenuData(festivo);
+}
 ---
 
 <SiteLayout title="Menú · Arcadia" fullWidth>
-    <div class="w-full" id="top">
-        {/* Cabecero (mismo estilo que /pedir) */}
-        <section
-            class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"
-            style={heroStyle}
+  <div class="w-full" id="top">
+    <section
+      class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"
+      style={heroStyle}
+    >
+      <div class="h-56 sm:h-150"></div>
+      <div class="absolute inset-0">
+        <div
+          class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]"
         >
-            <div class="h-56 sm:h-150"></div>
-            <div class="absolute inset-0">
-                <div
-                    class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]"
-                >
-                </div>
-                <div
-                    class="flex h-full w-full items-center justify-center text-center px-4 pb-12 pt-8 sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10"
-                >
-                    <div class="text-white">
-                        <div
-                            class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular"
-                        >
-                            MENÚ
-                        </div>
-                        <div
-                            class="mt-1 text-sm sm:text-[20px] text-white/80"
-                        >
-                            Platos especiales seleccionados por nuestro chef.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <div class="w-full px-4 py-2 sm:px-10">
-            <div class="mx-auto w-full max-w-4xl">
-                <MenuTabs
-                    client:load
-                    diario={diarioData}
-                    festivo={festivoData}
-                />
-            </div>
         </div>
+        <div
+          class="flex h-full w-full items-center justify-center text-center px-4 pb-12 pt-8 sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10"
+        >
+          <div class="text-white">
+            <div
+              class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular"
+            >
+              MENÚ
+            </div>
+            <div
+              class="mt-1 text-sm sm:text-[20px] text-white/80"
+            >
+              Platos especiales seleccionados por nuestro chef.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="w-full px-4 py-2 sm:px-10">
+      <div class="mx-auto w-full max-w-4xl">
+        <MenuTabs
+          client:load
+          diario={diarioData}
+          festivo={festivoData}
+        />
+      </div>
     </div>
+  </div>
 </SiteLayout>

@@ -470,6 +470,36 @@ const MenuItem = defineTable({
   indexes: [{ on: ["menuId", "course"] }, { on: ["menuId", "course", "sortOrder"] }]
 });
 
+const MenuDish = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    name: column.text(),
+    slug: column.text({ unique: true }),
+    description: column.text({ optional: true }),
+    course: column.text({ enum: ["PRIMERO", "SEGUNDO", "POSTRE"] }),
+    active: column.boolean({ default: true }),
+    sortOrder: column.number({ default: 0 }),
+    createdAt: column.date({ default: NOW }),
+    updatedAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "course" }, { on: "active" }, { on: ["course", "sortOrder"] }]
+});
+
+const MenuDishAssignment = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    kind: column.text({ enum: ["DIARIO", "FESTIVO"] }),
+    dishId: column.number({ references: () => MenuDish.columns.id }),
+    sortOrder: column.number({ default: 0 }),
+    createdAt: column.date({ default: NOW })
+  },
+  indexes: [
+    { on: ["kind", "dishId"], unique: true },
+    { on: ["kind", "sortOrder"] },
+    { on: "dishId" }
+  ]
+});
+
 const ContentBlock = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -575,6 +605,8 @@ export default defineDb({
 
     Menu,
     MenuItem,
+    MenuDish,
+    MenuDishAssignment,
 
     ContentBlock,
     AppSetting,
