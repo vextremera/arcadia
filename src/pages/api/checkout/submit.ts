@@ -11,11 +11,13 @@ import {
   Address,
   User,
   UserProfile,
+  Coupon,
   eq,
   and,
   inArray,
 } from "astro:db";
 import { getArcadiaAvailability } from "@/server/time/madrid";
+import { validateCheckoutCoupon } from "@/server/checkout/coupons";
 import { randomUUID } from "node:crypto";
 
 type CartItemSession = {
@@ -33,6 +35,16 @@ type SessionUser = {
   email: string;
   name?: string | null;
   role: "ADMIN" | "STAFF" | "CUSTOMER";
+};
+
+type AvailabilityLike = Awaited<ReturnType<typeof getArcadiaAvailability>> & {
+  sources?: {
+    delivery?: string;
+  };
+  sourceNotes?: {
+    delivery?: string | null;
+  };
+  todayDateISO?: string;
 };
 
 function json(data: unknown, status = 200) {
@@ -74,13 +86,11 @@ async function getPaymentsSettings() {
   return (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 }
 
-function buildForcedPickupReason(
-  availability: Awaited<ReturnType<typeof getArcadiaAvailability>>
-) {
+function buildForcedPickupReason(availability: AvailabilityLike) {
   const start = availability.windows.delivery.start;
   const end = availability.windows.delivery.end;
-  const source = availability.sources.delivery;
-  const note = availability.sourceNotes.delivery?.trim() || null;
+  const source = availability.sources?.delivery ?? "APP_SETTING";
+  const note = availability.sourceNotes?.delivery?.trim() || null;
 
   if (availability.forcePickup) {
     return note
@@ -129,7 +139,9 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const authUser = (await session.get("user")) as SessionUser | undefined;
 
-  const availability = await getArcadiaAvailability();
+  const rawAvailability = await getArcadiaAvailability();
+  const availability = rawAvailability as AvailabilityLike;
+
   if (availability.pauseOrders) {
     return json(
       { error: "PAUSED", message: "Pedidos pausados temporalmente. Inténtalo más tarde." },
@@ -138,7 +150,10 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!availability.isOpen) {
-    return json({ error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` }, 400);
+    return json(
+      { error: "CLOSED", message: `Ahora mismo está cerrado (${availability.now}).` },
+      400
+    );
   }
 
   if (!availability.kitchenOpen) {
@@ -159,6 +174,7 @@ export const POST: APIRoute = async ({ request, session }) => {
   const requestedType = safeStr(body.type).toUpperCase();
   const paymentMethod = safeStr(body.paymentMethod).toUpperCase();
   const orderNotes = safeStr(body.orderNotes);
+  const couponCode = safeStr(body.couponCode).toUpperCase();
 
   const customerName = safeStr(body.customerName);
   const customerPhone = safePhone(body.customerPhone);
@@ -178,7 +194,6 @@ export const POST: APIRoute = async ({ request, session }) => {
   const saveAddressDefault = !!body.saveAddressDefault;
   const saveAddressLabel =
     typeof body.saveAddressLabel === "string" ? body.saveAddressLabel.trim() : "";
-
   const saveProfile = !!body.saveProfile;
 
   const cart = ((await session.get("cart")) as CartItemSession[] | undefined) ?? [];
@@ -238,13 +253,19 @@ export const POST: APIRoute = async ({ request, session }) => {
   }
 
   if (!customerName || !customerPhone) {
-    return json({ error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." }, 400);
+    return json(
+      { error: "MISSING_CONTACT", message: "Nombre y teléfono son obligatorios." },
+      400
+    );
   }
 
   if (type === "DELIVERY") {
     if (!address.line1 || !address.city || !address.postalCode) {
       return json(
-        { error: "MISSING_ADDRESS", message: "Dirección, ciudad y código postal son obligatorios." },
+        {
+          error: "MISSING_ADDRESS",
+          message: "Dirección, ciudad y código postal son obligatorios.",
+        },
         400
       );
     }
@@ -321,13 +342,17 @@ export const POST: APIRoute = async ({ request, session }) => {
     if (!p || !p.active) return json({ error: "PRODUCT_INACTIVE" }, 400);
 
     const v = line.variantId ? variantById.get(line.variantId) : null;
-    if (line.variantId && (!v || !v.active)) return json({ error: "VARIANT_INACTIVE" }, 400);
+    if (line.variantId && (!v || !v.active)) {
+      return json({ error: "VARIANT_INACTIVE" }, 400);
+    }
 
     const chosenOptions = (line.modifierOptionIds ?? [])
       .map((id) => optionById.get(id))
       .filter((x): x is NonNullable<typeof x> => !!x);
 
-    if (chosenOptions.some((o) => !o.active)) return json({ error: "OPTION_INACTIVE" }, 400);
+    if (chosenOptions.some((o) => !o.active)) {
+      return json({ error: "OPTION_INACTIVE" }, 400);
+    }
 
     const added = (line.addedIngredientIds ?? [])
       .map((id) => ingredientById.get(id))
@@ -337,7 +362,9 @@ export const POST: APIRoute = async ({ request, session }) => {
       .map((id) => ingredientById.get(id))
       .filter((x): x is NonNullable<typeof x> => !!x);
 
-    if (added.some((i) => !i.active)) return json({ error: "INGREDIENT_INACTIVE" }, 400);
+    if (added.some((i) => !i.active)) {
+      return json({ error: "INGREDIENT_INACTIVE" }, 400);
+    }
 
     const baseUnit = (p.priceCents ?? 0) + (v?.priceDeltaCents ?? 0);
     const optionDelta = chosenOptions.reduce((acc, o) => acc + (o.priceDeltaCents ?? 0), 0);
@@ -377,15 +404,45 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const feeCents = type === "DELIVERY" ? (availability.deliveryFeeCents ?? 0) : 0;
 
-  const discountCents = 0;
+  let discountCents = 0;
+  let couponId: number | null = null;
+  let couponUsesCount: number | null = null;
+  let couponAppliedMessage: string | null = null;
+
+  if (couponCode) {
+    const couponResult = await validateCheckoutCoupon({
+      code: couponCode,
+      type,
+      subtotalCents,
+      deliveryFeeCents: feeCents,
+      userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
+    });
+
+    if (!couponResult.ok) {
+      return json(
+        {
+          error: "COUPON_INVALID",
+          message: couponResult.message,
+        },
+        400
+      );
+    }
+
+    couponId = couponResult.couponId;
+    discountCents = couponResult.discountCents;
+    couponUsesCount = couponResult.usesCount;
+    couponAppliedMessage = couponResult.message;
+  }
+
   const taxCents = 0;
-  const totalCents = subtotalCents + feeCents - discountCents + taxCents;
+  const totalCents = Math.max(0, subtotalCents + feeCents - discountCents + taxCents);
 
   const publicId = makePublicId();
 
   await db.insert(Order).values({
     publicId,
     userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
+    couponId,
     type,
     status: "PENDING",
     paymentStatus: "UNPAID",
@@ -403,11 +460,13 @@ export const POST: APIRoute = async ({ request, session }) => {
       paymentMethod: pm,
       forcedPickup,
       forcedReason,
-      deliveryResolutionSource: availability.sources.delivery,
-      deliveryResolutionNote: availability.sourceNotes.delivery ?? null,
+      couponCode: couponCode || null,
+      couponAppliedMessage,
+      deliveryResolutionSource: availability.sources?.delivery ?? null,
+      deliveryResolutionNote: availability.sourceNotes?.delivery ?? null,
       address: type === "DELIVERY" ? address : null,
       now: availability.now,
-      dateISO: availability.todayDateISO,
+      dateISO: availability.todayDateISO ?? null,
     },
   });
 
@@ -425,6 +484,15 @@ export const POST: APIRoute = async ({ request, session }) => {
       orderId: created.id,
     }))
   );
+
+  if (couponId && couponUsesCount !== null) {
+    await db
+      .update(Coupon)
+      .set({
+        usesCount: couponUsesCount + 1,
+      })
+      .where(eq(Coupon.id, couponId));
+  }
 
   let savedAddressId: number | null = null;
 
@@ -531,7 +599,10 @@ export const POST: APIRoute = async ({ request, session }) => {
       }
 
       if (customerPhone && customerPhone.length <= 40) {
-        await db.update(UserProfile).set({ phone: customerPhone }).where(eq(UserProfile.userId, userId));
+        await db
+          .update(UserProfile)
+          .set({ phone: customerPhone })
+          .where(eq(UserProfile.userId, userId));
       }
     } catch {
       // best-effort
@@ -546,6 +617,9 @@ export const POST: APIRoute = async ({ request, session }) => {
     type,
     forcedPickup,
     forcedReason,
+    couponId,
+    couponCode: couponCode || null,
+    discountCents,
     savedAddressId,
   });
 };

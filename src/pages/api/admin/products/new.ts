@@ -1,5 +1,11 @@
 import type { APIRoute } from "astro";
 import { db, Category, Product, eq } from "astro:db";
+import {
+  ProductImageUploadError,
+  getImageFileFromFormDataEntry,
+  productImageErrorToQuery,
+  uploadProductImage,
+} from "@/server/media/product-images";
 
 function parseEurToCents(value: FormDataEntryValue | null) {
   const raw = String(value ?? "").trim().replace(",", ".");
@@ -17,6 +23,7 @@ function slugify(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/gi, "n")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\s-]/g, "")
@@ -48,19 +55,27 @@ export const POST: APIRoute = async (context) => {
   const priceCents = parseEurToCents(form.get("priceEur"));
 
   if (!name) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "missing-name" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "missing-name" })
+    );
   }
 
   if (!slug) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-slug" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-slug" })
+    );
   }
 
   if (!Number.isFinite(categoryId)) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" })
+    );
   }
 
   if (priceCents === null) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-price" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-price" })
+    );
   }
 
   const [category] = await db
@@ -70,7 +85,9 @@ export const POST: APIRoute = async (context) => {
     .limit(1);
 
   if (!category) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" })
+    );
   }
 
   const [slugMatch] = await db
@@ -80,7 +97,39 @@ export const POST: APIRoute = async (context) => {
     .limit(1);
 
   if (slugMatch) {
-    return context.redirect(withQuery("/admin/catalogo/productos/nuevo", { error: "duplicate-slug" }));
+    return context.redirect(
+      withQuery("/admin/catalogo/productos/nuevo", { error: "duplicate-slug" })
+    );
+  }
+
+  let imageUrl = toNullableText(form.get("imageUrl"));
+  const imageFile = getImageFileFromFormDataEntry(form.get("imageFile"));
+
+  if (imageFile) {
+    try {
+      const uploaded = await uploadProductImage({
+        file: imageFile,
+        productName: name,
+        productSlug: slug,
+        alt: name,
+      });
+
+      imageUrl = uploaded.url;
+    } catch (error) {
+      if (error instanceof ProductImageUploadError) {
+        return context.redirect(
+          withQuery("/admin/catalogo/productos/nuevo", {
+            error: productImageErrorToQuery(error.code),
+          })
+        );
+      }
+
+      return context.redirect(
+        withQuery("/admin/catalogo/productos/nuevo", {
+          error: "image-upload-failed",
+        })
+      );
+    }
   }
 
   const existing = await db.select({ id: Product.id }).from(Product);
@@ -94,7 +143,7 @@ export const POST: APIRoute = async (context) => {
     slug,
     description: toNullableText(form.get("description")),
     details: toNullableText(form.get("details")),
-    imageUrl: toNullableText(form.get("imageUrl")),
+    imageUrl,
     priceCents,
     deliveryEnabled: form.get("deliveryEnabled") === "on",
     pickupEnabled: form.get("pickupEnabled") === "on",

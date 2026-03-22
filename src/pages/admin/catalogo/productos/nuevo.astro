@@ -28,7 +28,15 @@ const errorMessage =
           ? "El precio no es válido."
           : error === "duplicate-slug"
             ? "Ya existe otro producto con ese slug."
-            : "";
+            : error === "image-upload-disabled"
+              ? "La subida de imágenes no está configurada todavía en el entorno."
+              : error === "invalid-image"
+                ? "La imagen no es válida. Solo se permiten JPG, PNG o WEBP."
+                : error === "image-too-large"
+                  ? "La imagen supera el tamaño máximo permitido."
+                  : error === "image-upload-failed"
+                    ? "No se ha podido subir la imagen del producto."
+                    : "";
 ---
 
 <AdminLayout
@@ -60,10 +68,13 @@ const errorMessage =
     <form
       method="post"
       action="/api/admin/products/new"
+      enctype="multipart/form-data"
       class="rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
     >
       <div>
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
+        >
           Alta base
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -74,7 +85,9 @@ const errorMessage =
       <div class="mt-6 grid gap-4">
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Nombre
             </span>
             <input
@@ -86,7 +99,9 @@ const errorMessage =
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Slug
             </span>
             <input
@@ -100,7 +115,9 @@ const errorMessage =
 
         <div class="grid gap-4 md:grid-cols-2">
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Categoría
             </span>
             <select
@@ -108,14 +125,18 @@ const errorMessage =
               name="categoryId"
               required
             >
-              {activeCategories.map((category) => (
-                <option value={category.id}>{category.name}</option>
-              ))}
+              {
+                activeCategories.map((category) => (
+                  <option value={category.id}>{category.name}</option>
+                ))
+              }
             </select>
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Precio (€)
             </span>
             <input
@@ -131,40 +152,50 @@ const errorMessage =
         </div>
 
         <label class="block">
-          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Image URL
+          <span
+            class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+          >
+            Imagen del producto
           </span>
           <input
-            class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
-            type="text"
-            name="imageUrl"
-            placeholder="/images/productos/nuevo.webp"
+            class="block w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white file:mr-4 file:rounded-xl file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-sky-400 focus:border-sky-400/40 focus:outline-none"
+            type="file"
+            name="imageFile"
+            accept="image/jpeg,image/png,image/webp"
           />
+          <span class="mt-2 block text-xs leading-6 text-slate-500">
+            JPG, PNG o WEBP · máximo 4 MB. El archivo se renombra
+            automáticamente a partir del producto.
+          </span>
         </label>
 
         <label class="block">
-          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span
+            class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+          >
             Description
           </span>
           <textarea
             class="min-h-27.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-            name="description"
-          ></textarea>
+            name="description"></textarea>
         </label>
 
         <label class="block">
-          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span
+            class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+          >
             Details
           </span>
           <textarea
             class="min-h-37.5 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-            name="details"
-          ></textarea>
+            name="details"></textarea>
         </label>
       </div>
 
       <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+        <label
+          class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+        >
           <div class="flex items-start gap-3">
             <input
               class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -174,12 +205,16 @@ const errorMessage =
             />
             <div>
               <div class="text-sm font-semibold text-white">Activo</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en catálogo</p>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Disponible en catálogo
+              </p>
             </div>
           </div>
         </label>
 
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+        <label
+          class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+        >
           <div class="flex items-start gap-3">
             <input
               class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -189,12 +224,16 @@ const errorMessage =
             />
             <div>
               <div class="text-sm font-semibold text-white">Delivery</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">Canal a domicilio</p>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Canal a domicilio
+              </p>
             </div>
           </div>
         </label>
 
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+        <label
+          class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+        >
           <div class="flex items-start gap-3">
             <input
               class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -204,12 +243,16 @@ const errorMessage =
             />
             <div>
               <div class="text-sm font-semibold text-white">Pickup</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">Canal recogida</p>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Canal recogida
+              </p>
             </div>
           </div>
         </label>
 
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+        <label
+          class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
+        >
           <div class="flex items-start gap-3">
             <input
               class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -219,7 +262,9 @@ const errorMessage =
             />
             <div>
               <div class="text-sm font-semibold text-white">Sala</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">Consumo en local</p>
+              <p class="mt-1 text-sm leading-6 text-slate-400">
+                Consumo en local
+              </p>
             </div>
           </div>
         </label>
@@ -242,8 +287,12 @@ const errorMessage =
       </div>
     </form>
 
-    <aside class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+    <aside
+      class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+      >
         Qué crea esto
       </div>
       <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -254,21 +303,26 @@ const errorMessage =
         <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
           <div class="text-sm font-semibold text-white">Sí crea</div>
           <p class="mt-2 text-sm leading-6 text-slate-400">
-            Registro base en <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">Product</span> con nombre, slug, categoría, precio, imagen y canales.
+            Registro base en <span
+              class="rounded bg-white/10 px-2 py-0.5 text-xs text-white"
+              >Product</span
+            > con nombre, slug, categoría, precio, imagen y canales.
           </p>
         </div>
 
         <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
           <div class="text-sm font-semibold text-white">No crea todavía</div>
           <p class="mt-2 text-sm leading-6 text-slate-400">
-            Variantes, ingredientes, modifier groups y alérgenos. Eso se añade después desde la ficha del producto.
+            Variantes, ingredientes, modifier groups y alérgenos. Eso se añade
+            después desde la ficha del producto.
           </p>
         </div>
 
         <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
           <div class="text-sm font-semibold text-amber-200">Importante</div>
           <p class="mt-2 text-sm leading-6 text-amber-100/80">
-            El slug debe ser único. Si lo dejas vacío, se genera automáticamente a partir del nombre.
+            El slug debe ser único. Si lo dejas vacío, se genera automáticamente
+            a partir del nombre.
           </p>
         </div>
       </div>

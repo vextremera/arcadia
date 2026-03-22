@@ -1,5 +1,11 @@
 import type { APIRoute } from "astro";
 import { db, Product, Category, eq } from "astro:db";
+import {
+  ProductImageUploadError,
+  getImageFileFromFormDataEntry,
+  productImageErrorToQuery,
+  uploadProductImage,
+} from "@/server/media/product-images";
 
 function parseId(value: string | undefined) {
   const n = Number(value);
@@ -22,6 +28,7 @@ function slugify(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/gi, "n")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\s-]/g, "")
@@ -84,7 +91,10 @@ export const POST: APIRoute = async (context) => {
 
   if (intent === "toggle-active") {
     const nextActive = String(form.get("nextActive") ?? "") === "true";
-    const redirectTo = safeRedirectTo(form.get("redirectTo"), "/admin/catalogo/productos");
+    const redirectTo = safeRedirectTo(
+      form.get("redirectTo"),
+      "/admin/catalogo/productos"
+    );
 
     await db
       .update(Product)
@@ -139,6 +149,33 @@ export const POST: APIRoute = async (context) => {
     return context.redirect(withQuery(detailPath, { error: "duplicate-slug" }));
   }
 
+  const removeImage = form.get("removeImage") === "on";
+  let nextImageUrl = removeImage ? null : existing.imageUrl ?? null;
+
+  const imageFile = getImageFileFromFormDataEntry(form.get("imageFile"));
+  if (imageFile) {
+    try {
+      const uploaded = await uploadProductImage({
+        file: imageFile,
+        productName: name,
+        productSlug: slug,
+        alt: name,
+      });
+
+      nextImageUrl = uploaded.url;
+    } catch (error) {
+      if (error instanceof ProductImageUploadError) {
+        return context.redirect(
+          withQuery(detailPath, { error: productImageErrorToQuery(error.code) })
+        );
+      }
+
+      return context.redirect(
+        withQuery(detailPath, { error: "image-upload-failed" })
+      );
+    }
+  }
+
   await db
     .update(Product)
     .set({
@@ -147,7 +184,7 @@ export const POST: APIRoute = async (context) => {
       slug,
       description: toNullableText(form.get("description")),
       details: toNullableText(form.get("details")),
-      imageUrl: toNullableText(form.get("imageUrl")),
+      imageUrl: nextImageUrl,
       priceCents,
       deliveryEnabled: form.get("deliveryEnabled") === "on",
       pickupEnabled: form.get("pickupEnabled") === "on",

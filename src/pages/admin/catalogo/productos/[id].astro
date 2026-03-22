@@ -272,7 +272,15 @@ const errorMessage =
           ? "El precio no es válido."
           : error === "duplicate-slug"
             ? "Ya existe otro producto con ese slug."
-            : "";
+            : error === "image-upload-disabled"
+              ? "La subida de imágenes no está configurada todavía en el entorno."
+              : error === "invalid-image"
+                ? "La imagen no es válida. Solo se permiten JPG, PNG o WEBP."
+                : error === "image-too-large"
+                  ? "La imagen supera el tamaño máximo permitido."
+                  : error === "image-upload-failed"
+                    ? "No se ha podido subir la imagen del producto."
+                    : "";
 
 const variantErrorMessage =
   variantError === "missing-name"
@@ -554,6 +562,7 @@ const modifierOptionErrorMessage =
       <form
         method="post"
         action={`/api/admin/products/${product.id}`}
+        enctype="multipart/form-data"
         class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
       >
         <input type="hidden" name="intent" value="save-base" />
@@ -662,19 +671,45 @@ const modifierOptionErrorMessage =
               </label>
             </div>
 
-            <label class="block">
-              <span
-                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
-                >Image URL</span
+            <div class="grid gap-4">
+              <label class="block">
+                <span
+                  class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                  >Nueva imagen</span
+                >
+                <input
+                  class="block w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white file:mr-4 file:rounded-xl file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-sky-400 focus:border-sky-400/40 focus:outline-none"
+                  type="file"
+                  name="imageFile"
+                  accept="image/jpeg,image/png,image/webp"
+                />
+                <span class="mt-2 block text-xs leading-6 text-slate-500">
+                  JPG, PNG o WEBP · máximo 4 MB. Si subes una nueva, sustituye
+                  la actual.
+                </span>
+              </label>
+
+              <label
+                class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
               >
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
-                type="text"
-                name="imageUrl"
-                value={product.imageUrl ?? ""}
-                placeholder="/images/productos/ejemplo.webp"
-              />
-            </label>
+                <div class="flex items-start gap-3">
+                  <input
+                    class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                    type="checkbox"
+                    name="removeImage"
+                  />
+                  <div>
+                    <div class="text-sm font-semibold text-white">
+                      Eliminar imagen actual
+                    </div>
+                    <p class="mt-1 text-sm leading-6 text-slate-400">
+                      Déjalo marcado solo si quieres quitar la imagen sin
+                      reemplazarla.
+                    </p>
+                  </div>
+                </div>
+              </label>
+            </div>
 
             <label class="block">
               <span

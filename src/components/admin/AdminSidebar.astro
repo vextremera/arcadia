@@ -63,21 +63,6 @@ const navGroups: NavGroup[] = [
         description: "Listado real del menú",
       },
       {
-        href: "/admin/catalogo/ingredientes",
-        label: "Ingredientes",
-        description: "Catálogo global base",
-      },
-      {
-        href: "/admin/catalogo/modificadores",
-        label: "Modificadores",
-        description: "Grupos y opciones",
-      },
-      {
-        href: "/admin/catalogo/alergenos",
-        label: "Alérgenos",
-        description: "Catálogo fijo de 14",
-      },
-      {
         href: "/admin/categorias",
         label: "Categorías",
         description: "Estructura base",
@@ -95,8 +80,28 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    title: "Clientes",
+    items: [
+      {
+        href: "/admin/usuarios",
+        label: "Usuarios",
+        description: "Clientes, direcciones y loyalty",
+      },
+      {
+        href: "/admin/loyalty",
+        label: "Loyalty",
+        description: "Tiers y reglas de puntos",
+      },
+    ],
+  },
+  {
     title: "Ajustes",
     items: [
+      {
+        href: "/admin/cupones",
+        label: "Cupones",
+        description: "Descuentos y promociones",
+      },
       {
         href: "/admin/ajustes/pagos",
         label: "Pagos",

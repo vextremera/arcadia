@@ -66,6 +66,27 @@ type AddressDto = {
 
 type AddressesResponse = { ok: boolean; addresses?: AddressDto[]; error?: string };
 
+type CouponPreviewResponse =
+  | {
+      ok: true;
+      couponId: number;
+      code: string;
+      type: "PERCENT" | "FIXED" | "FREE_DELIVERY";
+      value: number;
+      discountCents: number;
+      minSubtotalCents: number | null;
+      maxUses: number | null;
+      usesCount: number;
+      requiredTierId: number | null;
+      requiredTierName: string | null;
+      message: string;
+    }
+  | {
+      ok: false;
+      error: string;
+      message: string;
+    };
+
 function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
@@ -78,11 +99,6 @@ async function safeJson<T>(url: string): Promise<T | null> {
   } catch {
     return null;
   }
-}
-
-function normalizeOptionalString(v: string) {
-  const t = v.trim();
-  return t ? t : undefined;
 }
 
 const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
@@ -123,6 +139,14 @@ export default function CheckoutForm() {
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saveAddressLabel, setSaveAddressLabel] = useState("");
 
+  const [couponCode, setCouponCode] = useState("");
+  const [couponPreview, setCouponPreview] = useState<CouponPreviewResponse | null>(null);
+  const [couponFeedback, setCouponFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+
   const deliveryDisabled = useMemo(() => !avail?.deliveryAvailable, [avail]);
 
   const deliveryFeeCents = useMemo(() => {
@@ -130,10 +154,14 @@ export default function CheckoutForm() {
     return avail?.deliveryFeeCents ?? 0;
   }, [type, avail]);
 
+  const couponDiscountCents = useMemo(() => {
+    return couponPreview?.ok ? couponPreview.discountCents : 0;
+  }, [couponPreview]);
+
   const totalCents = useMemo(() => {
     if (!cart) return 0;
-    return cart.subtotalCents + deliveryFeeCents;
-  }, [cart, deliveryFeeCents]);
+    return Math.max(0, cart.subtotalCents + deliveryFeeCents - couponDiscountCents);
+  }, [cart, deliveryFeeCents, couponDiscountCents]);
 
   const cashEnabled = useMemo(() => {
     if (!payments) return true;
@@ -158,6 +186,59 @@ export default function CheckoutForm() {
     setSaveThisAddress(false);
     setSaveAsDefault(false);
     setSaveAddressLabel("");
+  }
+
+  async function applyCoupon(codeOverride?: string, silent = false) {
+    if (!cart) return;
+
+    const nextCode = String(codeOverride ?? couponCode).trim();
+    if (!nextCode) {
+      setCouponPreview(null);
+      if (!silent) setCouponFeedback(null);
+      return;
+    }
+
+    setCouponLoading(true);
+
+    try {
+      const res = await fetch("/api/checkout/coupon", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          code: nextCode,
+          type,
+          subtotalCents: cart.subtotalCents,
+          deliveryFeeCents,
+        }),
+      });
+
+      const data = (await res.json().catch(() => null)) as CouponPreviewResponse | null;
+      if (!data) {
+        setCouponPreview(null);
+        setCouponFeedback({
+          tone: "error",
+          message: "No se ha podido validar el cupón.",
+        });
+        return;
+      }
+
+      if (data.ok) {
+        setCouponCode(data.code);
+        setCouponPreview(data);
+        setCouponFeedback({
+          tone: "success",
+          message: data.message,
+        });
+      } else {
+        setCouponPreview(null);
+        setCouponFeedback({
+          tone: "error",
+          message: data.message,
+        });
+      }
+    } finally {
+      setCouponLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -234,6 +315,13 @@ export default function CheckoutForm() {
     }
   }, [type]);
 
+  useEffect(() => {
+    if (!couponPreview?.ok) return;
+    if (!cart) return;
+
+    void applyCoupon(couponPreview.code, true);
+  }, [type, deliveryFeeCents]);
+
   async function makeDefaultFromCheckout() {
     if (!isLoggedIn) return;
     if (!selectedAddressId) return;
@@ -274,6 +362,7 @@ export default function CheckoutForm() {
       type,
       paymentMethod,
       orderNotes,
+      couponCode: couponPreview?.ok ? couponPreview.code : undefined,
       customerName,
       customerPhone,
       customerEmail,
@@ -600,6 +689,64 @@ export default function CheckoutForm() {
         </section>
 
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+          <h2 class="text-lg font-semibold">Cupón</h2>
+
+          <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+            <input
+              class="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm uppercase tracking-[0.06em]"
+              value={couponCode}
+              onInput={(e) => {
+                setCouponCode((e.target as HTMLInputElement).value.toUpperCase());
+                setCouponPreview(null);
+                setCouponFeedback(null);
+              }}
+              placeholder="BIENVENIDA10"
+            />
+
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                  couponLoading
+                    ? "bg-zinc-400 text-white"
+                    : "bg-zinc-900 text-white"
+                }`}
+                onClick={() => applyCoupon()}
+                disabled={couponLoading || !couponCode.trim()}
+              >
+                {couponLoading ? "Validando…" : "Aplicar"}
+              </button>
+
+              {(couponPreview?.ok || couponCode.trim()) ? (
+                <button
+                  type="button"
+                  class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
+                  onClick={() => {
+                    setCouponCode("");
+                    setCouponPreview(null);
+                    setCouponFeedback(null);
+                  }}
+                >
+                  Quitar
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {couponFeedback ? (
+            <div
+              class={`mt-3 rounded-xl p-3 text-sm ${
+                couponFeedback.tone === "success"
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border border-rose-200 bg-rose-50 text-rose-900"
+              }`}
+            >
+              {couponFeedback.message}
+            </div>
+          ) : null}
+        </section>
+
+        <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Comentarios del pedido</h2>
           <p class="mt-1 text-sm text-zinc-600">
             Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).
@@ -643,6 +790,13 @@ export default function CheckoutForm() {
             <div class="mt-2 flex items-center justify-between text-sm">
               <span class="text-zinc-600">Delivery</span>
               <span class="font-semibold">{money(deliveryFeeCents)}</span>
+            </div>
+          ) : null}
+
+          {couponPreview?.ok ? (
+            <div class="mt-2 flex items-center justify-between text-sm">
+              <span class="text-zinc-600">Cupón · {couponPreview.code}</span>
+              <span class="font-semibold text-emerald-700">- {money(couponPreview.discountCents)}</span>
             </div>
           ) : null}
 
