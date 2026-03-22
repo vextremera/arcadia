@@ -1,24 +1,26 @@
 import type { APIRoute } from "astro";
-import { db, ModifierGroup, ModifierOption, ProductModifierGroup, eq } from "astro:db";
+import {
+  db,
+  ModifierGroup,
+  ModifierOption,
+  ProductModifierGroup,
+  eq,
+} from "astro:db";
+
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
 
 function parseId(value: FormDataEntryValue | null) {
-  const n = Number(String(value ?? "").trim());
-  return Number.isFinite(n) ? n : null;
+  const n = Number(safeText(value));
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function parseNonNegativeInt(value: FormDataEntryValue | null) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return Math.trunc(n);
-}
-
-function parseSortOrder(value: FormDataEntryValue | null, fallback = 0) {
-  const raw = String(value ?? "").trim();
+function parseNonNegativeInt(value: FormDataEntryValue | null, fallback = 0) {
+  const raw = safeText(value);
   if (!raw) return fallback;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : fallback;
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
 }
 
 function withQuery(path: string, params: Record<string, string>) {
@@ -38,13 +40,13 @@ export const POST: APIRoute = async (context) => {
   }
 
   const form = await context.request.formData();
-  const intent = String(form.get("intent") ?? "").trim();
+  const intent = safeText(form.get("intent"));
 
   if (intent === "create") {
-    const name = String(form.get("name") ?? "").trim();
-    const minSelect = parseNonNegativeInt(form.get("minSelect"));
-    const maxSelect = parseNonNegativeInt(form.get("maxSelect"));
-    const sortOrder = parseSortOrder(form.get("sortOrder"), 0);
+    const name = safeText(form.get("name"));
+    const minSelect = parseNonNegativeInt(form.get("minSelect"), 0);
+    const maxSelect = parseNonNegativeInt(form.get("maxSelect"), 1);
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const required = form.get("required") === "on";
     const active = form.get("active") === "on";
 
@@ -52,8 +54,14 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
     }
 
-    if (minSelect === null || maxSelect === null || minSelect > maxSelect) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-limits" }));
+    if (
+      minSelect === null ||
+      maxSelect === null ||
+      sortOrder === null ||
+      maxSelect < 1 ||
+      minSelect > maxSelect
+    ) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-range" }));
     }
 
     const existing = await db.select({ id: ModifierGroup.id }).from(ModifierGroup);
@@ -88,10 +96,10 @@ export const POST: APIRoute = async (context) => {
   }
 
   if (intent === "update") {
-    const name = String(form.get("name") ?? "").trim();
-    const minSelect = parseNonNegativeInt(form.get("minSelect"));
-    const maxSelect = parseNonNegativeInt(form.get("maxSelect"));
-    const sortOrder = parseSortOrder(form.get("sortOrder"), 0);
+    const name = safeText(form.get("name"));
+    const minSelect = parseNonNegativeInt(form.get("minSelect"), 0);
+    const maxSelect = parseNonNegativeInt(form.get("maxSelect"), 1);
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const required = form.get("required") === "on";
     const active = form.get("active") === "on";
 
@@ -99,8 +107,14 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
     }
 
-    if (minSelect === null || maxSelect === null || minSelect > maxSelect) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-limits" }));
+    if (
+      minSelect === null ||
+      maxSelect === null ||
+      sortOrder === null ||
+      maxSelect < 1 ||
+      minSelect > maxSelect
+    ) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-range" }));
     }
 
     await db
@@ -128,12 +142,12 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "in-use-products" }));
     }
 
-    const optionLinks = await db
+    const options = await db
       .select({ id: ModifierOption.id })
       .from(ModifierOption)
       .where(eq(ModifierOption.groupId, groupId));
 
-    if (optionLinks.length > 0) {
+    if (options.length > 0) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "in-use-options" }));
     }
 

@@ -1,21 +1,38 @@
 import type { APIRoute } from "astro";
-import { db, Allergen, eq } from "astro:db";
+import {
+  db,
+  Allergen,
+  ProductAllergen,
+  eq,
+} from "astro:db";
+
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
 
 function parseId(value: FormDataEntryValue | null) {
-  const n = Number(String(value ?? "").trim());
-  return Number.isFinite(n) ? n : null;
+  const n = Number(safeText(value));
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function parseSortOrder(value: FormDataEntryValue | null, fallback = 0) {
-  const raw = String(value ?? "").trim();
+function parseNonNegativeInt(value: FormDataEntryValue | null, fallback = 0) {
+  const raw = safeText(value);
   if (!raw) return fallback;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : fallback;
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
 }
 
-function toNullableText(value: FormDataEntryValue | null) {
-  const s = String(value ?? "").trim();
-  return s ? s : null;
+function slugify(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ñ/gi, "n")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function withQuery(path: string, params: Record<string, string>) {
@@ -35,10 +52,53 @@ export const POST: APIRoute = async (context) => {
   }
 
   const form = await context.request.formData();
-  const intent = String(form.get("intent") ?? "").trim();
+  const intent = safeText(form.get("intent"));
 
-  if (intent !== "update") {
-    return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-intent" }));
+  if (intent === "create") {
+    const name = safeText(form.get("name"));
+    const slugInput = safeText(form.get("slug"));
+    const slug = slugify(slugInput || name);
+    const iconUrl = safeText(form.get("iconUrl"));
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
+    const active = form.get("active") === "on";
+
+    if (!name) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
+    }
+
+    if (!slug) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
+    }
+
+    if (sortOrder === null) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-allergen" }));
+    }
+
+    const [duplicateSlug] = await db
+      .select({ id: Allergen.id })
+      .from(Allergen)
+      .where(eq(Allergen.slug, slug))
+      .limit(1);
+
+    if (duplicateSlug) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "duplicate-slug" }));
+    }
+
+    const existing = await db.select({ id: Allergen.id }).from(Allergen);
+    const nextId = existing.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+
+    await db.insert(Allergen).values({
+      id: nextId,
+      name,
+      slug,
+      iconUrl: iconUrl || null,
+      sortOrder,
+      active,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return context.redirect(withQuery(REDIRECT_PATH, { saved: "1" }));
   }
 
   const allergenId = parseId(form.get("allergenId"));
@@ -56,25 +116,64 @@ export const POST: APIRoute = async (context) => {
     return context.redirect(withQuery(REDIRECT_PATH, { error: "not-found" }));
   }
 
-  const name = String(form.get("name") ?? "").trim();
-  const iconUrl = toNullableText(form.get("iconUrl"));
-  const sortOrder = parseSortOrder(form.get("sortOrder"), 0);
-  const active = form.get("active") === "on";
+  if (intent === "update") {
+    const name = safeText(form.get("name"));
+    const slugInput = safeText(form.get("slug"));
+    const slug = slugify(slugInput || name);
+    const iconUrl = safeText(form.get("iconUrl"));
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
+    const active = form.get("active") === "on";
 
-  if (!name) {
-    return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
+    if (!name) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
+    }
+
+    if (!slug) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
+    }
+
+    if (sortOrder === null) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-allergen" }));
+    }
+
+    const [duplicateSlug] = await db
+      .select({ id: Allergen.id })
+      .from(Allergen)
+      .where(eq(Allergen.slug, slug))
+      .limit(1);
+
+    if (duplicateSlug && duplicateSlug.id !== allergenId) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "duplicate-slug" }));
+    }
+
+    await db
+      .update(Allergen)
+      .set({
+        name,
+        slug,
+        iconUrl: iconUrl || null,
+        sortOrder,
+        active,
+        updatedAt: new Date(),
+      })
+      .where(eq(Allergen.id, allergenId));
+
+    return context.redirect(withQuery(REDIRECT_PATH, { saved: "1" }));
   }
 
-  await db
-    .update(Allergen)
-    .set({
-      name,
-      iconUrl,
-      sortOrder,
-      active,
-      updatedAt: new Date(),
-    })
-    .where(eq(Allergen.id, allergenId));
+  if (intent === "delete") {
+    const links = await db
+      .select({ id: ProductAllergen.id })
+      .from(ProductAllergen)
+      .where(eq(ProductAllergen.allergenId, allergenId));
 
-  return context.redirect(withQuery(REDIRECT_PATH, { saved: "1" }));
+    if (links.length > 0) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "in-use-products" }));
+    }
+
+    await db.delete(Allergen).where(eq(Allergen.id, allergenId));
+    return context.redirect(withQuery(REDIRECT_PATH, { saved: "1" }));
+  }
+
+  return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-intent" }));
 };

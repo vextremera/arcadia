@@ -7,6 +7,7 @@ import {
   ProductVariant,
   ProductIngredient,
   Ingredient,
+  CategoryIngredient,
   ProductModifierGroup,
   ModifierGroup,
   ModifierOption,
@@ -130,11 +131,34 @@ const allIngredients = await db
   .where(eq(Ingredient.active, true))
   .orderBy(Ingredient.sortOrder, Ingredient.name);
 
-const linkedIngredientIds = new Set(
-  ingredientRows.map((row) => row.ingredientId),
+const categoryIngredientRows = await db
+  .select({
+    id: CategoryIngredient.id,
+    ingredientId: CategoryIngredient.ingredientId,
+  })
+  .from(CategoryIngredient)
+  .where(eq(CategoryIngredient.categoryId, product.categoryId));
+
+const categoryCompatibleIngredientIds = new Set(
+  categoryIngredientRows.map((row) => row.ingredientId)
 );
-const availableIngredients = allIngredients.filter(
-  (ingredient) => !linkedIngredientIds.has(ingredient.id),
+const categoryCompatibilityEnabled = categoryIngredientRows.length > 0;
+
+const linkedIngredientIds = new Set(ingredientRows.map((row) => row.ingredientId));
+const availableIngredients = allIngredients.filter((ingredient) => {
+  if (linkedIngredientIds.has(ingredient.id)) return false;
+  if (!categoryCompatibilityEnabled) return true;
+  return categoryCompatibleIngredientIds.has(ingredient.id);
+});
+
+const blockedAvailableIngredients = allIngredients.filter((ingredient) => {
+  if (linkedIngredientIds.has(ingredient.id)) return false;
+  if (!categoryCompatibilityEnabled) return false;
+  return !categoryCompatibleIngredientIds.has(ingredient.id);
+});
+
+const incompatibleLinkedIngredients = ingredientRows.filter((row) =>
+  categoryCompatibilityEnabled && !categoryCompatibleIngredientIds.has(row.ingredientId)
 );
 
 const productModifierGroupLinks = await db
@@ -304,9 +328,11 @@ const ingredientErrorMessage =
         ? "La relación de ingrediente no es válida."
         : ingredientError === "not-found"
           ? "La relación de ingrediente no existe."
-          : ingredientError === "invalid-intent"
-            ? "Acción de ingrediente no válida."
-            : "";
+          : ingredientError === "not-compatible"
+            ? "Ese ingrediente no está permitido por la matriz de compatibilidad de la categoría actual."
+            : ingredientError === "invalid-intent"
+              ? "Acción de ingrediente no válida."
+              : "";
 
 const allergenErrorMessage =
   allergenError === "invalid-allergen"
@@ -355,24 +381,31 @@ const modifierOptionErrorMessage =
   actions={true}
 >
   <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/catalogo/productos"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-      >
-        Volver al listado
-      </a>
+  <div class="flex flex-wrap gap-3">
+    <a
+      href="/admin/catalogo/productos"
+      class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+    >
+      Volver al listado
+    </a>
 
-      <a
-        href={`/api/products/${product.id}`}
-        target="_blank"
-        rel="noreferrer"
-        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
-      >
-        Ver API pública
-      </a>
-    </div>
-  </Fragment>
+    <a
+      href={`/admin/catalogo/compatibilidades?categoryId=${product.categoryId}`}
+      class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
+    >
+      Compatibilidad categoría
+    </a>
+
+    <a
+      href={`/api/products/${product.id}`}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+    >
+      Ver API pública
+    </a>
+  </div>
+</Fragment>
 
   {
     saved ? (
@@ -1497,311 +1530,32 @@ const modifierOptionErrorMessage =
         </div>
       </section>
 
-      <section
-        id="ingredientes"
-        class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
-      >
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              Ingredientes
-            </div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-              Vincular y configurar ingredientes
-            </h2>
-          </div>
+      <Fragment slot="actions">
+  <div class="flex flex-wrap gap-3">
+    <a
+      href="/admin/catalogo/productos"
+      class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+    >
+      Volver al listado
+    </a>
 
-          <div class="text-sm text-slate-400">
-            Vinculados: {ingredientRows.length}
-          </div>
-        </div>
+    <a
+      href={`/admin/catalogo/compatibilidades?categoryId=${product.categoryId}`}
+      class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
+    >
+      Compatibilidad categoría
+    </a>
 
-        <form
-          method="post"
-          action={`/api/admin/products/${product.id}/ingredients`}
-          class="mt-6 rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-5"
-        >
-          <input type="hidden" name="intent" value="create" />
-
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_160px_auto]">
-            <label class="block">
-              <span
-                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80"
-                >Ingrediente</span
-              >
-              <select
-                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
-                name="ingredientId"
-                required
-              >
-                {
-                  availableIngredients.length === 0 ? (
-                    <option value="">No quedan ingredientes disponibles</option>
-                  ) : (
-                    availableIngredients.map((ingredient) => (
-                      <option value={ingredient.id}>
-                        {ingredient.name} ·{" "}
-                        {ingredient.addPriceDeltaCents > 0
-                          ? `+${money(ingredient.addPriceDeltaCents)}`
-                          : "sin extra"}
-                      </option>
-                    ))
-                  )
-                }
-              </select>
-            </label>
-
-            <label class="block">
-              <span
-                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80"
-                >Orden</span
-              >
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
-                type="number"
-                name="sortOrder"
-                step="1"
-                value={ingredientRows.length}
-              />
-            </label>
-
-            <div class="flex items-end">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-                type="submit"
-                disabled={availableIngredients.length === 0}
-              >
-                Añadir ingrediente
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <label
-              class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                  type="checkbox"
-                  name="defaultIncluded"
-                  checked
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">
-                    Va por defecto
-                  </div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">
-                    Sale incluido en la configuración inicial.
-                  </p>
-                </div>
-              </div>
-            </label>
-
-            <label
-              class="block rounded-3xl border border-white/10 bg-slate-950/40 p-4"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                  type="checkbox"
-                  name="removable"
-                  checked
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">Removible</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">
-                    El cliente lo puede quitar desde el configurador.
-                  </p>
-                </div>
-              </div>
-            </label>
-          </div>
-        </form>
-
-        <div class="mt-6 space-y-4">
-          {
-            ingredientRows.length === 0 ? (
-              <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-                Este producto no tiene ingredientes vinculados.
-              </div>
-            ) : (
-              ingredientRows.map((ingredient) => (
-                <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-                  <form
-                    method="post"
-                    action={`/api/admin/products/${product.id}/ingredients`}
-                    class="grid gap-4"
-                  >
-                    <input type="hidden" name="intent" value="update" />
-                    <input
-                      type="hidden"
-                      name="productIngredientId"
-                      value={ingredient.id}
-                    />
-
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div class="text-sm font-semibold text-white">
-                          {ingredient.name}
-                        </div>
-                        <div class="mt-1 text-xs text-slate-500">
-                          {ingredient.slug}
-                        </div>
-                      </div>
-
-                      <div class="flex flex-wrap gap-2">
-                        {ingredient.isCommon ? (
-                          <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                            Common
-                          </span>
-                        ) : null}
-
-                        {ingredient.addPriceDeltaCents > 0 ? (
-                          <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
-                            +{money(ingredient.addPriceDeltaCents)}
-                          </span>
-                        ) : (
-                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                            Sin extra
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div class="grid gap-4 lg:grid-cols-[160px_1fr_1fr]">
-                      <label class="block">
-                        <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Orden
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                          type="number"
-                          name="sortOrder"
-                          step="1"
-                          value={ingredient.sortOrder}
-                        />
-                      </label>
-
-                      <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div class="flex items-start gap-3">
-                          <input
-                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                            type="checkbox"
-                            name="defaultIncluded"
-                            checked={ingredient.defaultIncluded}
-                          />
-                          <div>
-                            <div class="text-sm font-semibold text-white">
-                              Va por defecto
-                            </div>
-                            <p class="mt-1 text-sm leading-6 text-slate-400">
-                              Incluido de base al abrir el producto
-                            </p>
-                          </div>
-                        </div>
-                      </label>
-
-                      <label class="block rounded-3xl border border-white/10 bg-white/5 p-4">
-                        <div class="flex items-start gap-3">
-                          <input
-                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                            type="checkbox"
-                            name="removable"
-                            checked={ingredient.removable}
-                          />
-                          <div>
-                            <div class="text-sm font-semibold text-white">
-                              Removible
-                            </div>
-                            <p class="mt-1 text-sm leading-6 text-slate-400">
-                              El cliente lo puede quitar
-                            </p>
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                      <button
-                        class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                        type="submit"
-                      >
-                        Guardar ingrediente
-                      </button>
-                    </div>
-                  </form>
-
-                  <form
-                    method="post"
-                    action={`/api/admin/products/${product.id}/ingredients`}
-                    class="mt-3"
-                  >
-                    <input type="hidden" name="intent" value="delete" />
-                    <input
-                      type="hidden"
-                      name="productIngredientId"
-                      value={ingredient.id}
-                    />
-                    <button
-                      class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                      type="submit"
-                    >
-                      Quitar ingrediente
-                    </button>
-                  </form>
-                </article>
-              ))
-            )
-          }
-        </div>
-      </section>
-    </div>
-
-    <aside class="space-y-6 xl:sticky xl:top-28 xl:h-fit">
-      <article
-        class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Metadatos
-        </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-          Contexto del registro
-        </h2>
-
-        <div class="mt-6 space-y-4 text-sm">
-          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div class="text-slate-400">ID</div>
-            <div class="mt-1 font-semibold text-white">{product.id}</div>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div class="text-slate-400">Creado</div>
-            <div class="mt-1 font-semibold text-white">
-              {formatDate(product.createdAt)}
-            </div>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div class="text-slate-400">Categoría</div>
-            <div class="mt-1 font-semibold text-white">
-              {product.categoryName}
-            </div>
-            <div class="mt-1 text-xs text-slate-500">
-              {product.categorySlug}
-            </div>
-          </div>
-
-          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-            <div class="text-slate-400">Ingredientes removibles</div>
-            <div class="mt-1 font-semibold text-white">{removableCount}</div>
-          </div>
-        </div>
-      </article>
+    <a
+      href={`/api/products/${product.id}`}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+    >
+      Ver API pública
+    </a>
+  </div>
+</Fragment>
 
       <section
         id="alergenos"

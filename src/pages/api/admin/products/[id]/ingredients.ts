@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { and, db, eq, Ingredient, Product, ProductIngredient } from "astro:db";
+import { and, db, eq, Ingredient, Product, ProductIngredient, CategoryIngredient } from "astro:db";
 
 function parseId(value: string | undefined) {
   const n = Number(value);
@@ -36,7 +36,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const [product] = await db
-    .select({ id: Product.id })
+    .select({ id: Product.id, categoryId: Product.categoryId })
     .from(Product)
     .where(eq(Product.id, productId))
     .limit(1);
@@ -69,6 +69,18 @@ export const POST: APIRoute = async (context) => {
 
     if (!ingredient || !ingredient.active) {
       return context.redirect(redirectToProduct(productId, { ingredientError: "invalid-ingredient" }));
+    }
+
+    const categoryLinks = await db
+      .select({ ingredientId: CategoryIngredient.ingredientId })
+      .from(CategoryIngredient)
+      .where(eq(CategoryIngredient.categoryId, product.categoryId));
+
+    if (categoryLinks.length > 0) {
+      const allowedIds = new Set(categoryLinks.map((row) => row.ingredientId));
+      if (!allowedIds.has(ingredientId)) {
+        return context.redirect(redirectToProduct(productId, { ingredientError: "not-compatible" }));
+      }
     }
 
     const [existingLink] = await db

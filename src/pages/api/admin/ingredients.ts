@@ -1,21 +1,30 @@
 import type { APIRoute } from "astro";
-import { db, Ingredient, ProductIngredient, CategoryIngredient, eq } from "astro:db";
+import {
+  db,
+  Ingredient,
+  ProductIngredient,
+  CategoryIngredient,
+  eq,
+} from "astro:db";
+
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
 
 function parseId(value: FormDataEntryValue | null) {
-  const n = Number(String(value ?? "").trim());
-  return Number.isFinite(n) ? n : null;
+  const n = Number(safeText(value));
+  return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function parseIntValue(value: FormDataEntryValue | null, fallback = 0) {
-  const raw = String(value ?? "").trim();
+function parseNonNegativeInt(value: FormDataEntryValue | null, fallback = 0) {
+  const raw = safeText(value);
   if (!raw) return fallback;
   const n = Number(raw);
-  return Number.isFinite(n) ? Math.trunc(n) : fallback;
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
 }
 
-function parseEurToCents(value: FormDataEntryValue | null) {
-  const raw = String(value ?? "").trim().replace(",", ".");
-  if (!raw) return 0;
+function parseEuroToCents(value: FormDataEntryValue | null) {
+  const raw = safeText(value).replace(",", ".");
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.round(n * 100);
@@ -51,14 +60,14 @@ export const POST: APIRoute = async (context) => {
   }
 
   const form = await context.request.formData();
-  const intent = String(form.get("intent") ?? "").trim();
+  const intent = safeText(form.get("intent"));
 
   if (intent === "create") {
-    const name = String(form.get("name") ?? "").trim();
-    const slugInput = String(form.get("slug") ?? "").trim();
+    const name = safeText(form.get("name"));
+    const slugInput = safeText(form.get("slug"));
     const slug = slugify(slugInput || name);
-    const addPriceDeltaCents = parseEurToCents(form.get("addPriceDeltaEur"));
-    const sortOrder = parseIntValue(form.get("sortOrder"), 0);
+    const addPriceDeltaCents = parseEuroToCents(form.get("addPriceDeltaEur"));
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const isCommon = form.get("isCommon") === "on";
     const active = form.get("active") === "on";
 
@@ -74,13 +83,17 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
     }
 
-    const [slugMatch] = await db
+    if (sortOrder === null) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
+    }
+
+    const [duplicateSlug] = await db
       .select({ id: Ingredient.id })
       .from(Ingredient)
       .where(eq(Ingredient.slug, slug))
       .limit(1);
 
-    if (slugMatch) {
+    if (duplicateSlug) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "duplicate-slug" }));
     }
 
@@ -105,25 +118,22 @@ export const POST: APIRoute = async (context) => {
     return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-ingredient" }));
   }
 
-  const [existingIngredient] = await db
-    .select({
-      id: Ingredient.id,
-      slug: Ingredient.slug,
-    })
+  const [ingredient] = await db
+    .select({ id: Ingredient.id })
     .from(Ingredient)
     .where(eq(Ingredient.id, ingredientId))
     .limit(1);
 
-  if (!existingIngredient) {
+  if (!ingredient) {
     return context.redirect(withQuery(REDIRECT_PATH, { error: "not-found" }));
   }
 
   if (intent === "update") {
-    const name = String(form.get("name") ?? "").trim();
-    const slugInput = String(form.get("slug") ?? "").trim();
+    const name = safeText(form.get("name"));
+    const slugInput = safeText(form.get("slug"));
     const slug = slugify(slugInput || name);
-    const addPriceDeltaCents = parseEurToCents(form.get("addPriceDeltaEur"));
-    const sortOrder = parseIntValue(form.get("sortOrder"), 0);
+    const addPriceDeltaCents = parseEuroToCents(form.get("addPriceDeltaEur"));
+    const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const isCommon = form.get("isCommon") === "on";
     const active = form.get("active") === "on";
 
@@ -139,13 +149,17 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
     }
 
-    const [slugMatch] = await db
+    if (sortOrder === null) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
+    }
+
+    const [duplicateSlug] = await db
       .select({ id: Ingredient.id })
       .from(Ingredient)
       .where(eq(Ingredient.slug, slug))
       .limit(1);
 
-    if (slugMatch && slugMatch.id !== ingredientId) {
+    if (duplicateSlug && duplicateSlug.id !== ingredientId) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "duplicate-slug" }));
     }
 
