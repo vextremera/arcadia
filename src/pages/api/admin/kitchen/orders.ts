@@ -5,6 +5,16 @@ type AddressSnapshot = {
   paymentMethod?: "CASH" | "CARD" | string;
   forcedPickup?: boolean;
   forcedReason?: string | null;
+  couponCode?: string | null;
+  adminInternalNote?: string | null;
+  adminEvents?: Array<{
+    id?: string;
+    kind?: string;
+    title?: string;
+    detail?: string;
+    by?: string | null;
+    at?: string | null;
+  }>;
   address?: {
     line1?: string;
     line2?: string;
@@ -38,6 +48,27 @@ const KITCHEN_STATUSES: KitchenStatus[] = [
   "OUT_FOR_DELIVERY",
 ];
 
+function readLastAdminEvent(snapshot: AddressSnapshot) {
+  const list = Array.isArray(snapshot.adminEvents) ? snapshot.adminEvents : [];
+  if (!list.length) return null;
+
+  const sorted = [...list].sort((a, b) => {
+    const aTime = a?.at ? new Date(a.at).getTime() : 0;
+    const bTime = b?.at ? new Date(b.at).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  const top = sorted[0];
+  if (!top) return null;
+
+  return {
+    title: String(top.title ?? "Evento"),
+    detail: String(top.detail ?? ""),
+    by: typeof top.by === "string" ? top.by : null,
+    at: typeof top.at === "string" ? top.at : null,
+  };
+}
+
 export const GET: APIRoute = async (context) => {
   const user = context.locals.user;
   if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
@@ -47,11 +78,12 @@ export const GET: APIRoute = async (context) => {
   const ordersRaw = await db
     .select()
     .from(Order)
-    .where(inArray(Order.status, [...KITCHEN_STATUSES]))
-    .orderBy(Order.createdAt)
-    .limit(80);
+    .where(inArray(Order.status, [...KITCHEN_STATUSES]));
 
-  const orders = [...ordersRaw].reverse();
+  const orders = [...ordersRaw]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(-120);
+
   const orderIds = orders.map((order) => order.id);
 
   const items = orderIds.length
@@ -70,26 +102,35 @@ export const GET: APIRoute = async (context) => {
 
   const payload = orders.map((order) => {
     const meta = (order.addressSnapshot ?? {}) as AddressSnapshot;
-    const itemRows = itemsByOrderId.get(order.id) ?? [];
+    const itemRows = [...(itemsByOrderId.get(order.id) ?? [])].sort((a, b) => a.id - b.id);
+    const itemCount = itemRows.reduce((sum, item) => sum + Number(item.qty ?? 0), 0);
 
     return {
       id: order.id,
       publicId: order.publicId,
       createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
       type: order.type,
       status: order.status,
       paymentStatus: order.paymentStatus,
       customerName: order.customerName ?? "",
       customerPhone: order.customerPhone ?? "",
       totalCents: order.totalCents,
+      subtotalCents: order.subtotalCents,
+      discountCents: order.discountCents,
       deliveryFeeCents: order.deliveryFeeCents,
       notes: order.notes ?? null,
+      itemCount,
       paymentMethod:
         meta.paymentMethod === "CASH" || meta.paymentMethod === "CARD"
           ? meta.paymentMethod
           : null,
       forcedPickup: Boolean(meta.forcedPickup),
       forcedReason: meta.forcedReason ?? null,
+      couponCode: meta.couponCode ?? null,
+      adminInternalNote:
+        typeof meta.adminInternalNote === "string" ? meta.adminInternalNote : null,
+      lastAdminEvent: readLastAdminEvent(meta),
       address: meta.address ?? null,
       items: itemRows.map((item) => {
         const modifiers = (item.modifiers ?? {}) as Record<string, unknown>;

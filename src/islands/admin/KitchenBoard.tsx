@@ -13,13 +13,13 @@ type KitchenOrderStatus =
 type KitchenPaymentMethod = "CASH" | "CARD" | null;
 
 type KitchenModifierOption = {
-  id: number;
+  id?: number;
   name: string;
-  priceDeltaCents: number;
+  priceDeltaCents?: number;
 };
 
 type KitchenIngredientRemoved = {
-  id: number;
+  id?: number;
   name: string;
 };
 
@@ -44,51 +44,88 @@ type KitchenAddress = {
   notes?: string;
 };
 
+type KitchenLastEvent = {
+  title: string;
+  detail: string;
+  by?: string | null;
+  at?: string | null;
+} | null;
+
 type KitchenOrder = {
   id: number;
   publicId: string;
   createdAt: string;
+  updatedAt: string;
   type: "DELIVERY" | "PICKUP";
   status: KitchenOrderStatus;
   paymentStatus: string;
   customerName: string;
   customerPhone: string;
   totalCents: number;
+  subtotalCents: number;
+  discountCents: number;
   deliveryFeeCents: number;
+  itemCount: number;
   notes?: string | null;
   paymentMethod: KitchenPaymentMethod;
   forcedPickup: boolean;
   forcedReason?: string | null;
+  couponCode?: string | null;
+  adminInternalNote?: string | null;
+  lastAdminEvent: KitchenLastEvent;
   address?: KitchenAddress | null;
   items: KitchenOrderItem[];
+};
+
+type LoadResponse = {
+  now?: string;
+  orders?: KitchenOrder[];
 };
 
 function money(cents: number) {
   return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
 }
 
-function minutesAgo(iso: string) {
-  const t = new Date(iso).getTime();
+function minutesOpen(iso: string) {
+  const openedAt = new Date(iso).getTime();
   const now = Date.now();
-  const mins = Math.max(0, Math.round((now - t) / 60000));
-  return mins === 0 ? "ahora" : `hace ${mins} min`;
+  return Math.max(0, Math.round((now - openedAt) / 60000));
+}
+
+function ageLabel(iso: string) {
+  const mins = minutesOpen(iso);
+  if (mins <= 0) return "ahora";
+  if (mins < 60) return `${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Europe/Madrid",
+  }).format(date);
 }
 
 function beep() {
   try {
-    const audioCtor =
+    const AudioCtor =
       window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
-    if (!audioCtor) return;
+    if (!AudioCtor) return;
 
-    const ctx = new audioCtor();
+    const ctx = new AudioCtor();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.type = "sine";
     osc.frequency.value = 880;
-    gain.gain.value = 0.04;
+    gain.gain.value = 0.035;
 
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -100,11 +137,11 @@ function beep() {
       void ctx.close();
     }, 140);
   } catch {
-    // no-op
+    // noop
   }
 }
 
-function badgeClass(status: KitchenOrderStatus) {
+function statusBadgeClass(status: KitchenOrderStatus) {
   switch (status) {
     case "PENDING":
       return "border-amber-400/20 bg-amber-400/10 text-amber-300";
@@ -127,6 +164,24 @@ function badgeClass(status: KitchenOrderStatus) {
   }
 }
 
+function paymentStatusBadgeClass(status: string) {
+  switch (status) {
+    case "PAID":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+    case "UNPAID":
+      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+    case "AUTH":
+      return "border-sky-400/20 bg-sky-400/10 text-sky-300";
+    case "FAILED":
+      return "border-rose-400/20 bg-rose-400/10 text-rose-300";
+    case "REFUNDED":
+    case "PARTIALLY_REFUNDED":
+      return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
+    default:
+      return "border-white/10 bg-white/5 text-slate-300";
+  }
+}
+
 function columnTone(key: "new" | "kitchen" | "ready" | "delivery") {
   if (key === "new") return "border-amber-400/20 bg-amber-400/5";
   if (key === "kitchen") return "border-violet-400/20 bg-violet-400/5";
@@ -134,30 +189,83 @@ function columnTone(key: "new" | "kitchen" | "ready" | "delivery") {
   return "border-fuchsia-400/20 bg-fuchsia-400/5";
 }
 
+function sortByQueueTime(a: KitchenOrder, b: KitchenOrder) {
+  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+}
+
+function nextPrimaryAction(order: KitchenOrder) {
+  if (order.status === "PENDING" || order.status === "PAID") {
+    return { label: "Aceptar", status: "ACCEPTED" as const };
+  }
+
+  if (order.status === "ACCEPTED") {
+    return { label: "Preparando", status: "PREPARING" as const };
+  }
+
+  if (order.status === "PREPARING") {
+    return { label: "Marcar listo", status: "READY" as const };
+  }
+
+  if (order.status === "READY") {
+    if (order.type === "DELIVERY") {
+      return { label: "En reparto", status: "OUT_FOR_DELIVERY" as const };
+    }
+    return { label: "Entregado", status: "DELIVERED" as const };
+  }
+
+  if (order.status === "OUT_FOR_DELIVERY") {
+    return { label: "Entregado", status: "DELIVERED" as const };
+  }
+
+  return null;
+}
+
+function quickVisibleItems(order: KitchenOrder, dense: boolean) {
+  return order.items.slice(0, dense ? 3 : 5);
+}
+
 export default function KitchenBoard() {
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [dense, setDense] = useState(true);
+  const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
 
   const seenIds = useRef<Set<string>>(new Set());
   const firstLoad = useRef(true);
 
-  async function load() {
+  async function load(options?: { silent?: boolean }) {
+    const silent = options?.silent ?? false;
+
+    if (!silent) {
+      if (loading) {
+        // keep loading state
+      } else {
+        setRefreshing(true);
+      }
+    }
+
     setErr(null);
 
     try {
-      const res = await fetch("/api/admin/kitchen/orders");
+      const res = await fetch("/api/admin/kitchen/orders", {
+        headers: { accept: "application/json" },
+      });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         throw new Error(String(data.error ?? `HTTP ${res.status}`));
       }
 
-      const data = (await res.json()) as { orders?: KitchenOrder[] };
-      const next = data.orders ?? [];
+      const data = (await res.json()) as LoadResponse;
+      const next = [...(data.orders ?? [])].sort(sortByQueueTime);
 
       const newOnes = next.filter((order) => !seenIds.current.has(order.publicId));
-      if (!firstLoad.current && newOnes.length > 0) {
+      if (!firstLoad.current && soundEnabled && newOnes.length > 0) {
         beep();
       }
 
@@ -167,37 +275,56 @@ export default function KitchenBoard() {
 
       firstLoad.current = false;
       setOrders(next);
+      setLastLoadedAt(data.now ?? new Date().toISOString());
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error cargando pedidos";
       setErr(message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
   useEffect(() => {
     void load();
 
+    return () => {
+      // noop cleanup for first load
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
     const timer = window.setInterval(() => {
-      void load();
+      void load({ silent: true });
     }, 8000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [autoRefresh, soundEnabled]);
 
   async function postUpdate(
     publicId: string,
     patch: { status?: string; paymentStatus?: string }
   ) {
-    if (busy) return;
+    if (busyKey) return;
 
-    setBusy(publicId);
+    const key = `${publicId}:${patch.status ?? patch.paymentStatus ?? "update"}`;
+    setBusyKey(key);
 
     try {
       const fd = new FormData();
-      if (patch.status) fd.set("status", patch.status);
-      if (patch.paymentStatus) fd.set("paymentStatus", patch.paymentStatus);
       fd.set("redirectTo", "/admin/cocina");
+
+      if (patch.status) {
+        fd.set("intent", "update-status");
+        fd.set("status", patch.status);
+      }
+
+      if (patch.paymentStatus) {
+        fd.set("intent", "update-payment");
+        fd.set("paymentStatus", patch.paymentStatus);
+      }
 
       const res = await fetch(`/api/admin/orders/${publicId}/update`, {
         method: "POST",
@@ -206,28 +333,50 @@ export default function KitchenBoard() {
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
-        alert(txt || "No se pudo actualizar");
+        alert(txt || "No se pudo actualizar el pedido.");
         return;
       }
 
-      await load();
+      await load({ silent: true });
     } finally {
-      setBusy(null);
+      setBusyKey(null);
     }
   }
 
-  const cols = useMemo(() => {
-    const nuevos = orders.filter((o) => o.status === "PENDING" || o.status === "PAID");
-    const cocina = orders.filter((o) => o.status === "ACCEPTED" || o.status === "PREPARING");
-    const listos = orders.filter((o) => o.status === "READY");
-    const reparto = orders.filter((o) => o.status === "OUT_FOR_DELIVERY");
+  const columns = useMemo(() => {
+    const nuevos = orders
+      .filter((order) => order.status === "PENDING" || order.status === "PAID")
+      .sort(sortByQueueTime);
+
+    const cocina = orders
+      .filter((order) => order.status === "ACCEPTED" || order.status === "PREPARING")
+      .sort(sortByQueueTime);
+
+    const listos = orders
+      .filter((order) => order.status === "READY")
+      .sort(sortByQueueTime);
+
+    const reparto = orders
+      .filter((order) => order.status === "OUT_FOR_DELIVERY")
+      .sort(sortByQueueTime);
 
     return { nuevos, cocina, listos, reparto };
   }, [orders]);
 
+  const stats = useMemo(() => {
+    const live = orders.length;
+    const delivery = orders.filter((order) => order.type === "DELIVERY").length;
+    const overdue = orders.filter((order) => minutesOpen(order.createdAt) >= 20).length;
+    const withNotes = orders.filter(
+      (order) => order.notes || order.adminInternalNote || order.lastAdminEvent
+    ).length;
+
+    return { live, delivery, overdue, withNotes };
+  }, [orders]);
+
   return (
-    <section class="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-      <div class="flex flex-wrap items-center justify-between gap-3">
+    <section class="rounded-[30px] border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+      <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
             Board live
@@ -235,20 +384,70 @@ export default function KitchenBoard() {
           <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
             Flujo operativo de cocina
           </h2>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Actualización automática cada 8 segundos con aviso sonoro cuando entran pedidos nuevos.
+          <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Cola viva con acciones rápidas de estado, ticket compacto, notas internas y lectura clara de pickup vs delivery.
           </p>
         </div>
 
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-          onClick={() => {
-            void load();
-          }}
-        >
-          Refrescar ahora
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            class={`inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              autoRefresh
+                ? "border border-emerald-400/20 bg-emerald-400/10 text-emerald-300 hover:border-emerald-400/30 hover:bg-emerald-400/15"
+                : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white"
+            }`}
+            onClick={() => setAutoRefresh((value) => !value)}
+          >
+            {autoRefresh ? "Auto refresh ON" : "Auto refresh OFF"}
+          </button>
+
+          <button
+            type="button"
+            class={`inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              soundEnabled
+                ? "border border-cyan-400/20 bg-cyan-400/10 text-cyan-300 hover:border-cyan-400/30 hover:bg-cyan-400/15"
+                : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white"
+            }`}
+            onClick={() => setSoundEnabled((value) => !value)}
+          >
+            {soundEnabled ? "Sonido ON" : "Sonido OFF"}
+          </button>
+
+          <button
+            type="button"
+            class={`inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              dense
+                ? "border border-violet-400/20 bg-violet-400/10 text-violet-300 hover:border-violet-400/30 hover:bg-violet-400/15"
+                : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white"
+            }`}
+            onClick={() => setDense((value) => !value)}
+          >
+            {dense ? "Vista compacta" : "Vista amplia"}
+          </button>
+
+          <button
+            type="button"
+            class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+            onClick={() => {
+              void load();
+            }}
+          >
+            {refreshing ? "Refrescando…" : "Refrescar ahora"}
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Pedidos vivos" value={String(stats.live)} helper="Estados operativos abiertos" tone="neutral" />
+        <StatCard label="Delivery" value={String(stats.delivery)} helper="Con reparto en curso" tone="cyan" />
+        <StatCard label="Overdue" value={String(stats.overdue)} helper="20 min o más en cola" tone="amber" />
+        <StatCard
+          label="Con notas"
+          value={String(stats.withNotes)}
+          helper={lastLoadedAt ? `Última carga ${formatDateTime(lastLoadedAt)}` : "Sincronizando"}
+          tone="violet"
+        />
       </div>
 
       {loading ? (
@@ -265,32 +464,36 @@ export default function KitchenBoard() {
             title="Nuevos"
             hint="PENDING / PAID"
             tone="new"
-            orders={cols.nuevos}
-            busy={busy}
+            orders={columns.nuevos}
+            dense={dense}
+            busyKey={busyKey}
             onUpdate={postUpdate}
           />
           <Column
             title="En cocina"
             hint="ACCEPTED / PREPARING"
             tone="kitchen"
-            orders={cols.cocina}
-            busy={busy}
+            orders={columns.cocina}
+            dense={dense}
+            busyKey={busyKey}
             onUpdate={postUpdate}
           />
           <Column
             title="Listos"
             hint="READY"
             tone="ready"
-            orders={cols.listos}
-            busy={busy}
+            orders={columns.listos}
+            dense={dense}
+            busyKey={busyKey}
             onUpdate={postUpdate}
           />
           <Column
             title="Reparto"
             hint="OUT_FOR_DELIVERY"
             tone="delivery"
-            orders={cols.reparto}
-            busy={busy}
+            orders={columns.reparto}
+            dense={dense}
+            busyKey={busyKey}
             onUpdate={postUpdate}
           />
         </div>
@@ -299,12 +502,39 @@ export default function KitchenBoard() {
   );
 }
 
+function StatCard(props: {
+  label: string;
+  value: string;
+  helper: string;
+  tone: "neutral" | "amber" | "cyan" | "violet";
+}) {
+  const toneClass =
+    props.tone === "amber"
+      ? "border-amber-400/20 bg-amber-400/10"
+      : props.tone === "cyan"
+        ? "border-cyan-400/20 bg-cyan-400/10"
+        : props.tone === "violet"
+          ? "border-violet-400/20 bg-violet-400/10"
+          : "border-white/10 bg-white/5";
+
+  return (
+    <article class={`rounded-3xl border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.18)] ${toneClass}`}>
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        {props.label}
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{props.value}</div>
+      <p class="mt-2 text-sm text-slate-400">{props.helper}</p>
+    </article>
+  );
+}
+
 function Column(props: {
   title: string;
   hint: string;
   tone: "new" | "kitchen" | "ready" | "delivery";
   orders: KitchenOrder[];
-  busy: string | null;
+  dense: boolean;
+  busyKey: string | null;
   onUpdate: (publicId: string, patch: { status?: string; paymentStatus?: string }) => Promise<void>;
 }) {
   return (
@@ -327,7 +557,13 @@ function Column(props: {
           </div>
         ) : (
           props.orders.map((order) => (
-            <OrderCard key={order.publicId} order={order} busy={props.busy} onUpdate={props.onUpdate} />
+            <OrderCard
+              key={order.publicId}
+              order={order}
+              dense={props.dense}
+              busyKey={props.busyKey}
+              onUpdate={props.onUpdate}
+            />
           ))
         )}
       </div>
@@ -337,35 +573,22 @@ function Column(props: {
 
 function OrderCard(props: {
   order: KitchenOrder;
-  busy: string | null;
+  dense: boolean;
+  busyKey: string | null;
   onUpdate: (publicId: string, patch: { status?: string; paymentStatus?: string }) => Promise<void>;
 }) {
-  const order = props.order;
-  const isBusy = props.busy === order.publicId;
+  const { order, dense } = props;
+  const primary = nextPrimaryAction(order);
+  const visibleItems = quickVisibleItems(order, dense);
+  const hiddenItems = Math.max(0, order.items.length - visibleItems.length);
+  const ageMinutesValue = minutesOpen(order.createdAt);
+  const isBusy = props.busyKey?.startsWith(`${order.publicId}:`) ?? false;
 
-  function nextPrimaryAction() {
-    if (order.status === "PENDING" || order.status === "PAID") {
-      return { label: "Aceptar", status: "ACCEPTED" };
-    }
-    if (order.status === "ACCEPTED") {
-      return { label: "Preparando", status: "PREPARING" };
-    }
-    if (order.status === "PREPARING") {
-      return { label: "Marcar listo", status: "READY" };
-    }
-    if (order.status === "READY") {
-      if (order.type === "DELIVERY") {
-        return { label: "En reparto", status: "OUT_FOR_DELIVERY" };
-      }
-      return { label: "Entregado", status: "DELIVERED" };
-    }
-    if (order.status === "OUT_FOR_DELIVERY") {
-      return { label: "Entregado", status: "DELIVERED" };
-    }
-    return null;
-  }
-
-  const primary = nextPrimaryAction();
+  const canQuickMarkPaid =
+    order.paymentMethod === "CARD" &&
+    order.paymentStatus !== "PAID" &&
+    order.paymentStatus !== "REFUNDED" &&
+    order.paymentStatus !== "PARTIALLY_REFUNDED";
 
   return (
     <article
@@ -379,7 +602,7 @@ function OrderCard(props: {
             <div class="text-base font-semibold text-white">{order.publicId}</div>
 
             <span
-              class={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${badgeClass(
+              class={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${statusBadgeClass(
                 order.status
               )}`}
             >
@@ -403,32 +626,43 @@ function OrderCard(props: {
             ) : null}
 
             <span
-              class={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${
-                order.paymentStatus === "PAID"
-                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                  : order.paymentStatus === "UNPAID"
-                    ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
-                    : "border-white/10 bg-white/5 text-slate-300"
-              }`}
+              class={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${paymentStatusBadgeClass(
+                order.paymentStatus
+              )}`}
             >
               {order.paymentStatus}
             </span>
+
+            {ageMinutesValue >= 20 ? (
+              <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-300">
+                {ageLabel(order.createdAt)}
+              </span>
+            ) : (
+              <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                {ageLabel(order.createdAt)}
+              </span>
+            )}
+
+            {order.couponCode ? (
+              <span class="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                {order.couponCode}
+              </span>
+            ) : null}
           </div>
 
-          <div class="mt-3 text-sm font-medium text-slate-200">{order.customerName}</div>
+          <div class="mt-3 text-sm font-medium text-slate-200">
+            {order.customerName || "Cliente"}
+          </div>
 
           <div class="mt-1 text-xs text-slate-500">
-            {order.customerPhone} · {minutesAgo(order.createdAt)} · {money(order.totalCents)}
+            {order.customerPhone || "Sin teléfono"} · {order.itemCount} ud{order.itemCount === 1 ? "" : "s"} · {money(order.totalCents)}
           </div>
 
-          {order.forcedPickup ? (
-            <div class="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-              Forzado a recogida{order.forcedReason ? ` · ${order.forcedReason}` : ""}
-            </div>
-          ) : null}
-
           {order.type === "DELIVERY" && order.address?.line1 ? (
-            <div class="mt-3 text-xs text-slate-400">{order.address.line1}</div>
+            <div class="mt-2 text-xs text-slate-400">
+              {order.address.line1}
+              {order.address.city ? ` · ${order.address.city}` : ""}
+            </div>
           ) : null}
         </div>
 
@@ -452,7 +686,7 @@ function OrderCard(props: {
       </div>
 
       <div class="mt-4 space-y-2">
-        {order.items.map((item) => (
+        {visibleItems.map((item) => (
           <div key={item.id} class="rounded-2xl border border-white/10 bg-white/5 p-3">
             <div class="text-sm font-semibold text-white">
               {item.qty}× {item.nameSnapshot}
@@ -464,28 +698,73 @@ function OrderCard(props: {
 
             {item.modifiers.modifierOptions.length ? (
               <div class="mt-2 text-xs text-slate-400">
-                Extras: {item.modifiers.modifierOptions.map((x) => x.name).join(", ")}
+                Extras: {item.modifiers.modifierOptions.map((entry) => entry.name).join(", ")}
               </div>
             ) : null}
 
             {item.modifiers.ingredientsAdded.length ? (
               <div class="mt-1 text-xs text-slate-400">
-                Añadidos: {item.modifiers.ingredientsAdded.map((x) => x.name).join(", ")}
+                Añadidos: {item.modifiers.ingredientsAdded.map((entry) => entry.name).join(", ")}
               </div>
             ) : null}
 
             {item.modifiers.ingredientsRemoved.length ? (
               <div class="mt-1 text-xs text-slate-400">
-                Quitados: {item.modifiers.ingredientsRemoved.map((x) => x.name).join(", ")}
+                Quitados: {item.modifiers.ingredientsRemoved.map((entry) => entry.name).join(", ")}
               </div>
             ) : null}
           </div>
         ))}
+
+        {hiddenItems > 0 ? (
+          <div class="rounded-2xl border border-white/10 bg-slate-950/50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+            + {hiddenItems} línea{hiddenItems === 1 ? "" : "s"} más
+          </div>
+        ) : null}
       </div>
+
+      {Number(order.discountCents ?? 0) > 0 || Number(order.deliveryFeeCents ?? 0) > 0 ? (
+        <div class="mt-4 flex flex-wrap gap-2">
+          {Number(order.deliveryFeeCents ?? 0) > 0 ? (
+            <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
+              Fee {money(order.deliveryFeeCents)}
+            </span>
+          ) : null}
+
+          {Number(order.discountCents ?? 0) > 0 ? (
+            <span class="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+              -{money(order.discountCents)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {order.forcedPickup ? (
+        <div class="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+          Forzado a recogida{order.forcedReason ? ` · ${order.forcedReason}` : ""}
+        </div>
+      ) : null}
 
       {order.notes ? (
         <div class="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-300">
-          <span class="font-semibold text-white">Notas:</span> {order.notes}
+          <span class="font-semibold text-white">Notas cliente:</span> {order.notes}
+        </div>
+      ) : null}
+
+      {order.adminInternalNote ? (
+        <div class="mt-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100/85">
+          <span class="font-semibold text-white">Nota interna:</span> {order.adminInternalNote}
+        </div>
+      ) : null}
+
+      {order.lastAdminEvent ? (
+        <div class="mt-3 rounded-2xl border border-violet-400/20 bg-violet-400/10 p-3 text-xs text-violet-100/85">
+          <div class="font-semibold text-white">{order.lastAdminEvent.title}</div>
+          <div class="mt-1">{order.lastAdminEvent.detail}</div>
+          <div class="mt-2 text-[11px] text-violet-200/80">
+            {formatDateTime(order.lastAdminEvent.at ?? null)}
+            {order.lastAdminEvent.by ? ` · ${order.lastAdminEvent.by}` : ""}
+          </div>
         </div>
       ) : null}
 
@@ -499,6 +778,18 @@ function OrderCard(props: {
             }}
           >
             {primary.label}
+          </button>
+        ) : null}
+
+        {canQuickMarkPaid ? (
+          <button
+            type="button"
+            class="inline-flex items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-xs font-semibold text-emerald-300 transition hover:border-emerald-400/30 hover:bg-emerald-400/15"
+            onClick={() => {
+              void props.onUpdate(order.publicId, { paymentStatus: "PAID" });
+            }}
+          >
+            Marcar cobrado
           </button>
         ) : null}
 
