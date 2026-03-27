@@ -1,39 +1,63 @@
 ---
-const days = [
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-  "Domingo",
+import { getWeeklyHours } from "@/features/hours/server/weeklyHours";
+import { getArcadiaAvailability } from "@/server/time/madrid";
+
+const weeklyHours = await getWeeklyHours();
+const availability = await getArcadiaAvailability();
+
+const localLabel = "LOCAL";
+const deliveryLabel = "A DOMICILIO";
+
+const liveCards = [
+  {
+    label: "Local",
+    value: availability.localOpen ? "Abierto" : "Cerrado",
+    detail: `${availability.windows.open.start} - ${availability.windows.open.end}`,
+    tone: availability.localOpen
+      ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+      : "border-zinc-300 bg-zinc-50 text-zinc-700",
+  },
+  {
+    label: "Recogida",
+    value: availability.pickupAvailable ? "Disponible" : "No disponible",
+    detail: `${availability.windows.pickup.start} - ${availability.windows.pickup.end}`,
+    tone: availability.pickupAvailable
+      ? "border-sky-300 bg-sky-50 text-sky-900"
+      : "border-zinc-300 bg-zinc-50 text-zinc-700",
+  },
+  {
+    label: "Delivery",
+    value: availability.forcePickup
+      ? "Solo recogida"
+      : availability.deliveryAvailable
+        ? "Disponible"
+        : "No disponible",
+    detail: `${availability.windows.delivery.start} - ${availability.windows.delivery.end}`,
+    tone: availability.forcePickup
+      ? "border-amber-300 bg-amber-50 text-amber-900"
+      : availability.deliveryAvailable
+        ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900"
+        : "border-zinc-300 bg-zinc-50 text-zinc-700",
+  },
 ];
 
-const local = {
-  label: "LOCAL",
-  times: [
-    "07:30 - 00:00",
-    "07:00 - 00:00",
-    "07:30 - 00:00",
-    "07:30 - 00:00",
-    "07:30 - 00:00",
-    "07:30 - 00:00",
-    "07:30 - 00:00",
-  ],
-};
+const specialNotes = availability.specialDateNotes ?? [];
 
-const delivery = {
-  label: "A DOMICILIO",
-  times: [
-    "19:30 - 00:00",
-    "19:30 - 00:00",
-    "19:30 - 00:00",
-    "19:30 - 00:00",
-    "19:30 - 00:00",
-    "Descanso",
-    "19:30 - 00:00",
-  ],
-};
+const operationalMessage = availability.pauseOrders
+  ? "Los pedidos están pausados temporalmente desde operativa. Puedes consultar horarios, pero el canal de pedidos puede no estar disponible en este momento."
+  : availability.forcePickup
+    ? availability.sourceNotes.delivery?.trim()
+      ? `Ahora mismo el delivery está desactivado temporalmente y el sistema puede forzar recogida. ${availability.sourceNotes.delivery.trim()}`
+      : "Ahora mismo el delivery está desactivado temporalmente y el sistema puede forzar recogida."
+    : specialNotes.length > 0
+      ? specialNotes.map((item) => `${item.channel}: ${item.note}`).join(" · ")
+      : "";
+
+const operationalTone = availability.pauseOrders
+  ? "border-rose-200 bg-rose-50 text-rose-900"
+  : availability.forcePickup
+    ? "border-amber-200 bg-amber-50 text-amber-900"
+    : "border-sky-200 bg-sky-50 text-sky-900";
 ---
 
 <section id="horarios" class="scroll-mt-24">
@@ -52,48 +76,82 @@ const delivery = {
         </div>
       </div>
 
+      <div class="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3">
+        {liveCards.map((card) => (
+          <article class:list={[
+            "rounded-[22px] border px-4 py-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.04)]",
+            card.tone,
+          ]}>
+            <div class="text-[11px] font-semibold uppercase tracking-[0.22em]">
+              {card.label}
+            </div>
+            <div class="mt-2 text-lg font-black tracking-wide">
+              {card.value}
+            </div>
+            <div class="mt-1 text-sm opacity-80">
+              {card.detail}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {operationalMessage ? (
+        <div class:list={[
+          "mt-5 rounded-[22px] border px-5 py-4 text-sm leading-6",
+          operationalTone,
+        ]}>
+          {operationalMessage}
+        </div>
+      ) : null}
+
       <div class="mt-8 grid gap-8 sm:mt-12 sm:gap-12 lg:grid-cols-2">
         <div class="px-0 sm:px-12">
           <div class="text-center text-lg font-normal sigmar-regular tracking-widest">
-            {local.label}
+            {localLabel}
           </div>
           <div
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
-            {
-              days.map((d, idx) => (
-                <>
-                  <div class="text-zinc-700">{d}</div>
-                  <div class="text-right font-semibold">{local.times[idx]}</div>
-                </>
-              ))
-            }
+            {weeklyHours.map((row) => (
+              <>
+                <div class="text-zinc-700">{row.dayLabel}</div>
+                <div
+                  class:list={[
+                    "text-right font-semibold",
+                    row.local === "Descanso" || row.local === "—"
+                      ? "text-zinc-500"
+                      : "text-zinc-900",
+                  ]}
+                >
+                  {row.local}
+                </div>
+              </>
+            ))}
           </div>
         </div>
 
         <div class="px-0 sm:px-12">
           <div class="text-center text-lg font-normal sigmar-regular tracking-widest">
-            {delivery.label}
+            {deliveryLabel}
           </div>
           <div
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
-            {
-              days.map((d, idx) => (
-                <>
-                  <div class="text-zinc-700">{d}</div>
-                  <div
-                    class={
-                      delivery.times[idx] === "Descanso"
-                        ? "text-right font-semibold text-zinc-500"
-                        : "text-right font-semibold"
-                    }
-                  >
-                    {delivery.times[idx]}
-                  </div>
-                </>
-              ))
-            }
+            {weeklyHours.map((row) => (
+              <>
+                <div class="text-zinc-700">{row.dayLabel}</div>
+                <div
+                  class:list={[
+                    "text-right font-semibold",
+                    row.delivery === "Descanso" || row.delivery === "—"
+                      ? "text-zinc-500"
+                      : "text-zinc-900",
+                  ]}
+                >
+                  {row.delivery}
+                </div>
+              </>
+            ))}
           </div>
         </div>
       </div>

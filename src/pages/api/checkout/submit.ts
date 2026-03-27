@@ -12,6 +12,7 @@ import {
   User,
   UserProfile,
   Coupon,
+  Payment,
   eq,
   and,
   inArray,
@@ -133,6 +134,50 @@ type OrderItemInsert = {
   lineTotalCents: number;
   notes: string | null;
 };
+
+type PaymentInsert = {
+  id: number;
+  orderId: number;
+  provider: "stripe";
+  providerIntentId: string | null;
+  providerChargeId: string | null;
+  status: "CREATED" | "AUTHORIZED" | "PAID" | "FAILED";
+  amountCents: number;
+  currency: string;
+  raw: Record<string, unknown>;
+};
+
+async function buildCardPaymentInsert(params: {
+  orderId: number;
+  publicId: string;
+  amountCents: number;
+  channel: "DELIVERY" | "PICKUP";
+  forcedPickup: boolean;
+}) {
+  const existing = await db.select({ id: Payment.id }).from(Payment);
+  const nextId = existing.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+
+  const raw = {
+    source: "checkout-submit",
+    mode: "manual-card-tracking",
+    channel: params.channel,
+    forcedPickup: params.forcedPickup,
+    createdAt: new Date().toISOString(),
+    note: "Registro interno de tarjeta pendiente de pasarela real.",
+  } satisfies Record<string, unknown>;
+
+  return {
+    id: nextId,
+    orderId: params.orderId,
+    provider: "stripe" as const,
+    providerIntentId: `arcadia-manual-${params.publicId}`,
+    providerChargeId: null,
+    status: "CREATED" as const,
+    amountCents: params.amountCents,
+    currency: "EUR",
+    raw,
+  } satisfies PaymentInsert;
+}
 
 export const POST: APIRoute = async ({ request, session }) => {
   if (!session) return new Response("Session not available", { status: 500 });
@@ -477,6 +522,28 @@ export const POST: APIRoute = async ({ request, session }) => {
     .limit(1);
 
   if (!created) return json({ error: "ORDER_CREATE_FAILED" }, 500);
+
+  if (pm === "CARD") {
+    const payment = await buildCardPaymentInsert({
+      orderId: created.id,
+      publicId,
+      amountCents: totalCents,
+      channel: type,
+      forcedPickup,
+    });
+
+    await db.insert(Payment).values({
+      id: payment.id,
+      orderId: payment.orderId,
+      provider: payment.provider,
+      providerIntentId: payment.providerIntentId ?? undefined,
+      providerChargeId: payment.providerChargeId ?? undefined,
+      status: payment.status,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      raw: payment.raw,
+    });
+  }
 
   await db.insert(OrderItem).values(
     itemsToInsert.map((it) => ({

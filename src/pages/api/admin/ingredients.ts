@@ -84,7 +84,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     if (sortOrder === null) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-sort-order" }));
     }
 
     const [duplicateSlug] = await db
@@ -150,7 +150,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     if (sortOrder === null) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-sort-order" }));
     }
 
     const [duplicateSlug] = await db

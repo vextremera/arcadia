@@ -9,6 +9,38 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const isVercelBuild =
+  process.env.VERCEL === "1" || process.env.VERCEL === "true";
+
+const hasUpstash =
+  !!process.env.UPSTASH_REDIS_REST_URL &&
+  !!process.env.UPSTASH_REDIS_REST_TOKEN;
+
+if (isVercelBuild && !hasUpstash) {
+  throw new Error(
+    [
+      "Arcadia requiere sesiones persistentes en producción.",
+      "Faltan UPSTASH_REDIS_REST_URL y/o UPSTASH_REDIS_REST_TOKEN.",
+      "Configura Upstash Redis antes de desplegar en Vercel para no romper auth, carrito y checkout.",
+    ].join(" "),
+  );
+}
+
+const sessionConfig = hasUpstash
+  ? {
+      driver: "upstash",
+      options: {
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+        base: "arcadia:session",
+      },
+      ttl: 60 * 60 * 24 * 30,
+    }
+  : {
+      driver: "memory",
+      ttl: 60 * 60 * 24 * 7,
+    };
+
 export default defineConfig({
   output: "server",
   adapter: vercel(),
@@ -20,13 +52,11 @@ export default defineConfig({
       tsconfigPaths({
         projects: [path.join(__dirname, "tsconfig.json")],
         loose: true,
-        ignoreConfigErrors: true
+        ignoreConfigErrors: true,
       }),
       tailwindcss(),
     ],
   },
 
-  session: {
-    driver: "memory",
-  },
+  session: sessionConfig,
 });

@@ -228,6 +228,24 @@ const canImportLegacy =
   assignments.length === 0 &&
   legacyMenus.length > 0 &&
   legacyMenuItems.length > 0;
+const hasV2Data = dishes.length > 0 || assignments.length > 0;
+const legacyMenusCount = legacyMenus.length;
+const legacyMenuItemsCount = legacyMenuItems.length;
+const publicSourceLabel = hasV2Data
+  ? "V2 canónico"
+  : canImportLegacy
+    ? "Fallback legacy activo"
+    : "Sin datos publicados";
+const legacyStatusLabel = canImportLegacy
+  ? "Importable"
+  : legacyMenusCount > 0 || legacyMenuItemsCount > 0
+    ? "Solo respaldo"
+    : "Vacío";
+const legacyGuidance = hasV2Data
+  ? "La página pública ya queda gobernada por el sistema nuevo. Lo legacy se conserva solo como respaldo histórico e importación puntual."
+  : canImportLegacy
+    ? "Todavía puedes importar el contenido legacy al sistema nuevo. Mientras no existan platos o asignaciones V2, la página pública puede seguir leyendo esa base antigua."
+    : "No hay contenido legacy utilizable y tampoco hay datos V2 suficientes publicados todavía.";
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") ?? "";
@@ -265,11 +283,13 @@ const errorMessage =
                     ? "Ya existe información en el sistema nuevo y no se puede importar encima."
                     : error === "import-failed"
                       ? "No se ha podido importar el menú legacy."
-                      : error === "invalid-intent"
-                        ? "Acción de menú no válida."
-                        : error === "reorder-failed"
-                          ? "No se ha podido reordenar la lista. Recarga y vuelve a intentarlo."
-                          : "";
+                      : error === "legacy-read-only"
+                        ? "El sistema legacy del menú ha quedado en modo solo respaldo. Usa /admin/menu y el endpoint /api/admin/menu-v2 para cualquier cambio."
+                        : error === "invalid-intent"
+                          ? "Acción de menú no válida."
+                          : error === "reorder-failed"
+                            ? "No se ha podido reordenar la lista. Recarga y vuelve a intentarlo."
+                            : "";
 ---
 
 <AdminLayout
@@ -352,43 +372,81 @@ const errorMessage =
     </article>
   </section>
 
-  <form method="post" action="/api/admin/menu-v2" class="mt-6">
-    <input type="hidden" name="intent" value="save-config" />
-
-    <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-      <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
-            Configuración fija
-          </div>
-          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-            Menú diario y festivo
-          </h2>
-          <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Ya no existen múltiples menús editables. Aquí solo configuras las dos variantes reales del negocio y su precio. Los platos viven en su propia biblioteca y se asignan por separado.
-          </p>
+  <section class="mt-6 rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+          Configuración fija
         </div>
-
-        {canImportLegacy ? (
-          <div class="flex gap-3">
-            <form method="post" action="/api/admin/menu-v2">
-              <input type="hidden" name="intent" value="import-legacy" />
-              <button
-                type="submit"
-                class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
-              >
-                Importar menú legacy
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-            Separado completamente del catálogo real
-          </div>
-        )}
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+          Menú diario y festivo
+        </h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          Ya no existen múltiples menús editables. Aquí solo configuras las dos variantes reales del negocio y su precio. Los platos viven en su propia biblioteca y se asignan por separado.
+        </p>
       </div>
 
-      <div class="mt-6 grid gap-6 xl:grid-cols-2">
+      <div class="flex flex-wrap gap-3">
+        {canImportLegacy ? (
+          <form method="post" action="/api/admin/menu-v2">
+            <input type="hidden" name="intent" value="import-legacy" />
+            <button
+              type="submit"
+              class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
+            >
+              Importar menú legacy
+            </button>
+          </form>
+        ) : null}
+
+        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+          Separado completamente del catálogo real
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6 grid gap-4 xl:grid-cols-3">
+      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          Fuente pública actual
+        </div>
+        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+          {publicSourceLabel}
+        </div>
+        <p class="mt-2 text-sm leading-6 text-slate-400">
+          {legacyGuidance}
+        </p>
+      </article>
+
+      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          Legacy detectado
+        </div>
+        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+          {legacyStatusLabel}
+        </div>
+        <p class="mt-2 text-sm leading-6 text-slate-400">
+          {legacyMenusCount} menús legacy · {legacyMenuItemsCount} items legacy.
+        </p>
+      </article>
+
+      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          Sistema canónico
+        </div>
+        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+          Biblioteca propia + asignaciones
+        </div>
+        <p class="mt-2 text-sm leading-6 text-slate-400">
+          El alta, edición y ordenación del menú deben pasar por <code>/api/admin/menu-v2</code>. El CRUD legacy queda retirado.
+        </p>
+      </article>
+    </div>
+
+    <form method="post" action="/api/admin/menu-v2" class="mt-6">
+      <input type="hidden" name="intent" value="save-config" />
+
+      <div class="grid gap-6 xl:grid-cols-2">
         {KINDS.map((kind) => (
           <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
             <div class="flex items-start justify-between gap-3">
@@ -455,8 +513,8 @@ const errorMessage =
           Guardar configuración del menú
         </button>
       </div>
-    </section>
-  </form>
+    </form>
+  </section>
 
   <section class="mt-6 space-y-6">
     {KINDS.map((kind) => (
@@ -681,7 +739,7 @@ const errorMessage =
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
             <div class="text-sm font-semibold text-white">Migración sin romper</div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              Mientras no uses el sistema nuevo, la página pública <code>/menu</code> puede seguir leyendo el sistema legacy.
+              {legacyGuidance}
             </p>
           </div>
         </div>

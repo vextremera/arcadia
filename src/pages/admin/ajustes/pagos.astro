@@ -62,7 +62,7 @@ const cards = [
 <AdminLayout
   title="Pagos · Admin · Arcadia"
   heading="Pagos"
-  description="Configuración de métodos de pago disponibles por canal. Estos ajustes impactan directamente en checkout."
+  description="Configuración de métodos de pago disponibles por canal. Checkout los consume de forma directa y los pedidos con tarjeta generan un registro interno en Payment."
   actions={true}
 >
   <Fragment slot="actions">
@@ -88,6 +88,13 @@ const cards = [
       Métodos de pago guardados correctamente.
     </section>
   ) : null}
+
+  <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100/85">
+    <div class="font-semibold text-amber-200">Estado real del módulo</div>
+    <p class="mt-2 leading-6">
+      El checkout ya bloquea y permite métodos por canal. Además, los pedidos con <strong>tarjeta</strong> generan un registro interno en <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">Payment</code> para que el admin deje de trabajar a ciegas. La pasarela externa sigue pendiente.
+    </p>
+  </section>
 
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     {cards.map((card) => (

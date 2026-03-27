@@ -20,6 +20,8 @@ type OrderPaymentStatus =
   | "REFUNDED"
   | "PARTIALLY_REFUNDED";
 
+type ManualPaymentStatus = "UNPAID" | "AUTH" | "PAID" | "FAILED";
+
 type ModifierEntry = {
   name?: string;
   priceDeltaCents?: number;
@@ -103,6 +105,18 @@ function parsePaymentMethod(snapshot: unknown) {
   return raw === "CASH" || raw === "CARD" ? raw : null;
 }
 
+function refundTone(status: string) {
+  if (status === "SUCCEEDED") return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
+  if (status === "FAILED") return "border-rose-400/20 bg-rose-400/10 text-rose-300";
+  return "border-white/10 bg-white/5 text-slate-300";
+}
+
+function sumSucceededRefunds(refunds: Array<{ status: string; amountCents: number }>) {
+  return refunds
+    .filter((refund) => refund.status === "SUCCEEDED")
+    .reduce((sum, refund) => sum + Number(refund.amountCents ?? 0), 0);
+}
+
 function adminEventTone(kind: string) {
   if (kind === "STATUS") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
   if (kind === "PAYMENT") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
@@ -170,6 +184,13 @@ const decoratedPayments = payments.map((payment) => ({
   refunds: refunds.filter((refund) => refund.paymentId === payment.id),
 }));
 
+const totalSucceededRefundCents = decoratedPayments.reduce(
+  (sum, payment) => sum + sumSucceededRefunds(payment.refunds),
+  0
+);
+const pendingRefundsCount = refunds.filter((refund) => refund.status === "CREATED").length;
+const failedRefundsCount = refunds.filter((refund) => refund.status === "FAILED").length;
+
 const meta = (order.addressSnapshot ?? {}) as Record<string, unknown>;
 const paymentMethod = parsePaymentMethod(order.addressSnapshot);
 const forcedPickup = Boolean(meta.forcedPickup);
@@ -214,13 +235,11 @@ const statusOptions: OrderStatus[] = [
   "CANCELLED",
 ];
 
-const paymentOptions: OrderPaymentStatus[] = [
+const paymentOptions: ManualPaymentStatus[] = [
   "UNPAID",
   "AUTH",
   "PAID",
   "FAILED",
-  "REFUNDED",
-  "PARTIALLY_REFUNDED",
 ];
 
 const timeline: TimelineEntry[] = [];
@@ -257,7 +276,9 @@ if (couponCode || Number(order.discountCents ?? 0) > 0) {
   timeline.push({
     key: "coupon",
     title: "Descuento aplicado",
-    detail: couponAppliedMessage || (couponCode ? `${couponCode} · -${money(order.discountCents)}` : `-${money(order.discountCents)}`),
+    detail:
+      couponAppliedMessage ||
+      (couponCode ? `${couponCode} · -${money(order.discountCents)}` : `-${money(order.discountCents)}`),
     at: order.updatedAt,
     tone: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
   });
@@ -316,6 +337,41 @@ const fullTimeline = [...timeline, ...adminEvents].sort((a, b) => {
 });
 
 const returnTo = `/admin/pedidos/${order.publicId}`;
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const error = url.searchParams.get("error") ?? "";
+
+const successMessage =
+  saved === "status"
+    ? "Estado del pedido actualizado correctamente."
+    : saved === "payment"
+      ? "Estado de pago actualizado correctamente."
+      : saved === "refund"
+        ? "Refund registrado correctamente."
+        : saved === "admin-note"
+          ? "Nota interna guardada correctamente."
+          : saved === "activity"
+            ? "Anotación añadida al timeline."
+            : "";
+
+const errorMessage =
+  error === "refund-required"
+    ? "Los estados REFUNDED y PARTIALLY_REFUNDED ya no se editan a mano. Se calculan al registrar refunds reales."
+    : error === "refund-state-locked"
+      ? "Este pedido ya tiene refunds SUCCEEDED. Mientras exista devolución registrada, el estado refund manda y no debe editarse manualmente."
+      : error === "refund-only-card"
+        ? "Solo se pueden registrar refunds en pedidos con método de pago CARD."
+        : error === "invalid-refund-status"
+          ? "El estado del refund no es válido."
+          : error === "invalid-refund-amount"
+            ? "El importe del refund debe ser mayor que cero."
+            : error === "invalid-payment-record"
+              ? "No se ha encontrado un Payment válido para este pedido."
+              : error === "refund-exceeds-payment"
+                ? "El refund supera el importe disponible del payment."
+                : error === "refund-payment-not-paid"
+                  ? "No se puede registrar un refund SUCCEEDED sobre un payment que todavía no está marcado como PAID."
+                  : "";
 ---
 
 <AdminLayout
@@ -353,7 +409,18 @@ const returnTo = `/admin/pedidos/${order.publicId}`;
     </div>
   </Fragment>
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+  {successMessage ? (
+    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      {successMessage}
+    </section>
+  ) : null}
+
+  {errorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {errorMessage}
+    </section>
+  ) : null}
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
     <article class="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
       <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Estado</div>
       <div class="mt-3">
@@ -545,8 +612,7 @@ const returnTo = `/admin/pedidos/${order.publicId}`;
           </div>
         </div>
       </article>
-
-      <article class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <article class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Items</div>
@@ -652,6 +718,13 @@ const returnTo = `/admin/pedidos/${order.publicId}`;
         <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Pago</div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Estado de cobro</h2>
 
+        <div class="mt-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100/85">
+          <div class="font-semibold text-emerald-200">Criterio actual</div>
+          <p class="mt-2">
+            Aquí se edita el estado manual del cobro (<strong>UNPAID</strong>, <strong>AUTH</strong>, <strong>PAID</strong>, <strong>FAILED</strong>). Los estados <strong>REFUNDED</strong> y <strong>PARTIALLY_REFUNDED</strong> pasan a calcularse automáticamente cuando registras refunds reales abajo.
+          </p>
+        </div>
+
         <form method="post" action={`/api/admin/orders/${order.publicId}/update`} class="mt-6 grid gap-4">
           <input type="hidden" name="intent" value="update-payment" />
           <input type="hidden" name="redirectTo" value={returnTo} />
@@ -744,8 +817,7 @@ const returnTo = `/admin/pedidos/${order.publicId}`;
           </button>
         </form>
       </article>
-
-      <article class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <article class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
         <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Actividad</div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Timeline</h2>
 
@@ -769,75 +841,186 @@ const returnTo = `/admin/pedidos/${order.publicId}`;
         <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Cobro real</div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Payments y refunds</h2>
 
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Payments</div>
+            <div class="mt-2 text-xl font-semibold text-white">{decoratedPayments.length}</div>
+            <p class="mt-2 text-sm text-slate-400">Registros internos de cobro</p>
+          </div>
+
+          <div class="rounded-3xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-4">
+            <div class="text-xs font-semibold uppercase tracking-[0.16em] text-fuchsia-200">Refunded</div>
+            <div class="mt-2 text-xl font-semibold text-white">{money(totalSucceededRefundCents)}</div>
+            <p class="mt-2 text-sm text-fuchsia-100/80">Importe total devuelto con éxito</p>
+          </div>
+
+          <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Pendientes / fallidos</div>
+            <div class="mt-2 text-xl font-semibold text-white">{pendingRefundsCount} / {failedRefundsCount}</div>
+            <p class="mt-2 text-sm text-slate-400">Refunds creados o fallidos</p>
+          </div>
+        </div>
+
         <div class="mt-6 space-y-4">
           {decoratedPayments.length === 0 ? (
             <div class="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
-              No hay registros en Payment para este pedido.
+              {paymentMethod === "CARD"
+                ? "No hay registros en Payment para este pedido. Si es un pedido antiguo, guarda primero el payment status en PAID/AUTH para materializar el rastro interno y después ya podrás registrar refunds."
+                : "No hay registros en Payment para este pedido."}
             </div>
           ) : (
-            decoratedPayments.map((payment) => (
-              <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div class="text-sm font-semibold text-white">Payment #{payment.id}</div>
-                    <div class="mt-1 text-xs text-slate-500">
-                      {payment.provider} · {payment.providerIntentId ?? "sin intent"}
+            decoratedPayments.map((payment) => {
+              const succeededRefundCents = sumSucceededRefunds(payment.refunds);
+              const refundableCents = Math.max(0, Number(payment.amountCents ?? 0) - succeededRefundCents);
+              const pendingCount = payment.refunds.filter((refund) => refund.status === "CREATED").length;
+              const failedCount = payment.refunds.filter((refund) => refund.status === "FAILED").length;
+              const canRegisterSucceededRefund =
+                paymentMethod === "CARD" && payment.status === "PAID" && refundableCents > 0;
+
+              return (
+                <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div class="text-sm font-semibold text-white">Payment #{payment.id}</div>
+                      <div class="mt-1 text-xs text-slate-500">
+                        {payment.provider} · {payment.providerIntentId ?? "sin intent"}
+                      </div>
                     </div>
+
+                    <span
+                      class:list={[
+                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                        payment.status === "PAID"
+                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                          : payment.status === "AUTHORIZED"
+                            ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
+                            : payment.status === "FAILED"
+                              ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
+                              : "border-white/10 bg-white/5 text-slate-300",
+                      ]}
+                    >
+                      {payment.status}
+                    </span>
                   </div>
 
-                  <span
-                    class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      payment.status === "PAID"
-                        ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                        : payment.status === "AUTHORIZED"
-                          ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
-                          : payment.status === "FAILED"
-                            ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-                            : "border-white/10 bg-white/5 text-slate-300",
-                    ]}
-                  >
-                    {payment.status}
-                  </span>
-                </div>
+                  <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm text-slate-300">
+                    <div>Importe: <span class="font-semibold text-white">{money(payment.amountCents)}</span></div>
+                    <div>Refunded ok: <span class="font-semibold text-white">{money(succeededRefundCents)}</span></div>
+                    <div>Disponible: <span class="font-semibold text-white">{money(refundableCents)}</span></div>
+                    <div>Creado: <span class="font-semibold text-white">{formatDate(payment.createdAt)}</span></div>
+                  </div>
 
-                <div class="mt-3 space-y-2 text-sm text-slate-300">
-                  <div>Importe: <span class="font-semibold text-white">{money(payment.amountCents)}</span></div>
-                  <div>Creado: <span class="font-semibold text-white">{formatDate(payment.createdAt)}</span></div>
                   {payment.providerChargeId ? (
-                    <div>Charge: <span class="font-semibold text-white">{payment.providerChargeId}</span></div>
+                    <div class="mt-2 text-sm text-slate-300">
+                      Charge: <span class="font-semibold text-white">{payment.providerChargeId}</span>
+                    </div>
                   ) : null}
-                </div>
 
-                {payment.refunds.length ? (
-                  <div class="mt-4 space-y-2">
-                    {payment.refunds.map((refund) => (
-                      <div class="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-3">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                          <div class="text-sm font-semibold text-white">Refund #{refund.id}</div>
-                          <span
-                            class:list={[
-                              "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                              refund.status === "SUCCEEDED"
-                                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                                : refund.status === "FAILED"
-                                  ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-                                  : "border-white/10 bg-white/5 text-slate-300",
-                            ]}
-                          >
-                            {refund.status}
-                          </span>
+                  <div class="mt-4 rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Registrar refund
                         </div>
-
-                        <div class="mt-2 text-sm text-slate-300">
-                          {money(refund.amountCents)} · {formatDate(refund.createdAt)}
+                        <div class="mt-1 text-sm text-slate-300">
+                          {canRegisterSucceededRefund
+                            ? "Puedes registrar devoluciones sobre el importe pendiente de este payment."
+                            : paymentMethod !== "CARD"
+                              ? "Los refunds solo se habilitan en pedidos CARD."
+                              : payment.status !== "PAID"
+                                ? "Para registrar un refund SUCCEEDED, el payment debe estar en PAID."
+                                : "No queda importe disponible para devolver en este payment."}
                         </div>
                       </div>
-                    ))}
+
+                      <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+                        Pendientes: {pendingCount} · Fallidos: {failedCount}
+                      </div>
+                    </div>
+
+                    <form method="post" action={`/api/admin/orders/${order.publicId}/update`} class="mt-4 grid gap-4">
+                      <input type="hidden" name="intent" value="create-refund" />
+                      <input type="hidden" name="redirectTo" value={returnTo} />
+                      <input type="hidden" name="paymentId" value={payment.id} />
+
+                      <div class="grid gap-4 lg:grid-cols-[180px_180px_minmax(0,1fr)]">
+                        <label class="block">
+                          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Importe €</span>
+                          <input
+                            class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                            type="number"
+                            name="refundAmountEur"
+                            min="0.01"
+                            step="0.01"
+                            value={(refundableCents / 100).toFixed(2)}
+                            required
+                          />
+                        </label>
+
+                        <label class="block">
+                          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Estado refund</span>
+                          <select
+                            class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                            name="refundStatus"
+                          >
+                            <option value="SUCCEEDED">SUCCEEDED</option>
+                            <option value="CREATED">CREATED</option>
+                            <option value="FAILED">FAILED</option>
+                          </select>
+                        </label>
+
+                        <label class="block">
+                          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nota</span>
+                          <input
+                            class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
+                            type="text"
+                            name="note"
+                            placeholder="Motivo, incidencia o referencia externa"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="submit"
+                        class:list={[
+                          "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                          paymentMethod === "CARD" && refundableCents > 0
+                            ? "bg-fuchsia-400 text-slate-950 hover:bg-fuchsia-300"
+                            : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                        ]}
+                        disabled={paymentMethod !== "CARD" || refundableCents <= 0}
+                      >
+                        Registrar refund
+                      </button>
+                    </form>
                   </div>
-                ) : null}
-              </div>
-            ))
+
+                  {payment.refunds.length ? (
+                    <div class="mt-4 space-y-2">
+                      {payment.refunds.map((refund) => (
+                        <div class="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-3">
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="text-sm font-semibold text-white">Refund #{refund.id}</div>
+                            <span
+                              class:list={[
+                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                refundTone(refund.status),
+                              ]}
+                            >
+                              {refund.status}
+                            </span>
+                          </div>
+
+                          <div class="mt-2 text-sm text-slate-300">
+                            {money(refund.amountCents)} · {formatDate(refund.createdAt)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })
           )}
         </div>
       </article>

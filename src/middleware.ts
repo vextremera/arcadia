@@ -15,14 +15,6 @@ function isAuthPage(pathname: string) {
   return pathname === "/login" || pathname === "/registro" || pathname.startsWith("/cuenta");
 }
 
-function isAuthApi(pathname: string) {
-  return (
-    pathname.startsWith("/api/auth/") ||
-    pathname.startsWith("/api/account/") ||
-    pathname.startsWith("/api/favorites/")
-  );
-}
-
 export const onRequest = defineMiddleware(async (context, next) => {
   // Cargar user en locals (si existe)
   const user = await context.session?.get("user");
@@ -37,7 +29,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // APIs (mejor 404 para que parezca “no existe”)
   if (DISABLE_ORDERS && isOrdersApi(pathname)) return new Response("Not Found", { status: 404 });
-  if (DISABLE_AUTH && isAuthApi(pathname)) return new Response("Not Found", { status: 404 });
 
   // Admin: protege todo /admin excepto /admin/login
   if (pathname.startsWith("/admin") && pathname !== "/admin/login") {

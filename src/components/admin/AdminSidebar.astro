@@ -63,6 +63,26 @@ const navGroups: NavGroup[] = [
         description: "Listado real del menú",
       },
       {
+        href: "/admin/catalogo/ingredientes",
+        label: "Ingredientes",
+        description: "Extras y base global",
+      },
+      {
+        href: "/admin/catalogo/compatibilidades",
+        label: "Compatibilidades",
+        description: "Categoría ↔ ingrediente",
+      },
+      {
+        href: "/admin/catalogo/modificadores",
+        label: "Modificadores",
+        description: "Grupos y opciones",
+      },
+      {
+        href: "/admin/catalogo/alergenos",
+        label: "Alérgenos",
+        description: "Iconos y catálogo visual",
+      },
+      {
         href: "/admin/categorias",
         label: "Categorías",
         description: "Estructura base",
@@ -250,17 +270,15 @@ const displayRole = user?.role?.trim() || "STAFF";
       </div>
     </nav>
 
-    <div
-      data-admin-sidebar-footer
-      class="border-t border-white/10 p-4 transition-all duration-200"
-    >
-      <a
-        href="/"
-        class="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-        title="Volver a la web pública"
-      >
-        <span data-admin-sidebar-footer-text>Volver a la web pública</span>
-      </a>
+    <div class="border-t border-white/10 px-4 py-4">
+      <form method="post" action="/api/admin/logout">
+        <button
+          type="submit"
+          class="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        >
+          Cerrar sesión
+        </button>
+      </form>
     </div>
   </div>
 </aside>
