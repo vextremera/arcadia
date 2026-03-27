@@ -1,0 +1,375 @@
+{
+	"version": 3,
+	"routes": [
+		{
+			"handle": "filesystem"
+		},
+		{
+			"src": "^/_astro/(.*)$",
+			"headers": {
+				"cache-control": "public, max-age=31536000, immutable"
+			},
+			"continue": true
+		},
+		{
+			"src": "^/_server-islands/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/_image/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/ajustes/fees/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/ajustes/pagos/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/alergenos/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/compatibilidades/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/ingredientes/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/modificadores/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/productos/nuevo/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/productos/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/catalogo/productos/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/categorias/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/cocina/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/cupones/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/loyalty/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/menu/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/newsletter/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/operativa/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pedidos/ticket/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pedidos/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pedidos/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/upsell/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/usuarios/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/account/addresses/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/account/profile/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/allergens/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/categories/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/category-ingredients/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/coupons/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/ingredients/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/kitchen/orders/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/logout/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/loyalty-tiers/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/menu-v2/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/menus/([^/]+?)/items/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/menus/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/modifier-groups/([^/]+?)/options/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/modifier-groups/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/newsletter/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/operativa/hours/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/operativa/save/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/operativa/special-dates/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/orders/([^/]+?)/update/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/new/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/([^/]+?)/allergens/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/([^/]+?)/ingredients/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/([^/]+?)/modifier-groups/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/([^/]+?)/variants/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/products/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/settings/fees/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/settings/payments/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/upsell/add/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/upsell/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/upsell/update/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/admin/users/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/logout/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/auth/register/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/add/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/clear/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/remove/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/set-qty/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/summary/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/cart/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/catalog/categories/([^/]+?)/products/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/catalog/categories/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/catalog/menu/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/catalog/upsell/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/checkout/availability/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/checkout/coupon/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/checkout/submit/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/home/reviews/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/marketing/subscribe/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/products/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/settings/payments/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/carta/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/carta/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/checkout/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/cuenta/pedidos/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/cuenta/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/menu/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/pedido/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/pedir/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/proximamente/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/registro/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/$",
+			"dest": "_render"
+		}
+	]
+}

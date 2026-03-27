@@ -1,0 +1,17 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import LoginCard from "@/islands/auth/LoginCard";
+
+const next = Astro.url.searchParams.get("next") ?? "";
+const error = Astro.url.searchParams.get("error") ?? "";
+
+const siteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY ?? "";
+---
+
+<SiteLayout title="Login · Arcadia" variant="landing">
+  <div class="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+    <div class="grid place-items-center">
+      <LoginCard client:load next={next} error={error} siteKey={siteKey} />
+    </div>
+  </div>
+</SiteLayout>

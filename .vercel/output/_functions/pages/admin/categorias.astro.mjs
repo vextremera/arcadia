@@ -1,0 +1,128 @@
+import { e as createComponent, k as renderComponent, r as renderTemplate, h as createAstro, g as addAttribute, l as Fragment, m as maybeRenderHead } from '../../chunks/astro/server_CA5VZefa.mjs';
+import 'piccolore';
+import { $ as $$AdminLayout } from '../../chunks/AdminLayout_Ccjf6LBM.mjs';
+import { d as db, C as Category, c as Product, b as CategoryIngredient } from '../../chunks/_astro_db_BPgDZzX3.mjs';
+import { inArray } from '@astrojs/db/dist/runtime/virtual.js';
+export { renderers } from '../../renderers.mjs';
+
+const $$Astro = createAstro();
+const $$Categorias = createComponent(async ($$result, $$props, $$slots) => {
+  const Astro2 = $$result.createAstro($$Astro, $$props, $$slots);
+  Astro2.self = $$Categorias;
+  const url = new URL(Astro2.request.url);
+  const saved = url.searchParams.get("saved") === "1";
+  const error = url.searchParams.get("error") ?? "";
+  const categoryRows = await db.select({
+    id: Category.id,
+    name: Category.name,
+    slug: Category.slug,
+    sortOrder: Category.sortOrder,
+    active: Category.active
+  }).from(Category).orderBy(Category.sortOrder, Category.name);
+  const categoryIds = categoryRows.map((category) => category.id);
+  const productRows = categoryIds.length ? await db.select({
+    categoryId: Product.categoryId,
+    active: Product.active
+  }).from(Product).where(inArray(Product.categoryId, categoryIds)) : [];
+  const compatibilityRows = categoryIds.length ? await db.select({
+    categoryId: CategoryIngredient.categoryId
+  }).from(CategoryIngredient).where(inArray(CategoryIngredient.categoryId, categoryIds)) : [];
+  const productCountByCategory = /* @__PURE__ */ new Map();
+  const activeProductCountByCategory = /* @__PURE__ */ new Map();
+  const inactiveProductCountByCategory = /* @__PURE__ */ new Map();
+  for (const row of productRows) {
+    productCountByCategory.set(
+      row.categoryId,
+      (productCountByCategory.get(row.categoryId) ?? 0) + 1
+    );
+    if (row.active) {
+      activeProductCountByCategory.set(
+        row.categoryId,
+        (activeProductCountByCategory.get(row.categoryId) ?? 0) + 1
+      );
+    } else {
+      inactiveProductCountByCategory.set(
+        row.categoryId,
+        (inactiveProductCountByCategory.get(row.categoryId) ?? 0) + 1
+      );
+    }
+  }
+  const compatibilityCountByCategory = /* @__PURE__ */ new Map();
+  for (const row of compatibilityRows) {
+    compatibilityCountByCategory.set(
+      row.categoryId,
+      (compatibilityCountByCategory.get(row.categoryId) ?? 0) + 1
+    );
+  }
+  const categories = categoryRows.map((row) => ({
+    ...row,
+    productCount: productCountByCategory.get(row.id) ?? 0,
+    activeProductCount: activeProductCountByCategory.get(row.id) ?? 0,
+    inactiveProductCount: inactiveProductCountByCategory.get(row.id) ?? 0,
+    ingredientCompatibilityCount: compatibilityCountByCategory.get(row.id) ?? 0
+  }));
+  const totalCategories = categories.length;
+  const activeCategories = categories.filter((category) => category.active).length;
+  const categoriesWithProducts = categories.filter((category) => category.productCount > 0).length;
+  const emptyCategories = categories.filter((category) => category.productCount === 0).length;
+  const errorMessage = error === "missing-name" ? "El nombre es obligatorio." : error === "invalid-slug" ? "El slug no es v\xE1lido." : error === "duplicate-slug" ? "Ya existe otra categor\xEDa con ese slug." : error === "invalid-category" ? "La categor\xEDa indicada no es v\xE1lida." : error === "not-found" ? "La categor\xEDa ya no existe." : error === "in-use-products" ? "No se puede borrar porque sigue teniendo productos asignados." : error === "in-use-ingredients" ? "No se puede borrar porque sigue teniendo compatibilidades de ingredientes." : error === "invalid-intent" ? "Acci\xF3n no v\xE1lida." : "";
+  return renderTemplate`${renderComponent($$result, "AdminLayout", $$AdminLayout, { "title": "Categor\xEDas \xB7 Admin \xB7 Arcadia", "heading": "Categor\xEDas", "description": "CRUD m\xEDnimo y real sobre Category. Solo edita nombre, slug, orden y estado, sin campos que no aportan al negocio actual.", "actions": true }, { "actions": async ($$result2) => renderTemplate`${renderComponent($$result2, "Fragment", Fragment, { "slot": "actions" }, { "default": async ($$result3) => renderTemplate` ${maybeRenderHead()}<div class="flex flex-wrap gap-3"> <a href="/admin/catalogo/productos" class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400">
+Ver productos
+</a> <a href="/admin/menu" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white">
+Ver menús
+</a> </div> ` })}`, "default": async ($$result2) => renderTemplate`  ${saved ? renderTemplate`<section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+Categorías actualizadas correctamente.
+</section>` : null}${errorMessage ? renderTemplate`<section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200"> ${errorMessage} </section>` : null}<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4"> <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Total</div> <div class="mt-3 text-2xl font-semibold tracking-tight text-white">${totalCategories}</div> <p class="mt-2 text-sm text-slate-400">Categorías registradas</p> </article> <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">Activas</div> <div class="mt-3 text-2xl font-semibold tracking-tight text-white">${activeCategories}</div> <p class="mt-2 text-sm text-emerald-100/70">Disponibles en catálogo</p> </article> <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">Con productos</div> <div class="mt-3 text-2xl font-semibold tracking-tight text-white">${categoriesWithProducts}</div> <p class="mt-2 text-sm text-cyan-100/70">Tienen al menos un producto asignado</p> </article> <article class="rounded-[28px] border border-indigo-400/15 bg-indigo-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-200/80">Vacías</div> <div class="mt-3 text-2xl font-semibold tracking-tight text-white">${emptyCategories}</div> <p class="mt-2 text-sm text-indigo-100/70">Se pueden limpiar con menos riesgo</p> </article> </section> <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px]"> <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"> <div class="border-b border-white/10 px-6 py-5"> <div class="flex flex-wrap items-center justify-between gap-3"> <div> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+Catálogo base
+</div> <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+CRUD real de categorías
+</h2> </div> <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+Sin campo de imagen en la operativa
+</div> </div> </div> ${categories.length === 0 ? renderTemplate`<div class="px-6 py-12 text-center"> <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8"> <div class="text-lg font-semibold text-white">No hay categorías</div> <p class="mt-2 text-sm leading-6 text-slate-400">
+Crea la primera categoría para empezar a estructurar el catálogo.
+</p> </div> </div>` : renderTemplate`<div class="space-y-4 px-6 py-6"> ${categories.map((category) => {
+    const canDelete = category.productCount === 0 && category.ingredientCompatibilityCount === 0;
+    return renderTemplate`<section class="rounded-3xl border border-white/10 bg-white/4 p-5"> <div class="flex flex-wrap items-start justify-between gap-4"> <div> <div class="text-base font-semibold text-white">${category.name}</div> <div class="mt-1"> <code class="rounded-xl border border-white/10 bg-slate-950/60 px-2.5 py-1.5 text-xs text-slate-300"> ${category.slug} </code> </div> </div> <div class="flex flex-wrap gap-2"> <span${addAttribute([
+      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+      category.active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-rose-400/20 bg-rose-400/10 text-rose-300"
+    ], "class:list")}> ${category.active ? "Activa" : "Inactiva"} </span> <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300"> ${category.productCount} productos
+</span> <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300"> ${category.ingredientCompatibilityCount} compatibilidades
+</span> </div> </div> <form method="post" action="/api/admin/categories" class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_140px]"> <input type="hidden" name="intent" value="update"> <input type="hidden" name="categoryId"${addAttribute(category.id, "value")}> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="text" name="name"${addAttribute(category.name, "value")} required> </label> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Slug</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="text" name="slug"${addAttribute(category.slug, "value")}> </label> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="number" name="sortOrder" min="0" step="1"${addAttribute(category.sortOrder, "value")}> </label> <div class="flex flex-wrap items-center gap-6 lg:col-span-2"> <label class="inline-flex items-center gap-3 text-sm text-slate-300"> <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="active"${addAttribute(category.active, "checked")}>
+Activa
+</label> <div class="text-sm text-slate-500"> ${category.activeProductCount} productos activos · ${category.inactiveProductCount} inactivos
+</div> </div> <div class="flex items-end justify-end"> <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
+Guardar
+</button> </div> <div class="flex items-end justify-end lg:col-span-3"> <a${addAttribute(`/admin/catalogo/productos?category=${category.id}`, "href")} class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white">
+Ver productos
+</a> </div> </form> <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4"> <p class="text-sm text-slate-500"> ${canDelete ? "Se puede borrar porque no tiene productos ni compatibilidades de ingredientes." : "No se puede borrar mientras tenga productos asignados o compatibilidades de ingredientes."} </p> <form method="post" action="/api/admin/categories"> <input type="hidden" name="intent" value="delete"> <input type="hidden" name="categoryId"${addAttribute(category.id, "value")}> <button type="submit"${addAttribute(!canDelete, "disabled")}${addAttribute([
+      "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+      canDelete ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15" : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"
+    ], "class:list")}>
+Borrar categoría
+</button> </form> </div> </section>`;
+  })} </div>`} </article> <aside class="space-y-6"> <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Alta</div> <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Nueva categoría</h2> <form method="post" action="/api/admin/categories" class="mt-6 grid gap-4"> <input type="hidden" name="intent" value="create"> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Nombre</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="text" name="name" placeholder="Bocadillos" required> </label> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Slug</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="text" name="slug" placeholder="Se genera automáticamente si lo dejas vacío"> </label> <label class="grid gap-2 text-sm text-slate-300"> <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden</span> <input class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none" type="number" name="sortOrder" min="0" step="1"${addAttribute(categories.length, "value")}> </label> <label class="inline-flex items-center gap-3 text-sm text-slate-300"> <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400" type="checkbox" name="active" checked>
+Activa
+</label> <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
+Crear categoría
+</button> </form> </section> <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Criterio</div> <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Qué cubre este bloque</h2> <div class="mt-6 space-y-4"> <div class="rounded-3xl border border-white/10 bg-white/3 p-4"> <div class="text-sm font-semibold text-white">Solo negocio real</div> <p class="mt-2 text-sm leading-6 text-slate-400">
+Categorías sin imagen. La UI se centra en nombre, slug, orden y estado porque es lo que de verdad aporta operativa al catálogo.
+</p> </div> <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4"> <div class="text-sm font-semibold text-amber-200">Sin migración</div> <p class="mt-2 text-sm leading-6 text-amber-100/80">
+No se toca el schema ni se borran datos existentes. Simplemente se deja de exponer <code>imageUrl</code> en el admin.
+</p> </div> <div class="rounded-3xl border border-white/10 bg-white/3 p-4"> <div class="text-sm font-semibold text-white">Borrado protegido</div> <p class="mt-2 text-sm leading-6 text-slate-400">
+La categoría no se puede borrar si sigue teniendo productos o compatibilidades en <code>CategoryIngredient</code>.
+</p> </div> </div> </section> </aside> </section> ` })}`;
+}, "C:/Users/VICTOR/Dev/arcadia/src/pages/admin/categorias.astro", void 0);
+
+const $$file = "C:/Users/VICTOR/Dev/arcadia/src/pages/admin/categorias.astro";
+const $$url = "/admin/categorias";
+
+const _page = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: $$Categorias,
+  file: $$file,
+  url: $$url
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const page = () => _page;
+
+export { page };

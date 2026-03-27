@@ -10,6 +10,9 @@ type ProfileResponse = {
         pointsBalance: number;
         tierId: number | null;
     };
+    newsletter?: {
+        active: boolean;
+    };
     error?: string;
 };
 
@@ -66,14 +69,15 @@ export default function AccountPanel() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string>("");
 
-    // Perfil
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [birthday, setBirthday] = useState("");
+    const [newsletterActive, setNewsletterActive] = useState(false);
     const [savingProfile, setSavingProfile] = useState(false);
     const [profileMsg, setProfileMsg] = useState<string>("");
+    const [savingNewsletter, setSavingNewsletter] = useState(false);
+    const [newsletterMsg, setNewsletterMsg] = useState<string>("");
 
-    // Direcciones
     const [addresses, setAddresses] = useState<AddressDto[]>([]);
     const [editing, setEditing] = useState<AddressFormState | null>(null);
     const [savingAddress, setSavingAddress] = useState(false);
@@ -96,6 +100,7 @@ export default function AccountPanel() {
             setName(p.user?.name ?? "");
             setPhone(p.profile?.phone ?? "");
             setBirthday(p.profile?.birthday ?? "");
+            setNewsletterActive(!!p.newsletter?.active);
 
             const a = await api<AddressesResponse>("/api/account/addresses");
             if (!a.ok) throw new Error(a.error || "No se pudieron cargar las direcciones.");
@@ -130,6 +135,24 @@ export default function AccountPanel() {
             setProfileMsg(e instanceof Error ? e.message : "No se pudo guardar.");
         } finally {
             setSavingProfile(false);
+        }
+    }
+
+    async function saveNewsletter(nextActive: boolean) {
+        setSavingNewsletter(true);
+        setNewsletterMsg("");
+        try {
+            const res = await api<ProfileResponse>("/api/account/profile", {
+                method: "POST",
+                body: JSON.stringify({ newsletterActive: nextActive }),
+            });
+            if (!res.ok) throw new Error(res.error || "No se pudo actualizar el newsletter.");
+            setNewsletterActive(!!res.newsletter?.active);
+            setNewsletterMsg(nextActive ? "Te has suscrito correctamente." : "Te has dado de baja correctamente.");
+        } catch (e) {
+            setNewsletterMsg(e instanceof Error ? e.message : "No se pudo actualizar el newsletter.");
+        } finally {
+            setSavingNewsletter(false);
         }
     }
 
@@ -176,7 +199,6 @@ export default function AccountPanel() {
                 isDefault: !!editing.isDefault,
             };
 
-            // Backend requiere mínimos
             if (!payload.contactName || !payload.phone || !payload.line1 || !payload.city || !payload.postalCode) {
                 setAddrMsg("Rellena contacto, teléfono, dirección, ciudad y CP.");
                 setSavingAddress(false);
@@ -258,7 +280,6 @@ export default function AccountPanel() {
 
     return (
         <div class="mt-6 space-y-4 sm:space-y-6">
-            {/* Perfil */}
             <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
                 <div class="text-sm font-semibold">Mis datos</div>
                 <div class="mt-1 text-sm text-zinc-600">Estos datos se usarán para facilitar el checkout.</div>
@@ -299,8 +320,7 @@ export default function AccountPanel() {
                 <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <button
                         type="button"
-                        class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingProfile ? "opacity-60 pointer-events-none" : ""
-                            }`}
+                        class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingProfile ? "opacity-60 pointer-events-none" : ""}`}
                         onClick={saveProfile}
                     >
                         Guardar
@@ -310,7 +330,36 @@ export default function AccountPanel() {
                 </div>
             </section>
 
-            {/* Direcciones */}
+            <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+                <div class="text-sm font-semibold">Newsletter</div>
+                <div class="mt-1 text-sm text-zinc-600">
+                    Suscríbete o date de baja fácilmente desde tu cuenta.
+                </div>
+
+                <div class="mt-4 flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div class="text-sm font-semibold text-zinc-900">
+                            {newsletterActive ? "Estás suscrito" : "No estás suscrito"}
+                        </div>
+                        <div class="mt-1 text-sm text-zinc-600">
+                            {newsletterActive
+                                ? "Recibirás ofertas, cupones y novedades de Arcadia en tu correo."
+                                : "Activa la suscripción para recibir ofertas, cupones y novedades."}
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        class={`w-full rounded-xl px-4 py-2 text-sm font-semibold sm:w-auto ${newsletterActive ? "border border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100" : "bg-zinc-900 text-white"} ${savingNewsletter ? "opacity-60 pointer-events-none" : ""}`}
+                        onClick={() => saveNewsletter(!newsletterActive)}
+                    >
+                        {newsletterActive ? "Darme de baja" : "Suscribirme"}
+                    </button>
+                </div>
+
+                {newsletterMsg ? <div class="mt-3 text-sm text-zinc-600">{newsletterMsg}</div> : null}
+            </section>
+
             <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
                 <div class="flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-start sm:gap-4">
                     <div>
@@ -489,8 +538,7 @@ export default function AccountPanel() {
                         <div class="mt-4 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                             <button
                                 type="button"
-                                class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingAddress ? "opacity-60 pointer-events-none" : ""
-                                    }`}
+                                class={`w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white sm:w-auto ${savingAddress ? "opacity-60 pointer-events-none" : ""}`}
                                 onClick={saveAddress}
                             >
                                 Guardar

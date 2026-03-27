@@ -1,0 +1,313 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, Product, UpsellItem, eq } from "astro:db";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+const upsellRows = await db
+  .select({
+    id: UpsellItem.id,
+    active: UpsellItem.active,
+    sortOrder: UpsellItem.sortOrder,
+    createdAt: UpsellItem.createdAt,
+    productId: Product.id,
+    name: Product.name,
+    priceCents: Product.priceCents,
+    image: Product.imageUrl ?? null,
+    productActive: Product.active,
+  })
+  .from(UpsellItem)
+  .innerJoin(Product, eq(UpsellItem.productId, Product.id))
+  .orderBy(UpsellItem.sortOrder);
+
+const products = await db
+  .select({
+    id: Product.id,
+    name: Product.name,
+    active: Product.active,
+    priceCents: Product.priceCents,
+  })
+  .from(Product)
+  .orderBy(Product.name);
+
+const activeCount = upsellRows.filter((item) => item.active).length;
+const inactiveCount = upsellRows.length - activeCount;
+const maxSort = upsellRows.length
+  ? Math.max(...upsellRows.map((item) => Number(item.sortOrder ?? 0)))
+  : 0;
+---
+
+<AdminLayout
+  title="Upsell · Admin · Arcadia"
+  heading="Upsell"
+  description="Gestión de productos sugeridos para venta adicional. Este módulo está conectado al flujo público y funciona enlazando productos reales del catálogo."
+>
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Total items
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {upsellRows.length}
+      </div>
+      <p class="mt-2 text-sm text-slate-400">Elementos enlazados a productos reales</p>
+    </article>
+
+    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
+        Activos
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {activeCount}
+      </div>
+      <p class="mt-2 text-sm text-emerald-100/70">Visibles para el flujo público</p>
+    </article>
+
+    <article class="rounded-[28px] border border-rose-400/15 bg-rose-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-200/80">
+        Inactivos
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {inactiveCount}
+      </div>
+      <p class="mt-2 text-sm text-rose-100/70">Guardados pero desactivados</p>
+    </article>
+
+    <article class="rounded-[28px] border border-sky-400/15 bg-sky-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
+        Próximo orden
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {maxSort + 1}
+      </div>
+      <p class="mt-2 text-sm text-sky-100/70">Siguiente sortOrder sugerido</p>
+    </article>
+  </section>
+
+  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_420px]">
+    <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+            Crear
+          </div>
+          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+            Añadir producto a upsell
+          </h2>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+            El modelo actual no crea items autónomos. Aquí solo enlazas productos ya existentes del catálogo al módulo de upsell.
+          </p>
+        </div>
+      </div>
+
+      <form method="post" action="/api/admin/upsell/add" class="mt-6 grid gap-4">
+        <label class="block">
+          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Producto
+          </span>
+
+          <select
+            class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+            name="productId"
+            required
+          >
+            {products
+              .filter((p) => p.active)
+              .map((p) => (
+                <option value={p.id}>
+                  {p.name} · {money(p.priceCents)} · #{p.id}
+                </option>
+              ))}
+          </select>
+        </label>
+
+        <div class="flex flex-wrap gap-3">
+          <button
+            class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+            type="submit"
+          >
+            Añadir a upsell
+          </button>
+
+          <a
+            href="/admin"
+            class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+          >
+            Volver al dashboard
+          </a>
+        </div>
+      </form>
+    </article>
+
+    <aside class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Importante
+      </div>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        Cómo funciona de verdad
+      </h2>
+
+      <div class="mt-6 space-y-4">
+        <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <div class="text-sm font-semibold text-white">Fuente de datos</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Nombre, precio e imagen salen de <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">Product</span>, no de <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">UpsellItem</span>.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <div class="text-sm font-semibold text-white">Qué sí se edita aquí</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Solo el <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">sortOrder</span> y el estado <span class="rounded bg-white/10 px-2 py-0.5 text-xs text-white">active</span>.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
+          <div class="text-sm font-semibold text-amber-200">Siguiente mejora</div>
+          <p class="mt-2 text-sm leading-6 text-amber-100/80">
+            Cuando entremos al módulo de productos, ahí sí tendrá sentido editar nombre, precio e imagen desde su ficha real.
+          </p>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="mt-6 rounded-[30px] border border-white/10 bg-white/4 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
+    <div class="border-b border-white/10 px-6 py-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            Listado
+          </div>
+          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+            Productos en upsell
+          </h2>
+        </div>
+
+        <div class="text-sm text-slate-400">
+          Edición rápida sobre el modelo actual
+        </div>
+      </div>
+    </div>
+
+    {upsellRows.length === 0 ? (
+      <div class="px-6 py-12 text-center">
+        <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+          <div class="text-lg font-semibold text-white">No hay upsell configurado</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Añade un producto desde el formulario superior.
+          </p>
+        </div>
+      </div>
+    ) : (
+      <div class="grid gap-4 p-6 xl:grid-cols-2">
+        {upsellRows.map((item) => (
+          <article class="rounded-[28px] border border-white/10 bg-slate-950/50 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.2)]">
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="truncate text-lg font-semibold text-white">{item.name}</h3>
+
+                  <span class:list={[
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                    item.active
+                      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                      : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                  ]}>
+                    {item.active ? "Activo" : "Inactivo"}
+                  </span>
+
+                  <span class:list={[
+                    "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                    item.productActive
+                      ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
+                      : "border-amber-400/20 bg-amber-400/10 text-amber-300",
+                  ]}>
+                    {item.productActive ? "Producto activo" : "Producto inactivo"}
+                  </span>
+                </div>
+
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-400">
+                  <span>
+                    Precio: <span class="font-semibold text-white">{money(item.priceCents)}</span>
+                  </span>
+                  <span>
+                    Orden: <span class="font-semibold text-white">{item.sortOrder}</span>
+                  </span>
+                  <span>
+                    Producto: <span class="font-semibold text-white">#{item.productId}</span>
+                  </span>
+                </div>
+
+                {item.image ? (
+                  <div class="mt-2 truncate text-xs text-slate-500">
+                    {item.image}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div class="mt-5 grid gap-3">
+              <form method="post" action="/api/admin/upsell/update" class="grid gap-3">
+                <input type="hidden" name="id" value={item.id} />
+
+                <label class="block">
+                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Orden
+                  </span>
+                  <input
+                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                    type="number"
+                    name="sortOrder"
+                    min="0"
+                    step="1"
+                    value={item.sortOrder}
+                    required
+                  />
+                </label>
+
+                <label class="block rounded-[20px] border border-white/10 bg-white/3 p-4">
+                  <div class="flex items-start gap-3">
+                    <input
+                      class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                      type="checkbox"
+                      name="active"
+                      checked={item.active}
+                    />
+                    <div>
+                      <div class="text-sm font-semibold text-white">Activo</div>
+                      <p class="mt-1 text-sm leading-6 text-slate-400">
+                        Mantener este producto dentro del flujo de upsell.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                    type="submit"
+                  >
+                    Guardar cambios
+                  </button>
+                </div>
+              </form>
+
+              <form method="post" action="/api/admin/upsell/delete">
+                <input type="hidden" name="id" value={item.id} />
+                <button
+                  class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                  type="submit"
+                >
+                  Quitar de upsell
+                </button>
+              </form>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>
+</AdminLayout>

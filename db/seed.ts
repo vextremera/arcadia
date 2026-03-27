@@ -13,7 +13,6 @@ import {
   ModifierGroup,
   ModifierOption,
   ProductModifierGroup,
-  Favorite,
   Order,
   OrderItem,
   Payment,
@@ -25,6 +24,10 @@ import {
   Allergen,
   ProductAllergen,
   UpsellItem,
+  CategoryIngredient,
+  LoyaltyLedger,
+  MenuDish,
+  MenuDishAssignment,
   eq,
 } from "astro:db";
 
@@ -279,34 +282,37 @@ const ALLERGENS = [
  */
 export default async function seed() {
   // -----------------------
-  // Limpieza mínima idempotente (orden FK)
+  // Limpieza mínima idempotente (orden FK real)
   // -----------------------
-  await db.delete(Menu);
+  await db.delete(MenuDishAssignment);
+  await db.delete(MenuDish);
+
   await db.delete(MenuItem);
+  await db.delete(Menu);
+
   await db.delete(Refund);
   await db.delete(Payment);
+
   await db.delete(OrderItem);
+  await db.delete(LoyaltyLedger);
   await db.delete(Order);
-  await db.delete(Favorite);
 
+  await db.delete(UpsellItem);
   await db.delete(ProductAllergen);
-
   await db.delete(ProductModifierGroup);
-  await db.delete(ModifierOption);
-  await db.delete(ModifierGroup);
+  await db.delete(ProductIngredient);
+  await db.delete(CategoryIngredient);
   await db.delete(ProductVariant);
 
-  await db.delete(ProductIngredient);
-  await db.delete(Ingredient);
+  await db.delete(ModifierOption);
+  await db.delete(ModifierGroup);
 
   await db.delete(Product);
 
   await db.delete(Allergen);
+  await db.delete(Ingredient);
 
   await db.delete(Category);
-
-  // Upsell (opcional)
-  await db.delete(UpsellItem);
 
   // -----------------------
   // Admin default (solo si no existe)

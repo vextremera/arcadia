@@ -1,43 +1,78 @@
-# Astro Starter Kit: Minimal
+# ARCADIA
 
-```sh
-npm create astro@latest -- --template minimal
-```
+Proyecto web real de Arcadia, bar-restaurante en Lloret de Mar.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Stack actual:
+- Astro SSR (`output: "server"`)
+- TypeScript
+- Preact para islas
+- Tailwind CSS
+- Astro DB / libSQL
+- sesiones con Astro Session
+- deploy orientado a Vercel
 
-## 🚀 Project Structure
+## Qué incluye
 
-Inside of your Astro project, you'll see the following folders and files:
+### Público
+- Home
+- Carta
+- Menú
+- Pedir
+- Checkout
+- Estado público de pedido
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+### Cuenta
+- Login / registro
+- Perfil
+- Direcciones
+- Pedidos
+- Newsletter desde cuenta
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+### Admin
+- Dashboard
+- Pedidos
+- Cocina
+- Operativa
+- Productos
+- Ingredientes
+- Modificadores
+- Alérgenos
+- Compatibilidades
+- Categorías
+- Menú
+- Cupones
+- Usuarios
+- Loyalty
+- Newsletter
+- Ajustes de pagos y fees
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+## Requisitos
 
-Any static assets, like images, can be placed in the `public/` directory.
+- Node.js 20+
+- npm
+- Astro DB configurada
+- Upstash Redis para producción
+- SMTP si quieres usar el newsletter manual
+- Vercel Blob si quieres subida de imágenes de producto
 
-## 🧞 Commands
+## Variables de entorno
 
-All commands are run from the root of the project, from a terminal:
+Revisa `.env.example`.
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+Las más importantes para arrancar:
+- `ASTRO_DB_REMOTE_URL`
+- `ASTRO_DB_APP_TOKEN`
 
-## 👀 Want to learn more?
+Para producción:
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+Para newsletter manual:
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_FROM`
+
+## Instalación
+
+```bash
+npm install

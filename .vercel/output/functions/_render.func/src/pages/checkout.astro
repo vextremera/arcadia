@@ -1,0 +1,152 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import CheckoutForm from "@/islands/checkout/CheckoutForm";
+import { getArcadiaAvailability } from "@/server/time/madrid";
+
+const availability = await getArcadiaAvailability(new Date());
+
+type PublicChannelCard = {
+  label: string;
+  source: string;
+  note: string | null;
+  start: string;
+  end: string;
+  state: string;
+  tone: string;
+};
+
+function formatDateISO(dateISO: string) {
+  const match = String(dateISO).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return dateISO;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function sourceLabel(source: string) {
+  if (source === "SPECIAL_DATE") return "Excepción activa";
+  if (source === "SPECIAL_DATE_CLOSED") return "Excepción de cierre";
+  if (source === "OPENING_HOUR") return "Horario semanal";
+  if (source === "OPENING_HOUR_CLOSED") return "Descanso semanal";
+  return "Horario base";
+}
+
+const specialCards: PublicChannelCard[] = [
+  {
+    label: "Local",
+    source: availability.sources.open,
+    note: availability.sourceNotes.open,
+    start: availability.windows.open.start,
+    end: availability.windows.open.end,
+    state: availability.isOpen ? "Abierto" : "Cerrado",
+    tone: availability.isOpen
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : "border-rose-200 bg-rose-50 text-rose-900",
+  },
+  {
+    label: "Pickup",
+    source: availability.sources.pickup,
+    note: availability.sourceNotes.pickup,
+    start: availability.windows.pickup.start,
+    end: availability.windows.pickup.end,
+    state: availability.pickupAvailable ? "Disponible" : "No disponible",
+    tone: availability.pickupAvailable
+      ? "border-indigo-200 bg-indigo-50 text-indigo-900"
+      : "border-amber-200 bg-amber-50 text-amber-900",
+  },
+  {
+    label: "Delivery",
+    source: availability.sources.delivery,
+    note: availability.sourceNotes.delivery,
+    start: availability.windows.delivery.start,
+    end: availability.windows.delivery.end,
+    state: availability.forcePickup
+      ? "Forzado a pickup"
+      : availability.deliveryAvailable
+        ? "Disponible"
+        : "No disponible",
+    tone: availability.forcePickup
+      ? "border-amber-200 bg-amber-50 text-amber-900"
+      : availability.deliveryAvailable
+        ? "border-cyan-200 bg-cyan-50 text-cyan-900"
+        : "border-amber-200 bg-amber-50 text-amber-900",
+  },
+].filter(
+  (card) => card.source === "SPECIAL_DATE" || card.source === "SPECIAL_DATE_CLOSED"
+);
+
+const hasSpecialResolution = specialCards.length > 0;
+---
+
+<SiteLayout title="Checkout · Arcadia">
+  <div class="mx-auto w-full max-w-448">
+    <h1 class="text-2xl font-semibold tracking-tight 2xl:text-[2rem]">
+      Finalizar pedido
+    </h1>
+
+    {availability.pauseOrders ? (
+      <section class="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-900">
+        <div class="font-semibold">Pedidos pausados temporalmente</div>
+        <p class="mt-1 leading-6">
+          Ahora mismo no estamos aceptando pedidos. Puedes revisar de nuevo más tarde.
+        </p>
+      </section>
+    ) : null}
+
+    {hasSpecialResolution ? (
+      <section class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+              Disponibilidad especial hoy
+            </div>
+            <h2 class="mt-1 text-lg font-semibold text-amber-950">
+              {formatDateISO(availability.todayDateISO)} se está resolviendo con una excepción
+            </h2>
+          </div>
+
+          <div class="rounded-full border border-amber-200 bg-white/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">
+            SpecialDate
+          </div>
+        </div>
+
+        <p class="mt-3 text-sm leading-6 text-amber-900">
+          Hoy la disponibilidad no sale solo del horario base. Alguno de los canales está gobernado por una excepción puntual y por eso puedes ver franjas distintas o cierres temporales.
+        </p>
+
+        <div class="mt-4 grid gap-3 lg:grid-cols-3">
+          {specialCards.map((card) => (
+            <article class:list={["rounded-2xl border p-4", card.tone]}>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-sm font-semibold">{card.label}</div>
+                <div class="text-xs font-semibold uppercase tracking-[0.14em]">
+                  {card.state}
+                </div>
+              </div>
+
+              <div class="mt-2 text-sm">
+                {card.start} - {card.end}
+              </div>
+
+              <div class="mt-2 text-xs font-semibold uppercase tracking-[0.14em] opacity-80">
+                {sourceLabel(card.source)}
+              </div>
+
+              {card.note ? (
+                <p class="mt-2 text-sm leading-6 opacity-90">
+                  {card.note}
+                </p>
+              ) : null}
+            </article>
+          ))}
+        </div>
+
+        {availability.forcePickup ? (
+          <div class="mt-4 rounded-xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-amber-900">
+            El reparto está forzado a recogida desde operativa, así que aunque exista franja especial de delivery el checkout te llevará por pickup.
+          </div>
+        ) : null}
+      </section>
+    ) : null}
+
+    <CheckoutForm client:load />
+  </div>
+</SiteLayout>

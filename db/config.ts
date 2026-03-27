@@ -36,15 +36,16 @@ const UserProfile = defineTable({
   indexes: [{ on: "userId", unique: true }]
 });
 
-const UserPreference = defineTable({
+const NewsletterSubscriber = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
-    userId: column.number({ references: () => User.columns.id }),
-    key: column.text(),
-    value: column.json(),
+    email: column.text({ unique: true }),
+    userId: column.number({ optional: true, references: () => User.columns.id }),
+    active: column.boolean({ default: true }),
+    createdAt: column.date({ default: NOW }),
     updatedAt: column.date({ default: NOW })
   },
-  indexes: [{ on: ["userId", "key"], unique: true }]
+  indexes: [{ on: "active" }, { on: "userId" }]
 });
 
 const Address = defineTable({
@@ -96,9 +97,7 @@ const Product = defineTable({
     taxRateId: column.number({ optional: true, references: () => TaxRate.columns.id }),
     name: column.text(),
     slug: column.text({ unique: true }),
-    // Texto corto (card/listado)
     description: column.text({ optional: true }),
-    // Texto largo (modal/SEO). ✅ NUEVO
     details: column.text({ optional: true }),
     imageUrl: column.text({ optional: true }),
     priceCents: column.number(),
@@ -151,13 +150,12 @@ const ProductIngredient = defineTable({
   indexes: [{ on: ["productId", "ingredientId"], unique: true }, { on: "productId" }]
 });
 
-// ✅ NUEVO: alérgenos (catálogo fijo de 14)
 const Allergen = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
-    slug: column.text({ unique: true }), // p.ej. "gluten"
-    name: column.text(), // p.ej. "Gluten"
-    iconUrl: column.text({ optional: true }), // p.ej. "/images/allergens/gluten.webp"
+    slug: column.text({ unique: true }),
+    name: column.text(),
+    iconUrl: column.text({ optional: true }),
     sortOrder: column.number({ default: 0 }),
     active: column.boolean({ default: true }),
     createdAt: column.date({ default: NOW }),
@@ -166,7 +164,6 @@ const Allergen = defineTable({
   indexes: [{ on: "active" }, { on: "sortOrder" }]
 });
 
-// ✅ NUEVO: relación N–N producto ↔ alérgeno
 const ProductAllergen = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -181,7 +178,6 @@ const ProductAllergen = defineTable({
   ]
 });
 
-// Opcional: qué ingredientes son “compatibles” por categoría (para filtrar “todos”)
 const CategoryIngredient = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -224,16 +220,6 @@ const ProductModifierGroup = defineTable({
     sortOrder: column.number({ default: 0 })
   },
   indexes: [{ on: ["productId", "groupId"], unique: true }]
-});
-
-const Favorite = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true }),
-    userId: column.number({ references: () => User.columns.id }),
-    productId: column.number({ references: () => Product.columns.id }),
-    createdAt: column.date({ default: NOW })
-  },
-  indexes: [{ on: ["userId", "productId"], unique: true }, { on: "userId" }]
 });
 
 const OpeningHour = defineTable({
@@ -409,43 +395,6 @@ const Refund = defineTable({
   indexes: [{ on: "paymentId" }]
 });
 
-const DiningTable = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true }),
-    name: column.text(),
-    area: column.text({ optional: true }),
-    capacity: column.number(),
-    active: column.boolean({ default: true })
-  },
-  indexes: [{ on: "active" }]
-});
-
-const Reservation = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true }),
-    userId: column.number({ optional: true, references: () => User.columns.id }),
-    name: column.text(),
-    phone: column.text(),
-    email: column.text({ optional: true }),
-    dateTime: column.date(),
-    partySize: column.number(),
-    status: column.text({ enum: ["REQUESTED", "CONFIRMED", "CANCELLED", "NO_SHOW"], default: "REQUESTED" }),
-    notes: column.text({ optional: true }),
-    source: column.text({ enum: ["WEB", "PHONE", "WALK_IN"], default: "WEB" }),
-    createdAt: column.date({ default: NOW })
-  },
-  indexes: [{ on: "dateTime" }, { on: "status" }]
-});
-
-const ReservationTable = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true }),
-    reservationId: column.number({ references: () => Reservation.columns.id }),
-    tableId: column.number({ references: () => DiningTable.columns.id })
-  },
-  indexes: [{ on: ["reservationId", "tableId"], unique: true }]
-});
-
 const Menu = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -500,17 +449,6 @@ const MenuDishAssignment = defineTable({
   ]
 });
 
-const ContentBlock = defineTable({
-  columns: {
-    id: column.number({ primaryKey: true }),
-    key: column.text({ unique: true }),
-    value: column.json(),
-    published: column.boolean({ default: true }),
-    updatedAt: column.date({ default: NOW })
-  },
-  indexes: [{ on: "published" }]
-});
-
 const AppSetting = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -562,7 +500,7 @@ export default defineDb({
   tables: {
     User,
     UserProfile,
-    UserPreference,
+    NewsletterSubscriber,
     Address,
 
     TaxRate,
@@ -581,8 +519,6 @@ export default defineDb({
     ModifierOption,
     ProductModifierGroup,
 
-    Favorite,
-
     OpeningHour,
     SpecialDate,
 
@@ -599,16 +535,11 @@ export default defineDb({
     Payment,
     Refund,
 
-    DiningTable,
-    Reservation,
-    ReservationTable,
-
     Menu,
     MenuItem,
     MenuDish,
     MenuDishAssignment,
 
-    ContentBlock,
     AppSetting,
     MediaAsset,
 
