@@ -1,4 +1,4 @@
-import { g as getArcadiaAvailability } from '../../../chunks/madrid_DhfhAJ1B.mjs';
+import { g as getArcadiaAvailability } from '../../../chunks/madrid_Co69_PDc.mjs';
 export { renderers } from '../../../renderers.mjs';
 
 function json(data, status = 200) {

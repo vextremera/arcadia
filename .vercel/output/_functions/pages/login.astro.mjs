@@ -1,6 +1,6 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate, h as createAstro, m as maybeRenderHead } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
+import { $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import { jsxs, jsx } from 'preact/jsx-runtime';
 export { renderers } from '../renderers.mjs';

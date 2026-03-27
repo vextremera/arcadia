@@ -1,4 +1,4 @@
-import { d as db, c as Product, I as Ingredient, b as CategoryIngredient, e as ProductIngredient } from '../../../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, c as Product, I as Ingredient, b as CategoryIngredient, e as ProductIngredient } from '../../../../../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq, and } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../../../renderers.mjs';
 

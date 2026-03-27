@@ -1,6 +1,6 @@
 # ARCADIA
 
-Proyecto web real de Arcadia, bar-restaurante en Lloret de Mar.
+Aplicación web real de Arcadia, bar-restaurante en Lloret de Mar.
 
 Stack actual:
 - Astro SSR (`output: "server"`)
@@ -19,14 +19,14 @@ Stack actual:
 - Menú
 - Pedir
 - Checkout
-- Estado público de pedido
+- Estado público del pedido
 
 ### Cuenta
 - Login / registro
 - Perfil
 - Direcciones
 - Pedidos
-- Newsletter desde cuenta
+- Suscripción al newsletter desde cuenta
 
 ### Admin
 - Dashboard

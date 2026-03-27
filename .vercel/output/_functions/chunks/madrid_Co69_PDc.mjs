@@ -1,4 +1,4 @@
-import { d as db, o as OpeningHour, S as SpecialDate, A as AppSetting } from './_astro_db_BPgDZzX3.mjs';
+import { d as db, o as OpeningHour, S as SpecialDate, A as AppSetting } from './_astro_db_ChTDrd2j.mjs';
 import { inArray, eq } from '@astrojs/db/dist/runtime/virtual.js';
 
 function getMadridDateInfo(now = /* @__PURE__ */ new Date()) {

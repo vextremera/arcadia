@@ -1,5 +1,5 @@
-import { d as db, C as Category, c as Product } from '../../../../chunks/_astro_db_BPgDZzX3.mjs';
-import { g as getImageFileFromFormDataEntry, u as uploadProductImage, P as ProductImageUploadError, p as productImageErrorToQuery } from '../../../../chunks/product-images_CvAWomT7.mjs';
+import { d as db, C as Category, c as Product } from '../../../../chunks/_astro_db_ChTDrd2j.mjs';
+import { g as getImageFileFromFormDataEntry, u as uploadProductImage, P as ProductImageUploadError, p as productImageErrorToQuery } from '../../../../chunks/product-images_C9BJgBzt.mjs';
 import { eq } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../../renderers.mjs';
 

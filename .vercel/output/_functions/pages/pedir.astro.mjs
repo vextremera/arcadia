@@ -1,6 +1,6 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { a as api, b as addToCart, $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
+import { a as api, b as addToCart, $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
 import { useState, useRef, useEffect, useMemo } from 'preact/hooks';
 import { jsxs, jsx, Fragment } from 'preact/jsx-runtime';
 export { renderers } from '../renderers.mjs';

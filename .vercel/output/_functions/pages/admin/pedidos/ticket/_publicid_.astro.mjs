@@ -1,6 +1,6 @@
 import { e as createComponent, o as renderHead, g as addAttribute, r as renderTemplate, k as renderComponent, l as Fragment, h as createAstro } from '../../../../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { d as db, O as Order, p as OrderItem } from '../../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, O as Order, p as OrderItem } from '../../../../chunks/_astro_db_ChTDrd2j.mjs';
 /* empty css                                               */
 import { eq } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../../renderers.mjs';

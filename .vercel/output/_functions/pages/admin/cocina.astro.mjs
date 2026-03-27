@@ -1,6 +1,6 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate, l as Fragment, m as maybeRenderHead } from '../../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { $ as $$AdminLayout } from '../../chunks/AdminLayout_Ccjf6LBM.mjs';
+import { $ as $$AdminLayout } from '../../chunks/AdminLayout_CaEDeM2K.mjs';
 import { useState, useRef, useEffect, useMemo } from 'preact/hooks';
 import { jsxs, jsx } from 'preact/jsx-runtime';
 export { renderers } from '../../renderers.mjs';

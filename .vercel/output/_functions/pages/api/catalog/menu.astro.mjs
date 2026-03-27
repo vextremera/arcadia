@@ -1,4 +1,4 @@
-import { d as db, C as Category, c as Product, e as ProductIngredient, I as Ingredient, a as Allergen, P as ProductAllergen, h as ProductVariant, g as ProductModifierGroup } from '../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, C as Category, c as Product, e as ProductIngredient, I as Ingredient, a as Allergen, P as ProductAllergen, h as ProductVariant, g as ProductModifierGroup } from '../../../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq, asc, and, inArray } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../renderers.mjs';
 

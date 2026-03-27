@@ -1,4 +1,4 @@
-import { d as db, a as Allergen, P as ProductAllergen } from '../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, a as Allergen, P as ProductAllergen } from '../../../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../renderers.mjs';
 

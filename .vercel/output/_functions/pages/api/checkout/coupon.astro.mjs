@@ -1,4 +1,4 @@
-import { v as validateCheckoutCoupon } from '../../../chunks/coupons_CuAZ12RY.mjs';
+import { v as validateCheckoutCoupon } from '../../../chunks/coupons_DiQMMw4o.mjs';
 export { renderers } from '../../../renderers.mjs';
 
 function json(data, status = 200) {

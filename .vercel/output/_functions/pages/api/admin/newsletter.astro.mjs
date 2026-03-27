@@ -1,5 +1,5 @@
 import 'nodemailer';
-import { d as db, N as NewsletterSubscriber } from '../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, N as NewsletterSubscriber } from '../../../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../renderers.mjs';
 

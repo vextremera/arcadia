@@ -1,4 +1,4 @@
-import { g as getCartSummaryFromSession } from '../../../chunks/cartSummary_tr67fzdw.mjs';
+import { g as getCartSummaryFromSession } from '../../../chunks/cartSummary_C3xzckdC.mjs';
 export { renderers } from '../../../renderers.mjs';
 
 const GET = async (context) => {

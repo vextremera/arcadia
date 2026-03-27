@@ -1,11 +1,11 @@
 import { e as createComponent, m as maybeRenderHead, g as addAttribute, r as renderTemplate, u as unescapeHTML, k as renderComponent, l as Fragment } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { c as createSvgComponent, $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
+import { c as createSvgComponent, $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
 import 'clsx';
 /* empty css                                 */
-import { d as db, o as OpeningHour, A as AppSetting } from '../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, o as OpeningHour, A as AppSetting } from '../chunks/_astro_db_ChTDrd2j.mjs';
 import { inArray, eq } from '@astrojs/db/dist/runtime/virtual.js';
-import { g as getArcadiaAvailability } from '../chunks/madrid_DhfhAJ1B.mjs';
+import { g as getArcadiaAvailability } from '../chunks/madrid_Co69_PDc.mjs';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import { jsx, jsxs } from 'preact/jsx-runtime';
 export { renderers } from '../renderers.mjs';

@@ -1,9 +1,9 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate, m as maybeRenderHead, g as addAttribute } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
+import { $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { jsxs, jsx } from 'preact/jsx-runtime';
-import { d as db, k as MenuDish, l as MenuDishAssignment, m as Menu, n as MenuItem, c as Product, A as AppSetting } from '../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, k as MenuDish, l as MenuDishAssignment, m as Menu, n as MenuItem, c as Product, A as AppSetting } from '../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq, inArray } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../renderers.mjs';
 

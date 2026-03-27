@@ -1,7 +1,7 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate, m as maybeRenderHead, g as addAttribute } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
-import { d as db, C as Category, c as Product, a as Allergen, P as ProductAllergen } from '../chunks/_astro_db_BPgDZzX3.mjs';
+import { $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
+import { d as db, C as Category, c as Product, a as Allergen, P as ProductAllergen } from '../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq, and, inArray, asc } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../renderers.mjs';
 

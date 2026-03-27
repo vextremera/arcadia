@@ -1,9 +1,9 @@
 import { e as createComponent, k as renderComponent, r as renderTemplate, m as maybeRenderHead, g as addAttribute } from '../chunks/astro/server_CA5VZefa.mjs';
 import 'piccolore';
-import { a as api, $ as $$SiteLayout } from '../chunks/SiteLayout_C6Gj-7Py.mjs';
+import { a as api, $ as $$SiteLayout } from '../chunks/SiteLayout_Qpsqvz8u.mjs';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import { jsx, jsxs } from 'preact/jsx-runtime';
-import { g as getArcadiaAvailability } from '../chunks/madrid_DhfhAJ1B.mjs';
+import { g as getArcadiaAvailability } from '../chunks/madrid_Co69_PDc.mjs';
 export { renderers } from '../renderers.mjs';
 
 function money(cents) {

@@ -1,4 +1,4 @@
-import { d as db, k as MenuDish, l as MenuDishAssignment, m as Menu, n as MenuItem, c as Product, A as AppSetting } from '../../../chunks/_astro_db_BPgDZzX3.mjs';
+import { d as db, k as MenuDish, l as MenuDishAssignment, m as Menu, n as MenuItem, c as Product, A as AppSetting } from '../../../chunks/_astro_db_ChTDrd2j.mjs';
 import { eq, inArray } from '@astrojs/db/dist/runtime/virtual.js';
 export { renderers } from '../../../renderers.mjs';
 
