@@ -24,35 +24,8 @@ type Cached = {
   }>;
 };
 
-function placeholder() {
-  return json({
-    reviews: [
-      {
-        name: "Pepito Fuentes",
-        rating: 5,
-        source: "Google",
-        totalReviews: 248,
-        text: "Fui a cenar y la experiencia estuvo maravillosa. Comida muy buena y a muy buen precio.",
-        avatarUrl: null,
-      },
-      {
-        name: "Laura M.",
-        rating: 5,
-        source: "Google",
-        totalReviews: 112,
-        text: "Bocatas enormes, servicio rápido y buen ambiente. Repetiremos seguro.",
-        avatarUrl: null,
-      },
-      {
-        name: "David R.",
-        rating: 5,
-        source: "Google",
-        totalReviews: 89,
-        text: "Menú del mediodía top. Cocina casera y trato cercano.",
-        avatarUrl: null,
-      },
-    ],
-  });
+function empty() {
+  return json({ reviews: [] });
 }
 
 function isFresh(iso: string, maxAgeMs: number) {
@@ -80,7 +53,7 @@ export const GET: APIRoute = async () => {
 
   if (!apiKey || !placeId) {
     if (cached?.reviews?.length) return json({ reviews: cached.reviews });
-    return placeholder();
+    return empty();
   }
 
   const url = new URL("https://maps.googleapis.com/maps/api/place/details/json");
@@ -93,18 +66,26 @@ export const GET: APIRoute = async () => {
     const res = await fetch(url.toString(), { method: "GET" });
     if (!res.ok) {
       if (cached?.reviews?.length) return json({ reviews: cached.reviews });
-      return placeholder();
+      return empty();
     }
 
     const data = (await res.json()) as any;
     const result = data?.result;
 
-    const totalReviews = typeof result?.user_ratings_total === "number" ? result.user_ratings_total : undefined;
+    const totalReviews =
+      typeof result?.user_ratings_total === "number"
+        ? result.user_ratings_total
+        : undefined;
+
     const raw = Array.isArray(result?.reviews) ? result.reviews : [];
 
     const filtered = raw
       .filter((r: any) => r && r.rating === 5)
-      .filter((r: any) => typeof r.profile_photo_url === "string" && r.profile_photo_url.length > 0)
+      .filter(
+        (r: any) =>
+          typeof r.profile_photo_url === "string" &&
+          r.profile_photo_url.length > 0
+      )
       .map((r: any) => ({
         name: String(r.author_name ?? "Cliente"),
         rating: 5,
@@ -119,7 +100,7 @@ export const GET: APIRoute = async () => {
     const payload: Cached = {
       fetchedAt: new Date().toISOString(),
       placeId,
-      reviews: filtered.length ? filtered : (cached?.reviews?.length ? cached.reviews : []),
+      reviews: filtered.length ? filtered : cached?.reviews?.length ? cached.reviews : [],
     };
 
     if (cacheRow?.id) {
@@ -128,13 +109,16 @@ export const GET: APIRoute = async () => {
         .set({ value: payload, updatedAt: new Date() })
         .where(eq(AppSetting.id, cacheRow.id));
     } else {
-      await db.insert(AppSetting).values({ key: "googleReviewsCache", value: payload });
+      await db.insert(AppSetting).values({
+        key: "googleReviewsCache",
+        value: payload,
+      });
     }
 
     if (payload.reviews.length) return json({ reviews: payload.reviews });
-    return placeholder();
+    return empty();
   } catch {
     if (cached?.reviews?.length) return json({ reviews: cached.reviews });
-    return placeholder();
+    return empty();
   }
 };

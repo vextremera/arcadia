@@ -26,7 +26,7 @@ function allergenIconPath(slug: string, iconUrl?: string | null) {
   return iconUrl ?? `/images/allergens/${slug}.webp`;
 }
 
-export const GET: APIRoute = async ({ params, locals }) => {
+export const GET: APIRoute = async ({ params }) => {
   const id = Number(params.id);
   if (!Number.isFinite(id)) return json({ error: "INVALID_ID" }, 400);
 
@@ -149,12 +149,12 @@ export const GET: APIRoute = async ({ params, locals }) => {
     .where(and(eq(ProductAllergen.productId, id), eq(Allergen.active, true)))
     .orderBy(Allergen.sortOrder, Allergen.name);
 
-  const favorited = locals.user ? false : null;
-
   return json({
     product,
 
-    variants: variants.filter((variant) => variant.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    variants: variants
+      .filter((variant) => variant.active)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
 
     modifierGroups: groups
       .filter((group) => group.active)
@@ -193,6 +193,5 @@ export const GET: APIRoute = async ({ params, locals }) => {
       name: allergen.name,
       iconUrl: allergenIconPath(allergen.slug, allergen.iconUrl),
     })),
-    favorited,
   });
 };

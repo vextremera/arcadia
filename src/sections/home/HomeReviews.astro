@@ -1,46 +1,45 @@
 ---
+import { db, AppSetting, eq } from "astro:db";
 import ReviewsCarousel, { type Review } from "@/islands/home/ReviewsCarousel";
 
-const fallback: Review[] = [
-  {
-    name: "Pepito Fuentes",
-    totalReviews: 248,
-    source: "Google",
-    rating: 5,
-    text: "Fui a cenar y la experiencia estuvo maravillosa. Comida muy buena y a muy buen precio.",
-    avatarUrl: null,
-  },
-  {
-    name: "Laura M.",
-    totalReviews: 112,
-    source: "Google",
-    rating: 5,
-    text: "Tapas muy ricas y bocatas enormes. Servicio rápido y ambiente de barrio, de los de siempre.",
-    avatarUrl: null,
-  },
-  {
-    name: "David R.",
-    totalReviews: 89,
-    source: "Google",
-    rating: 5,
-    text: "Buen producto y cocina honesta. Pedimos a domicilio y llegó caliente, perfecto.",
-    avatarUrl: null,
-  },
-];
+type Cached = {
+  fetchedAt?: string;
+  placeId?: string;
+  reviews?: Review[];
+};
+
+const hasPlacesConfig = Boolean(
+  process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACE_ID
+);
+
+const [cacheRow] = await db
+  .select({ value: AppSetting.value })
+  .from(AppSetting)
+  .where(eq(AppSetting.key, "googleReviewsCache"))
+  .limit(1);
+
+const cached = (cacheRow?.value ?? null) as Cached | null;
+const cachedReviews = Array.isArray(cached?.reviews)
+  ? cached.reviews.filter(Boolean)
+  : [];
+
+const shouldRenderSection = hasPlacesConfig || cachedReviews.length > 0;
 ---
 
-<section id="resenas" class="scroll-mt-24">
-  <div class="mx-auto w-full max-w-340 px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
-    <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl text-center">
-      RESEÑAS
-    </h2>
+{shouldRenderSection ? (
+  <section id="resenas" class="scroll-mt-24">
+    <div class="mx-auto w-full max-w-340 px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
+      <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl text-center">
+        RESEÑAS
+      </h2>
 
-    <div class="mt-8 sm:mt-10">
-      <ReviewsCarousel
-        client:load
-        fetchUrl="/api/home/reviews"
-        reviews={fallback}
-      />
+      <div class="mt-8 sm:mt-10">
+        <ReviewsCarousel
+          client:load
+          fetchUrl="/api/home/reviews"
+          reviews={cachedReviews}
+        />
+      </div>
     </div>
-  </div>
-</section>
+  </section>
+) : null}
