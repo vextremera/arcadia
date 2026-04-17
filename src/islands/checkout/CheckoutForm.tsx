@@ -17,11 +17,6 @@ type Availability = {
   };
 };
 
-type PaymentsSettings = {
-  delivery: { cashEnabled: boolean; cardEnabled: boolean };
-  pickup: { cashEnabled: boolean; cardEnabled: boolean };
-};
-
 type CartResponse = {
   currency: "EUR";
   items: Array<{
@@ -107,7 +102,6 @@ const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
 export default function CheckoutForm() {
   const [cart, setCart] = useState<CartResponse | null>(null);
   const [avail, setAvail] = useState<Availability | null>(null);
-  const [payments, setPayments] = useState<PaymentsSettings | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -163,16 +157,6 @@ export default function CheckoutForm() {
     if (!cart) return 0;
     return Math.max(0, cart.subtotalCents + deliveryFeeCents - couponDiscountCents);
   }, [cart, deliveryFeeCents, couponDiscountCents]);
-
-  const cashEnabled = useMemo(() => {
-    if (!payments) return true;
-    return type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-  }, [payments, type]);
-
-  const cardEnabled = useMemo(() => {
-    if (!payments) return true;
-    return type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
-  }, [payments, type]);
 
   function applyAddress(address: AddressDto) {
     setLine1(address.line1 ?? "");
@@ -246,15 +230,13 @@ export default function CheckoutForm() {
     (async () => {
       setLoading(true);
       try {
-        const [c, a, p] = await Promise.all([
+        const [c, a] = await Promise.all([
           api<CartResponse>("/api/cart/summary"),
           api<Availability>("/api/checkout/availability"),
-          api<PaymentsSettings>("/api/settings/payments"),
         ]);
 
         setCart(c);
         setAvail(a);
-        setPayments(p);
         setType(a.deliveryAvailable ? "DELIVERY" : "PICKUP");
 
         const profile = await safeJson<ProfileResponse>("/api/account/profile");
@@ -299,18 +281,6 @@ export default function CheckoutForm() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    if (!payments) return;
-
-    const okCash =
-      type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-    const okCard =
-      type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
-
-    if (paymentMethod === "CASH" && !okCash && okCard) setPaymentMethod("CARD");
-    if (paymentMethod === "CARD" && !okCard && okCash) setPaymentMethod("CASH");
-  }, [payments, type, paymentMethod]);
 
   useEffect(() => {
     if (type !== "DELIVERY") {
@@ -681,14 +651,17 @@ export default function CheckoutForm() {
         <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
           <h2 class="text-lg font-semibold">Pago</h2>
 
+          <div class="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700">
+            Efectivo y tarjeta están disponibles tanto en delivery como en recogida.
+          </div>
+
           <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               class={`rounded-xl px-4 py-2 text-sm font-semibold ${
                 paymentMethod === "CASH" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-              } ${!cashEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              }`}
               onClick={() => setPaymentMethod("CASH")}
-              disabled={!cashEnabled}
             >
               Efectivo
             </button>
@@ -697,9 +670,8 @@ export default function CheckoutForm() {
               type="button"
               class={`rounded-xl px-4 py-2 text-sm font-semibold ${
                 paymentMethod === "CARD" ? "bg-zinc-900 text-white" : "border border-zinc-300"
-              } ${!cardEnabled ? "opacity-50 pointer-events-none" : ""}`}
+              }`}
               onClick={() => setPaymentMethod("CARD")}
-              disabled={!cardEnabled}
             >
               Tarjeta
             </button>

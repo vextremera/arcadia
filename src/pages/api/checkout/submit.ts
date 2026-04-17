@@ -7,7 +7,6 @@ import {
   ProductVariant,
   ModifierOption,
   Ingredient,
-  AppSetting,
   Address,
   User,
   UserProfile,
@@ -19,6 +18,7 @@ import {
 } from "astro:db";
 import { getArcadiaAvailability } from "@/server/time/madrid";
 import { validateCheckoutCoupon } from "@/server/checkout/coupons";
+import { normalizePaymentMethod } from "@/server/payments/settings";
 import { randomUUID } from "node:crypto";
 
 type CartItemSession = {
@@ -70,21 +70,6 @@ function opt(v: unknown): string | undefined {
 
 function makePublicId() {
   return `A-${randomUUID().slice(0, 8).toUpperCase()}`;
-}
-
-const DEFAULT_PAYMENTS = {
-  delivery: { cashEnabled: true, cardEnabled: true },
-  pickup: { cashEnabled: true, cardEnabled: true },
-};
-
-async function getPaymentsSettings() {
-  const [row] = await db
-    .select({ value: AppSetting.value })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, "payments"))
-    .limit(1);
-
-  return (row?.value ?? DEFAULT_PAYMENTS) as typeof DEFAULT_PAYMENTS;
 }
 
 function buildForcedPickupReason(availability: AvailabilityLike) {
@@ -214,10 +199,8 @@ export const POST: APIRoute = async ({ request, session }) => {
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: "INVALID_JSON" }, 400);
 
-  const payments = await getPaymentsSettings();
-
   const requestedType = safeStr(body.type).toUpperCase();
-  const paymentMethod = safeStr(body.paymentMethod).toUpperCase();
+  const requestedPaymentMethod = normalizePaymentMethod(body.paymentMethod);
   const orderNotes = safeStr(body.orderNotes);
   const couponCode = safeStr(body.couponCode).toUpperCase();
 
@@ -254,48 +237,17 @@ export const POST: APIRoute = async ({ request, session }) => {
     forcedReason = buildForcedPickupReason(availability);
   }
 
-  const pm: "CARD" | "CASH" = paymentMethod === "CARD" ? "CARD" : "CASH";
-
-  const allowedCash =
-    type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-  const allowedCard =
-    type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
-
-  if (!allowedCash && !allowedCard) {
+  if (!requestedPaymentMethod) {
     return json(
       {
-        error: "NO_PAYMENT_METHODS",
-        message: `No hay métodos de pago disponibles para ${
-          type === "DELIVERY" ? "delivery" : "recogida"
-        }.`,
+        error: "INVALID_PAYMENT_METHOD",
+        message: "Selecciona un método de pago válido.",
       },
       400
     );
   }
 
-  if (pm === "CASH" && !allowedCash) {
-    return json(
-      {
-        error: "PAYMENT_METHOD_DISABLED",
-        message: `El pago en efectivo no está disponible para ${
-          type === "DELIVERY" ? "delivery" : "recogida"
-        }.`,
-      },
-      400
-    );
-  }
-
-  if (pm === "CARD" && !allowedCard) {
-    return json(
-      {
-        error: "PAYMENT_METHOD_DISABLED",
-        message: `El pago con tarjeta no está disponible para ${
-          type === "DELIVERY" ? "delivery" : "recogida"
-        }.`,
-      },
-      400
-    );
-  }
+  const pm = requestedPaymentMethod;
 
   if (!customerName || !customerPhone) {
     return json(

@@ -1,27 +1,16 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
-import { db, AppSetting, eq } from "astro:db";
+import { getPaymentsSettings } from "@/server/payments/settings";
 
-type PaymentsSetting = {
-  delivery: { cashEnabled: boolean; cardEnabled: boolean };
-  pickup: { cashEnabled: boolean; cardEnabled: boolean };
-};
-
-const DEFAULT_PAYMENTS: PaymentsSetting = {
-  delivery: { cashEnabled: true, cardEnabled: true },
-  pickup: { cashEnabled: true, cardEnabled: true },
-};
-
-const [row] = await db
-  .select({ value: AppSetting.value })
-  .from(AppSetting)
-  .where(eq(AppSetting.key, "payments"))
-  .limit(1);
-
-const payments = (row?.value ?? DEFAULT_PAYMENTS) as PaymentsSetting;
+const payments = getPaymentsSettings();
 
 const url = new URL(Astro.request.url);
-const saved = url.searchParams.get("saved") === "1";
+const info = url.searchParams.get("info") ?? "";
+
+const infoMessage =
+  info === "fixed-methods"
+    ? "Los métodos de pago ya no se configuran por canal. En Arcadia, efectivo y tarjeta están siempre disponibles tanto en delivery como en pickup."
+    : "";
 
 const cards = [
   {
@@ -62,7 +51,7 @@ const cards = [
 <AdminLayout
   title="Pagos · Admin · Arcadia"
   heading="Pagos"
-  description="Configuración de métodos de pago disponibles por canal. Checkout los consume de forma directa y los pedidos con tarjeta generan un registro interno en Payment."
+  description="Métodos de pago fijos por negocio. Efectivo y tarjeta están disponibles tanto en delivery como en pickup; la operativa real depende del canal, no del método."
   actions={true}
 >
   <Fragment slot="actions">
@@ -83,16 +72,16 @@ const cards = [
     </div>
   </Fragment>
 
-  {saved ? (
-    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
-      Métodos de pago guardados correctamente.
+  {infoMessage ? (
+    <section class="mb-6 rounded-3xl border border-sky-400/20 bg-sky-400/10 px-5 py-4 text-sm text-sky-100">
+      {infoMessage}
     </section>
   ) : null}
 
   <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100/85">
     <div class="font-semibold text-amber-200">Estado real del módulo</div>
     <p class="mt-2 leading-6">
-      El checkout ya bloquea y permite métodos por canal. Además, los pedidos con <strong>tarjeta</strong> generan un registro interno en <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">Payment</code> para que el admin deje de trabajar a ciegas. La pasarela externa sigue pendiente.
+      En Arcadia no se desactivan métodos de pago por canal. Tanto <strong>efectivo</strong> como <strong>tarjeta</strong> forman parte del flujo normal en <strong>delivery</strong> y <strong>pickup</strong>. Lo que sí puede cambiar desde operativa es la disponibilidad del canal: pausa global, force pickup, horarios y excepciones.
     </p>
   </section>
 
@@ -115,137 +104,72 @@ const cards = [
     ))}
   </section>
 
-  <form
-    class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-    method="post"
-    action="/api/admin/settings/payments"
-  >
+  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
     <article class="rounded-3xl border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300">
-            Canal
-          </div>
-          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-            Delivery
-          </h2>
-          <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
-            Define qué métodos de pago puede usar el cliente cuando el pedido se envía a domicilio.
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+        Regla de negocio
+      </div>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        Métodos fijos
+      </h2>
+      <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+        Este panel ya no sirve para activar o desactivar efectivo/tarjeta por canal. La operativa correcta de Arcadia es más simple:
+      </p>
+
+      <div class="mt-6 grid gap-4 md:grid-cols-2">
+        <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="text-sm font-semibold text-white">Delivery</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Admite efectivo y tarjeta siempre que el canal delivery esté disponible por horario y operativa.
           </p>
         </div>
 
-        <div class="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
-          Delivery
+        <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5">
+          <div class="text-sm font-semibold text-white">Pickup</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Admite efectivo y tarjeta siempre que pickup esté operativo.
+          </p>
         </div>
-      </div>
-
-      <div class="mt-6 space-y-4">
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-          <div class="flex items-start gap-3">
-            <input
-              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-              type="checkbox"
-              name="deliveryCash"
-              checked={payments.delivery.cashEnabled}
-            />
-            <div>
-              <div class="text-sm font-semibold text-white">Efectivo habilitado</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">
-                Permite pagar en metálico al recibir el pedido.
-              </p>
-            </div>
-          </div>
-        </label>
-
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-          <div class="flex items-start gap-3">
-            <input
-              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-              type="checkbox"
-              name="deliveryCard"
-              checked={payments.delivery.cardEnabled}
-            />
-            <div>
-              <div class="text-sm font-semibold text-white">Tarjeta habilitada</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">
-                Permite usar tarjeta para pedidos delivery.
-              </p>
-            </div>
-          </div>
-        </label>
       </div>
     </article>
 
-    <article class="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-300">
-            Canal
-          </div>
-          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-            Pickup
-          </h2>
-          <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
-            Controla los métodos de pago permitidos cuando el cliente recoge en local.
+    <aside class="rounded-3xl border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Qué manda de verdad
+      </div>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        Operativa
+      </h2>
+
+      <div class="mt-6 space-y-4">
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div class="text-sm font-semibold text-white">Pause orders</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Bloquea el checkout completo independientemente del método de pago.
           </p>
         </div>
 
-        <div class="rounded-full border border-indigo-400/20 bg-indigo-400/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-300">
-          Pickup
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div class="text-sm font-semibold text-white">Force pickup</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Desactiva delivery y fuerza recogida, pero no cambia los métodos de pago.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <div class="text-sm font-semibold text-white">Horarios y special dates</div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Determinan si un canal está abierto o cerrado en cada momento.
+          </p>
+        </div>
+
+        <div class="rounded-3xl border border-sky-400/20 bg-sky-400/10 p-4">
+          <div class="text-sm font-semibold text-sky-200">Trazabilidad interna</div>
+          <p class="mt-2 text-sm leading-6 text-sky-100/80">
+            Los pedidos con tarjeta siguen generando un registro interno en <code>Payment</code>. La pasarela externa sigue pendiente, pero el método ya no es una configuración variable.
+          </p>
         </div>
       </div>
-
-      <div class="mt-6 space-y-4">
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-          <div class="flex items-start gap-3">
-            <input
-              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-              type="checkbox"
-              name="pickupCash"
-              checked={payments.pickup.cashEnabled}
-            />
-            <div>
-              <div class="text-sm font-semibold text-white">Efectivo habilitado</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">
-                Permite cobrar en caja cuando el cliente recoge el pedido.
-              </p>
-            </div>
-          </div>
-        </label>
-
-        <label class="block rounded-3xl border border-white/10 bg-slate-950/40 p-5">
-          <div class="flex items-start gap-3">
-            <input
-              class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-              type="checkbox"
-              name="pickupCard"
-              checked={payments.pickup.cardEnabled}
-            />
-            <div>
-              <div class="text-sm font-semibold text-white">Tarjeta habilitada</div>
-              <p class="mt-1 text-sm leading-6 text-slate-400">
-                Permite cobro con tarjeta para pedidos de recogida.
-              </p>
-            </div>
-          </div>
-        </label>
-      </div>
-    </article>
-
-    <div class="xl:col-span-2 flex flex-wrap gap-3">
-      <button
-        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-        type="submit"
-      >
-        Guardar métodos de pago
-      </button>
-
-      <a
-        href="/admin"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-      >
-        Volver al dashboard
-      </a>
-    </div>
-  </form>
+    </aside>
+  </section>
 </AdminLayout>
