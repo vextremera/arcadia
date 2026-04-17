@@ -9,6 +9,7 @@ import {
   MenuItem as LegacyMenuItem,
   eq,
 } from "astro:db";
+import { getPublicMenuState } from "@/server/menu/public";
 
 type MenuKind = "DIARIO" | "FESTIVO";
 type MenuCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
@@ -113,7 +114,7 @@ function courseLabel(course: MenuCourse) {
 
 function getAssignedKinds(
   map: Map<number, Set<MenuKind>>,
-  dishId: number
+  dishId: number,
 ): Set<MenuKind> {
   return map.get(dishId) ?? new Set<MenuKind>();
 }
@@ -173,7 +174,8 @@ const assignments = [...(assignmentRows as AssignmentRow[])].sort((a, b) => {
   const c = courseOrder[a.dishCourse] - courseOrder[b.dishCourse];
   if (c !== 0) return c;
   if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-  if (a.dishSortOrder !== b.dishSortOrder) return a.dishSortOrder - b.dishSortOrder;
+  if (a.dishSortOrder !== b.dishSortOrder)
+    return a.dishSortOrder - b.dishSortOrder;
   return a.dishName.localeCompare(b.dishName, "es");
 });
 
@@ -206,7 +208,7 @@ const assignmentCountByDishId = new Map<number, number>();
 for (const row of assignments) {
   assignmentCountByDishId.set(
     row.dishId,
-    (assignmentCountByDishId.get(row.dishId) ?? 0) + 1
+    (assignmentCountByDishId.get(row.dishId) ?? 0) + 1,
   );
 }
 
@@ -218,34 +220,126 @@ const dishesByCourse: Record<MenuCourse, DishRow[]> = {
 
 const totalDishes = dishes.length;
 const activeDishes = dishes.filter((dish) => dish.active).length;
-const diarioAssignments = assignments.filter((row) => row.kind === "DIARIO").length;
-const festivoAssignments = assignments.filter((row) => row.kind === "FESTIVO").length;
+
+function getKindStats(kind: MenuKind) {
+  const rows = assignments.filter((row) => row.kind === kind);
+  const activeRows = rows.filter((row) => row.dishActive);
+  const inactiveRows = rows.filter((row) => !row.dishActive);
+
+  const byCourse: Record<
+    MenuCourse,
+    {
+      total: number;
+      active: number;
+      inactive: number;
+    }
+  > = {
+    PRIMERO: { total: 0, active: 0, inactive: 0 },
+    SEGUNDO: { total: 0, active: 0, inactive: 0 },
+    POSTRE: { total: 0, active: 0, inactive: 0 },
+  };
+
+  for (const row of rows) {
+    byCourse[row.dishCourse].total += 1;
+    if (row.dishActive) {
+      byCourse[row.dishCourse].active += 1;
+    } else {
+      byCourse[row.dishCourse].inactive += 1;
+    }
+  }
+
+  const published = config[kind].active && activeRows.length > 0;
+
+  const reason = !config[kind].active
+    ? "Variante oculta"
+    : activeRows.length === 0 && rows.length === 0
+      ? "Sin platos asignados"
+      : activeRows.length === 0
+        ? "Solo platos inactivos"
+        : inactiveRows.length > 0
+          ? "Publica con arrastre inactivo"
+          : "Publicación limpia";
+
+  return {
+    totalAssignments: rows.length,
+    activeAssignments: activeRows.length,
+    inactiveAssignments: inactiveRows.length,
+    published,
+    reason,
+    byCourse,
+  };
+}
+
+const kindStats: Record<MenuKind, ReturnType<typeof getKindStats>> = {
+  DIARIO: getKindStats("DIARIO"),
+  FESTIVO: getKindStats("FESTIVO"),
+};
 
 const legacyMenus = await db.select({ id: LegacyMenu.id }).from(LegacyMenu);
-const legacyMenuItems = await db.select({ id: LegacyMenuItem.id }).from(LegacyMenuItem);
+const legacyMenuItems = await db
+  .select({ id: LegacyMenuItem.id })
+  .from(LegacyMenuItem);
+
 const canImportLegacy =
   dishes.length === 0 &&
   assignments.length === 0 &&
   legacyMenus.length > 0 &&
   legacyMenuItems.length > 0;
+
 const hasV2Data = dishes.length > 0 || assignments.length > 0;
 const legacyMenusCount = legacyMenus.length;
 const legacyMenuItemsCount = legacyMenuItems.length;
-const publicSourceLabel = hasV2Data
+const hasUsableLegacyData = legacyMenusCount > 0 && legacyMenuItemsCount > 0;
+
+const publishedKinds = KINDS.filter(
+  (kind) =>
+    config[kind.key].active &&
+    assignments.some((row) => row.kind === kind.key && row.dishActive),
+);
+
+const hasPublishedV2Data = publishedKinds.length > 0;
+const hasBlockedV2Transition =
+  hasV2Data && !hasPublishedV2Data && hasUsableLegacyData;
+
+const publicSourceLabel = hasPublishedV2Data
   ? "V2 canónico"
-  : canImportLegacy
+  : hasUsableLegacyData
     ? "Fallback legacy activo"
     : "Sin datos publicados";
+
 const legacyStatusLabel = canImportLegacy
   ? "Importable"
-  : legacyMenusCount > 0 || legacyMenuItemsCount > 0
-    ? "Solo respaldo"
+  : hasBlockedV2Transition
+    ? "Bloqueado por V2 incompleto"
+    : hasUsableLegacyData
+      ? "Solo respaldo"
+      : "Vacío";
+
+const legacyGuidance = hasPublishedV2Data
+  ? `La página pública ya queda gobernada por el sistema nuevo. Publicando: ${publishedKinds
+      .map((kind) => kind.label.toLowerCase())
+      .join(
+        " y ",
+      )}. Lo legacy se conserva solo como respaldo histórico e importación puntual.`
+  : hasBlockedV2Transition
+    ? "La página pública sigue cayendo al legacy, pero la importación ya está bloqueada porque existen datos V2. Todavía no hay ninguna variante publicable: revisa platos activos, asignaciones activas y publicación de diario/festivo antes de dar por cerrada la transición."
+    : canImportLegacy
+      ? "Todavía puedes importar el contenido legacy al sistema nuevo. Mientras V2 esté vacío de verdad, la página pública puede seguir leyendo esa base antigua."
+      : hasUsableLegacyData
+        ? "Existe respaldo legacy, pero no hace falta importarlo porque el sistema nuevo ya tiene contenido suficiente o la transición ya está decidida."
+        : "No hay contenido legacy utilizable y tampoco hay una variante V2 publicable ahora mismo.";
+
+const publicationStateLabel = hasPublishedV2Data
+  ? publishedKinds.map((kind) => kind.label).join(" + ")
+  : hasV2Data
+    ? "Datos sin publicar"
     : "Vacío";
-const legacyGuidance = hasV2Data
-  ? "La página pública ya queda gobernada por el sistema nuevo. Lo legacy se conserva solo como respaldo histórico e importación puntual."
-  : canImportLegacy
-    ? "Todavía puedes importar el contenido legacy al sistema nuevo. Mientras no existan platos o asignaciones V2, la página pública puede seguir leyendo esa base antigua."
-    : "No hay contenido legacy utilizable y tampoco hay datos V2 suficientes publicados todavía.";
+
+const publicationGuidance = hasPublishedV2Data
+  ? "Hay al menos una variante activa con platos activos asignados, así que la página pública ya puede resolverse desde V2."
+  : hasV2Data
+    ? "Existe biblioteca o asignaciones V2, pero todavía no hay ninguna variante realmente publicable. La transición no está cerrada."
+    : "Aún no hay platos ni asignaciones en el sistema nuevo.";
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") ?? "";
@@ -275,21 +369,23 @@ const errorMessage =
             ? "El plato indicado no es válido."
             : error === "dish-not-found"
               ? "El plato ya no existe."
-              : error === "dish-in-use"
-                ? "No se puede borrar el plato mientras siga asignado a un menú."
-                : error === "invalid-assignment"
-                  ? "La asignación indicada no es válida."
-                  : error === "already-v2-data"
-                    ? "Ya existe información en el sistema nuevo y no se puede importar encima."
-                    : error === "import-failed"
-                      ? "No se ha podido importar el menú legacy."
-                      : error === "legacy-read-only"
-                        ? "El sistema legacy del menú ha quedado en modo solo respaldo. Usa /admin/menu y el endpoint /api/admin/menu-v2 para cualquier cambio."
-                        : error === "invalid-intent"
-                          ? "Acción de menú no válida."
-                          : error === "reorder-failed"
-                            ? "No se ha podido reordenar la lista. Recarga y vuelve a intentarlo."
-                            : "";
+              : error === "inactive-dish"
+                ? "No se puede asignar un plato inactivo. Actívalo primero para que pueda formar parte del menú público."
+                : error === "dish-in-use"
+                  ? "No se puede borrar el plato mientras siga asignado a un menú."
+                  : error === "invalid-assignment"
+                    ? "La asignación indicada no es válida."
+                    : error === "already-v2-data"
+                      ? "Ya existe información en el sistema nuevo y no se puede importar encima."
+                      : error === "import-failed"
+                        ? "No se ha podido importar el menú legacy."
+                        : error === "legacy-read-only"
+                          ? "El sistema legacy del menú ha quedado en modo solo respaldo. Usa /admin/menu y el endpoint /api/admin/menu-v2 para cualquier cambio."
+                          : error === "invalid-intent"
+                            ? "Acción de menú no válida."
+                            : error === "reorder-failed"
+                              ? "No se ha podido reordenar la lista. Recarga y vuelve a intentarlo."
+                              : "";
 ---
 
 <AdminLayout
@@ -318,21 +414,40 @@ const errorMessage =
     </div>
   </Fragment>
 
-  {successMessage ? (
-    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
-      {successMessage}
-    </section>
-  ) : null}
+  {
+    successMessage ? (
+      <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+        {successMessage}
+      </section>
+    ) : null
+  }
 
-  {errorMessage ? (
-    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {errorMessage}
-    </section>
-  ) : null}
+  {
+    errorMessage ? (
+      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {errorMessage}
+      </section>
+    ) : null
+  }
+
+  {
+    hasBlockedV2Transition ? (
+      <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+        Hay datos en V2, pero todavía no existe una variante publicable. La
+        página pública sigue leyendo el menú legacy y la importación ya está
+        bloqueada porque el sistema nuevo no está vacío. Revisa publicación,
+        platos activos y asignaciones antes de seguir avanzando.
+      </section>
+    ) : null
+  }
 
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+    <article
+      class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+      >
         Biblioteca
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
@@ -341,8 +456,12 @@ const errorMessage =
       <p class="mt-2 text-sm text-slate-400">Platos propios del menú</p>
     </article>
 
-    <article class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80">
+    <article
+      class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+    >
+      <div
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80"
+      >
         Activos
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
@@ -351,63 +470,110 @@ const errorMessage =
       <p class="mt-2 text-sm text-emerald-100/70">Visibles para asignar</p>
     </article>
 
-    <article class="rounded-[28px] border border-sky-400/15 bg-sky-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
+    <article
+      class:list={[
+        "rounded-[28px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+        kindStats.DIARIO.published
+          ? "border-sky-400/15 bg-sky-400/6"
+          : "border-amber-400/15 bg-amber-400/8",
+      ]}
+    >
+      <div
+        class:list={[
+          "text-[11px] font-semibold uppercase tracking-[0.22em]",
+          kindStats.DIARIO.published ? "text-sky-200/80" : "text-amber-200/80",
+        ]}
+      >
         Diario
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-        {diarioAssignments}
+        {kindStats.DIARIO.published ? "Publicando" : "No publica"}
       </div>
-      <p class="mt-2 text-sm text-sky-100/70">Platos asignados al menú diario</p>
+      <p class="mt-2 text-sm leading-6 text-white/75">
+        {kindStats.DIARIO.activeAssignments}/{kindStats.DIARIO.totalAssignments} asignaciones
+        publicables · {kindStats.DIARIO.reason}
+      </p>
     </article>
 
-    <article class="rounded-[28px] border border-violet-400/15 bg-violet-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80">
+    <article
+      class:list={[
+        "rounded-[28px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+        kindStats.FESTIVO.published
+          ? "border-violet-400/15 bg-violet-400/6"
+          : "border-amber-400/15 bg-amber-400/8",
+      ]}
+    >
+      <div
+        class:list={[
+          "text-[11px] font-semibold uppercase tracking-[0.22em]",
+          kindStats.FESTIVO.published
+            ? "text-violet-200/80"
+            : "text-amber-200/80",
+        ]}
+      >
         Festivo
       </div>
       <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-        {festivoAssignments}
+        {kindStats.FESTIVO.published ? "Publicando" : "No publica"}
       </div>
-      <p class="mt-2 text-sm text-violet-100/70">Platos asignados al menú festivo</p>
+      <p class="mt-2 text-sm leading-6 text-white/75">
+        {kindStats.FESTIVO.activeAssignments}/{
+          kindStats.FESTIVO.totalAssignments
+        } asignaciones publicables · {kindStats.FESTIVO.reason}
+      </p>
     </article>
   </section>
 
-  <section class="mt-6 rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+  <section
+    class="mt-6 rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+  >
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300"
+        >
           Configuración fija
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
           Menú diario y festivo
         </h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Ya no existen múltiples menús editables. Aquí solo configuras las dos variantes reales del negocio y su precio. Los platos viven en su propia biblioteca y se asignan por separado.
+          Ya no existen múltiples menús editables. Aquí solo configuras las dos
+          variantes reales del negocio y su precio. Los platos viven en su
+          propia biblioteca y se asignan por separado.
         </p>
       </div>
 
       <div class="flex flex-wrap gap-3">
-        {canImportLegacy ? (
-          <form method="post" action="/api/admin/menu-v2">
-            <input type="hidden" name="intent" value="import-legacy" />
-            <button
-              type="submit"
-              class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
-            >
-              Importar menú legacy
-            </button>
-          </form>
-        ) : null}
+        {
+          canImportLegacy ? (
+            <form method="post" action="/api/admin/menu-v2">
+              <input type="hidden" name="intent" value="import-legacy" />
+              <button
+                type="submit"
+                class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
+              >
+                Importar menú legacy
+              </button>
+            </form>
+          ) : null
+        }
 
-        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+        <div
+          class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300"
+        >
           Separado completamente del catálogo real
         </div>
       </div>
     </div>
 
     <div class="mt-6 grid gap-4 xl:grid-cols-3">
-      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <article
+        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Fuente pública actual
         </div>
         <div class="mt-3 text-lg font-semibold tracking-tight text-white">
@@ -418,8 +584,12 @@ const errorMessage =
         </p>
       </article>
 
-      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <article
+        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Legacy detectado
         </div>
         <div class="mt-3 text-lg font-semibold tracking-tight text-white">
@@ -430,15 +600,19 @@ const errorMessage =
         </p>
       </article>
 
-      <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Sistema canónico
+      <article
+        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
+          Publicación V2
         </div>
         <div class="mt-3 text-lg font-semibold tracking-tight text-white">
-          Biblioteca propia + asignaciones
+          {publicationStateLabel}
         </div>
         <p class="mt-2 text-sm leading-6 text-slate-400">
-          El alta, edición y ordenación del menú deben pasar por <code>/api/admin/menu-v2</code>. El CRUD legacy queda retirado.
+          {publicationGuidance}
         </p>
       </article>
     </div>
@@ -447,62 +621,72 @@ const errorMessage =
       <input type="hidden" name="intent" value="save-config" />
 
       <div class="grid gap-6 xl:grid-cols-2">
-        {KINDS.map((kind) => (
-          <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <span class:list={["inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]", kind.tone]}>
-                  {kind.label}
-                </span>
-                <h3 class="mt-3 text-lg font-semibold text-white">
-                  Menú {kind.label.toLowerCase()}
-                </h3>
-              </div>
-
-              <div class="text-right">
-                <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  Precio actual
+        {
+          KINDS.map((kind) => (
+            <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span
+                    class:list={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      kind.tone,
+                    ]}
+                  >
+                    {kind.label}
+                  </span>
+                  <h3 class="mt-3 text-lg font-semibold text-white">
+                    Menú {kind.label.toLowerCase()}
+                  </h3>
                 </div>
-                <div class="mt-1 text-lg font-semibold text-white">
-                  {money(config[kind.key].priceCents)}
-                </div>
-              </div>
-            </div>
 
-            <div class="mt-5 grid gap-4 sm:grid-cols-[180px_auto]">
-              <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Precio €
-                </span>
-                <input
-                  class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  name={`${kind.key}_priceEur`}
-                  value={moneyInput(config[kind.key].priceCents)}
-                />
-              </label>
-
-              <label class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4">
-                <div class="flex items-start gap-3">
-                  <input
-                    class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                    type="checkbox"
-                    name={`${kind.key}_active`}
-                    checked={config[kind.key].active}
-                  />
-                  <div>
-                    <div class="text-sm font-semibold text-white">Publicado</div>
-                    <p class="mt-1 text-sm leading-6 text-slate-400">
-                      Controla si esta variante se muestra en la página pública.
-                    </p>
+                <div class="text-right">
+                  <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Precio actual
+                  </div>
+                  <div class="mt-1 text-lg font-semibold text-white">
+                    {money(config[kind.key].priceCents)}
                   </div>
                 </div>
-              </label>
-            </div>
-          </article>
-        ))}
+              </div>
+
+              <div class="mt-5 grid gap-4 sm:grid-cols-[180px_auto]">
+                <label class="block">
+                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Precio €
+                  </span>
+                  <input
+                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    name={`${kind.key}_priceEur`}
+                    value={moneyInput(config[kind.key].priceCents)}
+                  />
+                </label>
+
+                <label class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4">
+                  <div class="flex items-start gap-3">
+                    <input
+                      class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                      type="checkbox"
+                      name={`${kind.key}_active`}
+                      checked={config[kind.key].active}
+                    />
+                    <div>
+                      <div class="text-sm font-semibold text-white">
+                        Publicado
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-slate-400">
+                        Controla si esta variante se muestra en la página
+                        pública.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </article>
+          ))
+        }
       </div>
 
       <div class="mt-6">
@@ -517,113 +701,167 @@ const errorMessage =
   </section>
 
   <section class="mt-6 space-y-6">
-    {KINDS.map((kind) => (
-      <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Planner
+    {
+      KINDS.map((kind) => (
+        <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Planner
+              </div>
+              <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+                Menú {kind.label.toLowerCase()}
+              </h2>
             </div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-              Menú {kind.label.toLowerCase()}
-            </h2>
-          </div>
 
-          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
-            {config[kind.key].active ? "Publicado" : "Oculto"} · {money(config[kind.key].priceCents)}
-          </div>
-        </div>
-
-        <div class="mt-6 grid gap-4 xl:grid-cols-3">
-          {COURSES.map((course) => (
-            <section class="rounded-[28px] border border-white/10 bg-slate-950/40 p-4">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    {course.key}
-                  </div>
-                  <div class="mt-1 text-sm font-semibold text-white">
-                    {course.label}
-                  </div>
-                </div>
-
-                <div class="text-sm text-slate-400">
-                  {planner[kind.key][course.key].length}
-                </div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+              <div>
+                {config[kind.key].active ? "Publicado" : "Oculto"} ·{" "}
+                {money(config[kind.key].priceCents)}
               </div>
+              <div class="mt-1 text-xs text-slate-500">
+                {kindStats[kind.key].activeAssignments}/
+                {kindStats[kind.key].totalAssignments} publicables ·{" "}
+                {kindStats[kind.key].reason}
+              </div>
+            </div>
+          </div>
 
-              <div
-                class="mt-4 space-y-3 min-h-16"
-                data-menu-dropzone
-                data-kind={kind.key}
-                data-course={course.key}
+          <div class="mt-6 grid gap-4 xl:grid-cols-3">
+            {COURSES.map((course) => (
+              <section
+                class:list={[
+                  "rounded-[28px] border p-4",
+                  kindStats[kind.key].byCourse[course.key].total > 0 &&
+                  kindStats[kind.key].byCourse[course.key].active === 0
+                    ? "border-amber-400/20 bg-amber-400/8"
+                    : "border-white/10 bg-slate-950/40",
+                ]}
               >
-                {planner[kind.key][course.key].length === 0 ? (
-                  <div class="rounded-2xl border border-dashed border-white/10 bg-white/3 px-4 py-4 text-sm text-slate-500">
-                    Sin platos asignados en este curso.
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      {course.key}
+                    </div>
+                    <div class="mt-1 text-sm font-semibold text-white">
+                      {course.label}
+                    </div>
+                    <div class="mt-1 text-xs text-slate-500">
+                      {kindStats[kind.key].byCourse[course.key].active}/
+                      {kindStats[kind.key].byCourse[course.key].total}{" "}
+                      publicables
+                    </div>
                   </div>
-                ) : (
-                  planner[kind.key][course.key].map((item) => (
-                    <article
-                      draggable="true"
-                      data-menu-assignment-card={item.assignmentId}
-                      data-kind={kind.key}
-                      data-course={course.key}
-                      class="rounded-2xl border border-white/10 bg-white/5 p-4 cursor-move"
-                    >
-                      <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div class="text-sm font-semibold text-white">{item.dishName}</div>
-                          {item.dishDescription ? (
-                            <p class="mt-1 text-sm leading-6 text-slate-400">
-                              {item.dishDescription}
-                            </p>
-                          ) : null}
+
+                  <div
+                    class:list={[
+                      "text-sm font-semibold",
+                      kindStats[kind.key].byCourse[course.key].total > 0 &&
+                      kindStats[kind.key].byCourse[course.key].active === 0
+                        ? "text-amber-200"
+                        : "text-slate-400",
+                    ]}
+                  >
+                    {planner[kind.key][course.key].length}
+                  </div>
+                </div>
+
+                <div
+                  class="mt-4 space-y-3 min-h-16"
+                  data-menu-dropzone
+                  data-kind={kind.key}
+                  data-course={course.key}
+                >
+                  {kindStats[kind.key].byCourse[course.key].total > 0 &&
+                  kindStats[kind.key].byCourse[course.key].active === 0 ? (
+                    <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                      Este curso tiene asignaciones, pero ninguna es publicable
+                      porque todos los platos asignados están inactivos.
+                    </div>
+                  ) : null}
+                  {planner[kind.key][course.key].length === 0 ? (
+                    <div class="rounded-2xl border border-dashed border-white/10 bg-white/3 px-4 py-4 text-sm text-slate-500">
+                      Sin platos asignados en este curso.
+                    </div>
+                  ) : (
+                    planner[kind.key][course.key].map((item) => (
+                      <article
+                        draggable="true"
+                        data-menu-assignment-card={item.assignmentId}
+                        data-kind={kind.key}
+                        data-course={course.key}
+                        class="rounded-2xl border border-white/10 bg-white/5 p-4 cursor-move"
+                      >
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div class="text-sm font-semibold text-white">
+                              {item.dishName}
+                            </div>
+                            {item.dishDescription ? (
+                              <p class="mt-1 text-sm leading-6 text-slate-400">
+                                {item.dishDescription}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div class="flex flex-wrap gap-2">
+                            <span
+                              class:list={[
+                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                item.dishActive
+                                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                                  : "border-amber-400/20 bg-amber-400/10 text-amber-300",
+                              ]}
+                            >
+                              {item.dishActive ? "Activo" : "Inactivo"}
+                            </span>
+                          </div>
                         </div>
 
-                        <div class="flex flex-wrap gap-2">
-                          <span class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                            item.dishActive
-                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                              : "border-amber-400/20 bg-amber-400/10 text-amber-300",
-                          ]}>
-                            {item.dishActive ? "Activo" : "Inactivo"}
-                          </span>
-                        </div>
-                      </div>
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+                          <div class="text-xs uppercase tracking-[0.14em] text-slate-500">
+                            Arrastrar para reordenar
+                          </div>
 
-                      <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-                        <div class="text-xs uppercase tracking-[0.14em] text-slate-500">
-                          Arrastrar para reordenar
+                          <form method="post" action="/api/admin/menu-v2">
+                            <input
+                              type="hidden"
+                              name="intent"
+                              value="unassign-dish"
+                            />
+                            <input
+                              type="hidden"
+                              name="assignmentId"
+                              value={item.assignmentId}
+                            />
+                            <button
+                              type="submit"
+                              class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                            >
+                              Quitar
+                            </button>
+                          </form>
                         </div>
-
-                        <form method="post" action="/api/admin/menu-v2">
-                          <input type="hidden" name="intent" value="unassign-dish" />
-                          <input type="hidden" name="assignmentId" value={item.assignmentId} />
-                          <button
-                            type="submit"
-                            class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                          >
-                            Quitar
-                          </button>
-                        </form>
-                      </div>
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
-      </section>
-    ))}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            ))}
+          </div>
+        </section>
+      ))
+    }
   </section>
 
   <section class="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
     <aside class="space-y-6">
-      <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <section
+        class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Alta
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -634,7 +872,9 @@ const errorMessage =
           <input type="hidden" name="intent" value="create-dish" />
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Nombre
             </span>
             <input
@@ -647,7 +887,9 @@ const errorMessage =
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Curso
             </span>
             <select
@@ -661,7 +903,9 @@ const errorMessage =
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span
+              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
               Descripción
             </span>
             <textarea
@@ -673,7 +917,9 @@ const errorMessage =
 
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span
+                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              >
                 Orden base
               </span>
               <input
@@ -686,7 +932,9 @@ const errorMessage =
               />
             </label>
 
-            <label class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4">
+            <label
+              class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4"
+            >
               <div class="flex items-start gap-3">
                 <input
                   class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -713,8 +961,12 @@ const errorMessage =
         </form>
       </section>
 
-      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <section
+        class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Criterio
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -723,21 +975,31 @@ const errorMessage =
 
         <div class="mt-6 space-y-4">
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
-            <div class="text-sm font-semibold text-white">Separado del catálogo</div>
+            <div class="text-sm font-semibold text-white">
+              Separado del catálogo
+            </div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              Los platos del menú ya no dependen de <code>Product</code>. Tienen su propia biblioteca y su propia asignación.
+              Los platos del menú ya no dependen de <code>Product</code>. Tienen
+              su propia biblioteca y su propia asignación.
             </p>
           </div>
 
-          <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
-            <div class="text-sm font-semibold text-amber-200">Dos variantes fijas</div>
+          <div
+            class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4"
+          >
+            <div class="text-sm font-semibold text-amber-200">
+              Dos variantes fijas
+            </div>
             <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              Solo existen <strong>DIARIO</strong> y <strong>FESTIVO</strong>. No hay CRUD de menús infinitos.
+              Solo existen <strong>DIARIO</strong> y <strong>FESTIVO</strong>.
+              No hay CRUD de menús infinitos.
             </p>
           </div>
 
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
-            <div class="text-sm font-semibold text-white">Migración sin romper</div>
+            <div class="text-sm font-semibold text-white">
+              Migración sin romper
+            </div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
               {legacyGuidance}
             </p>
@@ -746,10 +1008,14 @@ const errorMessage =
       </section>
     </aside>
 
-    <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+    <section
+      class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+    >
       <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+          <div
+            class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
             Biblioteca
           </div>
           <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -757,210 +1023,289 @@ const errorMessage =
           </h2>
         </div>
 
-        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+        <div
+          class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300"
+        >
           Asignación rápida a diario / festivo
         </div>
       </div>
 
       <div class="mt-6 space-y-6">
-        {COURSES.map((course) => (
-          <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
-            <div class="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {course.key}
+        {
+          COURSES.map((course) => (
+            <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
+              <div class="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {course.key}
+                  </div>
+                  <h3 class="mt-2 text-lg font-semibold text-white">
+                    {course.label}
+                  </h3>
                 </div>
-                <h3 class="mt-2 text-lg font-semibold text-white">
-                  {course.label}
-                </h3>
+
+                <div class="text-sm text-slate-400">
+                  {dishesByCourse[course.key].length} plato
+                  {dishesByCourse[course.key].length === 1 ? "" : "s"}
+                </div>
               </div>
 
-              <div class="text-sm text-slate-400">
-                {dishesByCourse[course.key].length} plato{dishesByCourse[course.key].length === 1 ? "" : "s"}
-              </div>
-            </div>
+              <div class="mt-4 space-y-4">
+                {dishesByCourse[course.key].length === 0 ? (
+                  <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+                    No hay platos creados en este curso.
+                  </div>
+                ) : (
+                  dishesByCourse[course.key].map((dish) => {
+                    const assignedKinds = getAssignedKinds(
+                      assignedKindsByDishId,
+                      dish.id,
+                    );
+                    const assignmentCount =
+                      assignmentCountByDishId.get(dish.id) ?? 0;
+                    const canDelete = assignmentCount === 0;
 
-            <div class="mt-4 space-y-4">
-              {dishesByCourse[course.key].length === 0 ? (
-                <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
-                  No hay platos creados en este curso.
-                </div>
-              ) : (
-                dishesByCourse[course.key].map((dish) => {
-                  const assignedKinds = getAssignedKinds(assignedKindsByDishId, dish.id);
-                  const assignmentCount = assignmentCountByDishId.get(dish.id) ?? 0;
-                  const canDelete = assignmentCount === 0;
-
-                  return (
-                    <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
-                      <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div class="text-sm font-semibold text-white">{dish.name}</div>
-                          <div class="mt-1">
-                            <code class="rounded-xl border border-white/10 bg-[#0b1120] px-2.5 py-1.5 text-xs text-slate-300">
-                              {dish.slug}
-                            </code>
+                    return (
+                      <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div class="text-sm font-semibold text-white">
+                              {dish.name}
+                            </div>
+                            <div class="mt-1">
+                              <code class="rounded-xl border border-white/10 bg-[#0b1120] px-2.5 py-1.5 text-xs text-slate-300">
+                                {dish.slug}
+                              </code>
+                            </div>
+                            {dish.description ? (
+                              <p class="mt-3 text-sm leading-6 text-slate-400">
+                                {dish.description}
+                              </p>
+                            ) : null}
                           </div>
-                          {dish.description ? (
-                            <p class="mt-3 text-sm leading-6 text-slate-400">
-                              {dish.description}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div class="flex flex-wrap gap-2">
-                          <span class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                            dish.active
-                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                              : "border-amber-400/20 bg-amber-400/10 text-amber-300",
-                          ]}>
-                            {dish.active ? "Activo" : "Inactivo"}
-                          </span>
-
-                          {assignedKinds.has("DIARIO") ? (
-                            <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
-                              Diario
-                            </span>
-                          ) : null}
-
-                          {assignedKinds.has("FESTIVO") ? (
-                            <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-violet-300">
-                              Festivo
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <form method="post" action="/api/admin/menu-v2" class="mt-5 grid gap-4">
-                        <input type="hidden" name="intent" value="update-dish" />
-                        <input type="hidden" name="dishId" value={dish.id} />
-
-                        <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px]">
-                          <label class="block">
-                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Nombre
-                            </span>
-                            <input
-                              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                              type="text"
-                              name="name"
-                              value={dish.name}
-                              required
-                            />
-                          </label>
-
-                          <label class="block">
-                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Curso
-                            </span>
-                            <select
-                              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                              name="course"
-                            >
-                              <option value="PRIMERO" selected={dish.course === "PRIMERO"}>PRIMERO</option>
-                              <option value="SEGUNDO" selected={dish.course === "SEGUNDO"}>SEGUNDO</option>
-                              <option value="POSTRE" selected={dish.course === "POSTRE"}>POSTRE</option>
-                            </select>
-                          </label>
-
-                          <label class="block">
-                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Orden
-                            </span>
-                            <input
-                              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                              type="number"
-                              min="0"
-                              step="1"
-                              name="sortOrder"
-                              value={dish.sortOrder}
-                            />
-                          </label>
-                        </div>
-
-                        <label class="block">
-                          <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            Descripción
-                          </span>
-                          <textarea
-                            class="min-h-24 w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                            name="description"
-                          >{dish.description ?? ""}</textarea>
-                        </label>
-
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                          <label class="inline-flex items-center gap-3 text-sm text-slate-300">
-                            <input
-                              class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                              type="checkbox"
-                              name="active"
-                              checked={dish.active}
-                            />
-                            Activo
-                          </label>
 
                           <div class="flex flex-wrap gap-2">
-                            <button
-                              type="submit"
-                              class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                            <span
+                              class:list={[
+                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                dish.active
+                                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                                  : "border-amber-400/20 bg-amber-400/10 text-amber-300",
+                              ]}
                             >
-                              Guardar plato
-                            </button>
+                              {dish.active ? "Activo" : "Inactivo"}
+                            </span>
+
+                            {!dish.active ? (
+                              <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-300">
+                                No publicable
+                              </span>
+                            ) : null}
+
+                            {assignedKinds.has("DIARIO") ? (
+                              <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
+                                Diario
+                              </span>
+                            ) : null}
+
+                            {assignedKinds.has("FESTIVO") ? (
+                              <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-violet-300">
+                                Festivo
+                              </span>
+                            ) : null}
                           </div>
                         </div>
-                      </form>
 
-                      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                        <div class="flex flex-wrap gap-2">
-                          {(["DIARIO", "FESTIVO"] as MenuKind[]).map((kind) => (
-                            <form method="post" action="/api/admin/menu-v2">
-                              <input type="hidden" name="intent" value="assign-dish" />
-                              <input type="hidden" name="dishId" value={dish.id} />
-                              <input type="hidden" name="kind" value={kind} />
+                        <form
+                          method="post"
+                          action="/api/admin/menu-v2"
+                          class="mt-5 grid gap-4"
+                        >
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="update-dish"
+                          />
+                          <input type="hidden" name="dishId" value={dish.id} />
+
+                          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px]">
+                            <label class="block">
+                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Nombre
+                              </span>
+                              <input
+                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                type="text"
+                                name="name"
+                                value={dish.name}
+                                required
+                              />
+                            </label>
+
+                            <label class="block">
+                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Curso
+                              </span>
+                              <select
+                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                name="course"
+                              >
+                                <option
+                                  value="PRIMERO"
+                                  selected={dish.course === "PRIMERO"}
+                                >
+                                  PRIMERO
+                                </option>
+                                <option
+                                  value="SEGUNDO"
+                                  selected={dish.course === "SEGUNDO"}
+                                >
+                                  SEGUNDO
+                                </option>
+                                <option
+                                  value="POSTRE"
+                                  selected={dish.course === "POSTRE"}
+                                >
+                                  POSTRE
+                                </option>
+                              </select>
+                            </label>
+
+                            <label class="block">
+                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Orden
+                              </span>
+                              <input
+                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                type="number"
+                                min="0"
+                                step="1"
+                                name="sortOrder"
+                                value={dish.sortOrder}
+                              />
+                            </label>
+                          </div>
+
+                          <label class="block">
+                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Descripción
+                            </span>
+                            <textarea
+                              class="min-h-24 w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                              name="description"
+                            >
+                              {dish.description ?? ""}
+                            </textarea>
+                          </label>
+
+                          <div class="flex flex-wrap items-center justify-between gap-3">
+                            <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+                              <input
+                                class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                                type="checkbox"
+                                name="active"
+                                checked={dish.active}
+                              />
+                              Activo
+                            </label>
+
+                            <div class="flex flex-wrap gap-2">
                               <button
                                 type="submit"
-                                class:list={[
-                                  "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                                  assignedKinds.has(kind)
-                                    ? kind === "DIARIO"
-                                      ? "border border-sky-400/20 bg-sky-400/10 text-sky-300"
-                                      : "border border-violet-400/20 bg-violet-400/10 text-violet-300"
-                                    : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white",
-                                ]}
+                                class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
                               >
-                                {assignedKinds.has(kind)
-                                  ? `Asignado a ${kind === "DIARIO" ? "diario" : "festivo"}`
-                                  : `Añadir a ${kind === "DIARIO" ? "diario" : "festivo"}`}
+                                Guardar plato
                               </button>
-                            </form>
-                          ))}
-                        </div>
-
-                        <form method="post" action="/api/admin/menu-v2">
-                          <input type="hidden" name="intent" value="delete-dish" />
-                          <input type="hidden" name="dishId" value={dish.id} />
-                          <button
-                            type="submit"
-                            disabled={!canDelete}
-                            class:list={[
-                              "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                              canDelete
-                                ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
-                                : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
-                            ]}
-                          >
-                            Borrar plato
-                          </button>
+                            </div>
+                          </div>
                         </form>
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        ))}
+
+                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                          <div class="flex flex-wrap gap-2">
+                            {(["DIARIO", "FESTIVO"] as MenuKind[]).map(
+                              (kind) => {
+                                const isAssigned = assignedKinds.has(kind);
+                                const isDisabled = !dish.active && !isAssigned;
+
+                                return (
+                                  <form
+                                    method="post"
+                                    action="/api/admin/menu-v2"
+                                  >
+                                    <input
+                                      type="hidden"
+                                      name="intent"
+                                      value="assign-dish"
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="dishId"
+                                      value={dish.id}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="kind"
+                                      value={kind}
+                                    />
+                                    <button
+                                      type="submit"
+                                      disabled={isDisabled}
+                                      class:list={[
+                                        "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                                        isAssigned
+                                          ? kind === "DIARIO"
+                                            ? "border border-sky-400/20 bg-sky-400/10 text-sky-300"
+                                            : "border border-violet-400/20 bg-violet-400/10 text-violet-300"
+                                          : isDisabled
+                                            ? "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"
+                                            : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white",
+                                      ]}
+                                    >
+                                      {isAssigned
+                                        ? `Asignado a ${kind === "DIARIO" ? "diario" : "festivo"}`
+                                        : isDisabled
+                                          ? "Activa el plato primero"
+                                          : `Añadir a ${kind === "DIARIO" ? "diario" : "festivo"}`}
+                                    </button>
+                                  </form>
+                                );
+                              },
+                            )}
+                          </div>
+
+                          <form method="post" action="/api/admin/menu-v2">
+                            <input
+                              type="hidden"
+                              name="intent"
+                              value="delete-dish"
+                            />
+                            <input
+                              type="hidden"
+                              name="dishId"
+                              value={dish.id}
+                            />
+                            <button
+                              type="submit"
+                              disabled={!canDelete}
+                              class:list={[
+                                "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                                canDelete
+                                  ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
+                                  : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                              ]}
+                            >
+                              Borrar plato
+                            </button>
+                          </form>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </section>
+          ))
+        }
       </div>
     </section>
   </section>
@@ -991,7 +1336,10 @@ const errorMessage =
 
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", card.getAttribute("data-menu-assignment-card") || "");
+        event.dataTransfer.setData(
+          "text/plain",
+          card.getAttribute("data-menu-assignment-card") || "",
+        );
       }
     });
 
@@ -1002,9 +1350,9 @@ const errorMessage =
     const zones = Array.from(document.querySelectorAll("[data-menu-dropzone]"));
 
     function getAfterElement(zone, clientY) {
-      const cards = Array.from(zone.querySelectorAll("[data-menu-assignment-card]")).filter(
-        (card) => card !== dragged
-      );
+      const cards = Array.from(
+        zone.querySelectorAll("[data-menu-assignment-card]"),
+      ).filter((card) => card !== dragged);
 
       let closest = null;
       let closestOffset = Number.NEGATIVE_INFINITY;
@@ -1026,8 +1374,11 @@ const errorMessage =
         if (!dragged) return;
         if (!(dragged instanceof Element)) return;
 
-        const sameKind = dragged.getAttribute("data-kind") === zone.getAttribute("data-kind");
-        const sameCourse = dragged.getAttribute("data-course") === zone.getAttribute("data-course");
+        const sameKind =
+          dragged.getAttribute("data-kind") === zone.getAttribute("data-kind");
+        const sameCourse =
+          dragged.getAttribute("data-course") ===
+          zone.getAttribute("data-course");
         if (!sameKind || !sameCourse) return;
 
         event.preventDefault();
@@ -1044,8 +1395,11 @@ const errorMessage =
         if (!dragged) return;
         if (!(dragged instanceof Element)) return;
 
-        const sameKind = dragged.getAttribute("data-kind") === zone.getAttribute("data-kind");
-        const sameCourse = dragged.getAttribute("data-course") === zone.getAttribute("data-course");
+        const sameKind =
+          dragged.getAttribute("data-kind") === zone.getAttribute("data-kind");
+        const sameCourse =
+          dragged.getAttribute("data-course") ===
+          zone.getAttribute("data-course");
         if (!sameKind || !sameCourse) {
           clearDraggedState();
           return;
@@ -1054,7 +1408,7 @@ const errorMessage =
         event.preventDefault();
 
         const orderedIds = Array.from(
-          zone.querySelectorAll("[data-menu-assignment-card]")
+          zone.querySelectorAll("[data-menu-assignment-card]"),
         )
           .map((card) => card.getAttribute("data-menu-assignment-card"))
           .filter(Boolean);

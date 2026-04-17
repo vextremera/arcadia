@@ -6,6 +6,7 @@ type Availability = {
   pauseOrders: boolean;
   forcePickup: boolean;
   deliveryFeeCents: number;
+  deliveryMessage?: string;
   isOpen: boolean;
   kitchenOpen: boolean;
   deliveryAvailable: boolean;
@@ -278,7 +279,9 @@ export default function CheckoutForm() {
             typeof window !== "undefined" ? window.localStorage.getItem(LAST_ADDRESS_KEY) : null;
           const lastId = lastIdRaw ? Number(lastIdRaw) : NaN;
 
-          const last = Number.isFinite(lastId) ? list.find((item) => item.id === lastId) : undefined;
+          const last = Number.isFinite(lastId)
+            ? list.find((item) => item.id === lastId)
+            : undefined;
           const def = list.find((item) => item.isDefault);
           const chosen = last ?? def ?? list[0];
 
@@ -300,8 +303,10 @@ export default function CheckoutForm() {
   useEffect(() => {
     if (!payments) return;
 
-    const okCash = type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
-    const okCard = type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
+    const okCash =
+      type === "DELIVERY" ? payments.delivery.cashEnabled : payments.pickup.cashEnabled;
+    const okCard =
+      type === "DELIVERY" ? payments.delivery.cardEnabled : payments.pickup.cardEnabled;
 
     if (paymentMethod === "CASH" && !okCash && okCard) setPaymentMethod("CARD");
     if (paymentMethod === "CARD" && !okCard && okCash) setPaymentMethod("CASH");
@@ -321,6 +326,11 @@ export default function CheckoutForm() {
 
     void applyCoupon(couponPreview.code, true);
   }, [type, deliveryFeeCents]);
+
+  const deliveryNotice = useMemo(() => {
+    if (avail?.deliveryMessage?.trim()) return avail.deliveryMessage.trim();
+    return `Fuera de horario de reparto (${avail?.windows.delivery.start ?? ""}–${avail?.windows.delivery.end ?? ""}).`;
+  }, [avail]);
 
   async function makeDefaultFromCheckout() {
     if (!isLoggedIn) return;
@@ -378,7 +388,11 @@ export default function CheckoutForm() {
       saveProfile: shouldSaveProfile,
       saveAddress: isLoggedIn && type === "DELIVERY" && saveThisAddress && !selectedAddressId,
       saveAddressDefault:
-        isLoggedIn && type === "DELIVERY" && saveThisAddress && saveAsDefault && !selectedAddressId,
+        isLoggedIn &&
+        type === "DELIVERY" &&
+        saveThisAddress &&
+        saveAsDefault &&
+        !selectedAddressId,
       saveAddressLabel:
         isLoggedIn && type === "DELIVERY" && saveThisAddress && !selectedAddressId
           ? saveAddressLabel.trim()
@@ -423,8 +437,12 @@ export default function CheckoutForm() {
 
           {!avail?.deliveryAvailable ? (
             <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Ahora mismo no hay reparto. Horario delivery: {avail?.windows.delivery.start}–
-              {avail?.windows.delivery.end}. Tu pedido será <b>recogida</b>.
+              <div class="font-semibold">
+                {avail?.forcePickup ? "Solo recogida" : "Delivery no disponible ahora"}
+              </div>
+              <p class="mt-1 leading-6">
+                {deliveryNotice} Tu pedido será <b>recogida</b>.
+              </p>
             </div>
           ) : null}
 
@@ -707,9 +725,7 @@ export default function CheckoutForm() {
               <button
                 type="button"
                 class={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                  couponLoading
-                    ? "bg-zinc-400 text-white"
-                    : "bg-zinc-900 text-white"
+                  couponLoading ? "bg-zinc-400 text-white" : "bg-zinc-900 text-white"
                 }`}
                 onClick={() => applyCoupon()}
                 disabled={couponLoading || !couponCode.trim()}
@@ -717,7 +733,7 @@ export default function CheckoutForm() {
                 {couponLoading ? "Validando…" : "Aplicar"}
               </button>
 
-              {(couponPreview?.ok || couponCode.trim()) ? (
+              {couponPreview?.ok || couponCode.trim() ? (
                 <button
                   type="button"
                   class="rounded-xl border border-zinc-300 px-4 py-2 text-sm font-semibold"
@@ -796,7 +812,9 @@ export default function CheckoutForm() {
           {couponPreview?.ok ? (
             <div class="mt-2 flex items-center justify-between text-sm">
               <span class="text-zinc-600">Cupón · {couponPreview.code}</span>
-              <span class="font-semibold text-emerald-700">- {money(couponPreview.discountCents)}</span>
+              <span class="font-semibold text-emerald-700">
+                - {money(couponPreview.discountCents)}
+              </span>
             </div>
           ) : null}
 

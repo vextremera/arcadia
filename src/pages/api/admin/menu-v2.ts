@@ -285,7 +285,11 @@ export const POST: APIRoute = async (context) => {
     }
 
     const [dish] = await db
-      .select({ id: MenuDish.id })
+      .select({
+        id: MenuDish.id,
+        name: MenuDish.name,
+        slug: MenuDish.slug,
+      })
       .from(MenuDish)
       .where(eq(MenuDish.id, dishId))
       .limit(1);
@@ -308,10 +312,18 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
     }
 
+    const slug =
+      name === dish.name ? dish.slug : await buildUniqueDishSlug(name, dishId);
+
+    if (!slug) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
+    }
+
     await db
       .update(MenuDish)
       .set({
         name,
+        slug,
         description: description ?? undefined,
         course,
         active,
@@ -358,6 +370,7 @@ export const POST: APIRoute = async (context) => {
       .select({
         id: MenuDish.id,
         course: MenuDish.course,
+        active: MenuDish.active,
       })
       .from(MenuDish)
       .where(eq(MenuDish.id, dishId))
@@ -367,14 +380,9 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "dish-not-found" }));
     }
 
-    const existingSame = await db
-      .select({ id: MenuDishAssignment.id })
-      .from(MenuDishAssignment)
-      .where(eq(MenuDishAssignment.kind, kind));
-
-    const alreadyAssigned = existingSame.some((row) => {
-      return row.id && false;
-    });
+    if (!dish.active) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "inactive-dish" }));
+    }
 
     const existingAssignmentsForDish = await db
       .select({
@@ -565,8 +573,6 @@ export const POST: APIRoute = async (context) => {
         : DEFAULT_MENU_CONFIG.FESTIVO,
     };
 
-    await saveMenuConfig(nextConfig);
-
     let nextDishId = 1;
     let nextAssignmentId = 1;
 
@@ -664,6 +670,8 @@ export const POST: APIRoute = async (context) => {
     if (!dishesToInsert.length || !assignmentsToInsert.length) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "import-failed" }));
     }
+
+    await saveMenuConfig(nextConfig);
 
     await db.insert(MenuDish).values(dishesToInsert);
     await db.insert(MenuDishAssignment).values(assignmentsToInsert);

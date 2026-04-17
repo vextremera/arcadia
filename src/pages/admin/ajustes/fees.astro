@@ -4,7 +4,11 @@ import { db, AppSetting, eq } from "astro:db";
 
 type DeliveryFeeSetting = { cents: number };
 
-const DEFAULT_DELIVERY_FEE: DeliveryFeeSetting = { cents: 250 };
+type LegacyFeesSetting = {
+  deliveryFeeCents?: number;
+};
+
+const DEFAULT_DELIVERY_FEE: DeliveryFeeSetting = { cents: 0 };
 
 const [rowDelivery] = await db
   .select({ value: AppSetting.value })
@@ -18,18 +22,24 @@ const [rowLegacy] = await db
   .where(eq(AppSetting.key, "fees"))
   .limit(1);
 
-const legacyValue = rowLegacy?.value as { deliveryFeeCents?: number } | undefined;
+const legacyValue = rowLegacy?.value as LegacyFeesSetting | undefined;
 
 const deliveryFee = (rowDelivery?.value ??
   (typeof legacyValue?.deliveryFeeCents === "number"
     ? { cents: Number(legacyValue.deliveryFeeCents) }
     : DEFAULT_DELIVERY_FEE)) as DeliveryFeeSetting;
 
-const deliveryFeeEur = ((Number(deliveryFee.cents ?? 0)) / 100).toFixed(2);
+const deliveryFeeEur = (Number(deliveryFee.cents ?? 0) / 100).toFixed(2);
 const hasLegacyOnly = Boolean(rowLegacy && !rowDelivery);
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") === "1";
+const error = url.searchParams.get("error") ?? "";
+
+const errorMessage =
+  error === "invalid-fee"
+    ? "Introduce un importe válido en euros para la tarifa de delivery."
+    : "";
 ---
 
 <AdminLayout
@@ -59,6 +69,12 @@ const saved = url.searchParams.get("saved") === "1";
   {saved ? (
     <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
       Fee guardado correctamente.
+    </section>
+  ) : null}
+
+  {errorMessage ? (
+    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      {errorMessage}
     </section>
   ) : null}
 

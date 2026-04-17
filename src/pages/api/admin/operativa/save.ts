@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { db, AppSetting, eq } from "astro:db";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 type OperatingHoursSetting = {
   open: { start: string; end: string };
@@ -11,90 +12,239 @@ type DeliveryFeeSetting = {
   cents: number;
 };
 
+type LegacyFeesSetting = {
+  deliveryFeeCents?: number;
+  [key: string]: unknown;
+};
+
 type OpsFlagsSetting = {
   pauseOrders: boolean;
   forcePickup: boolean;
 };
 
-function toCents(v: string) {
-  const n = Number(String(v ?? "").replace(",", "."));
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.round(n * 100));
+const DEFAULT_OPERATING_HOURS: OperatingHoursSetting = {
+  open: { start: "07:30", end: "00:00" },
+  kitchen: { start: "08:00", end: "23:20" },
+  delivery: { start: "20:00", end: "22:50" },
+};
+
+const DEFAULT_DELIVERY_FEE: DeliveryFeeSetting = { cents: 0 };
+const DEFAULT_OPS_FLAGS: OpsFlagsSetting = { pauseOrders: false, forcePickup: false };
+
+function withQuery(path: string, params: Record<string, string>) {
+  const url = new URL(path, "http://local");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
 }
 
-function safeTime(value: FormDataEntryValue | null, fallback: string) {
-  const raw = String(value ?? "").trim();
-  return /^\d{2}:\d{2}$/.test(raw) ? raw : fallback;
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
 }
 
-async function upsertSetting<T>(key: string, value: T) {
-  const [existing] = await db
-    .select({ key: AppSetting.key })
+function parseTime(value: FormDataEntryValue | null, mode: "open" | "close") {
+  const raw = safeText(value);
+  const match = raw.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+  if (mode === "close" && hour === 0 && minute === 0) {
+    return 24 * 60;
+  }
+
+  return hour * 60 + minute;
+}
+
+function parseEuroToCents(value: FormDataEntryValue | null) {
+  const raw = safeText(value).replace(",", ".");
+  if (!raw) return 0;
+
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+
+  return Math.round(amount * 100);
+}
+
+async function getNextId() {
+  const rows = await db.select({ id: AppSetting.id }).from(AppSetting);
+  return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
+}
+
+async function getSettingValue<T>(key: string, fallback: T): Promise<{ id?: number; value: T }> {
+  const [row] = await db
+    .select({
+      id: AppSetting.id,
+      value: AppSetting.value,
+    })
     .from(AppSetting)
     .where(eq(AppSetting.key, key))
     .limit(1);
 
-  if (existing) {
+  return {
+    id: row?.id,
+    value: (row?.value ?? fallback) as T,
+  };
+}
+
+async function upsertSetting(key: string, value: unknown, id?: number) {
+  if (id) {
     await db
       .update(AppSetting)
-      .set({ value, updatedAt: new Date() })
-      .where(eq(AppSetting.key, key));
-  } else {
-    await db.insert(AppSetting).values({ key, value });
+      .set({
+        value,
+        updatedAt: new Date(),
+      })
+      .where(eq(AppSetting.id, id));
+
+    return id;
   }
+
+  const nextId = await getNextId();
+
+  await db.insert(AppSetting).values({
+    id: nextId,
+    key,
+    value,
+    updatedAt: new Date(),
+  });
+
+  return nextId;
 }
 
 export const POST: APIRoute = async (context) => {
-  const u = context.locals.user;
-  if (!u || (u.role !== "ADMIN" && u.role !== "STAFF")) {
+  const user = context.locals.user;
+  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
+  if (!allowed) {
     return context.redirect("/admin/login");
   }
 
   const form = await context.request.formData();
 
-  const operatingHours: OperatingHoursSetting = {
-    open: {
-      start: safeTime(form.get("openStart"), "07:30"),
-      end: safeTime(form.get("openEnd"), "00:00"),
-    },
-    kitchen: {
-      start: safeTime(form.get("kitchenStart"), "08:00"),
-      end: safeTime(form.get("kitchenEnd"), "23:20"),
-    },
-    delivery: {
-      start: safeTime(form.get("deliveryStart"), "20:00"),
-      end: safeTime(form.get("deliveryEnd"), "22:50"),
-    },
+  const openStart = safeText(form.get("openStart"));
+  const openEnd = safeText(form.get("openEnd"));
+  const kitchenStart = safeText(form.get("kitchenStart"));
+  const kitchenEnd = safeText(form.get("kitchenEnd"));
+  const deliveryStart = safeText(form.get("deliveryStart"));
+  const deliveryEnd = safeText(form.get("deliveryEnd"));
+
+  const openStartMins = parseTime(form.get("openStart"), "open");
+  const openEndMins = parseTime(form.get("openEnd"), "close");
+  const kitchenStartMins = parseTime(form.get("kitchenStart"), "open");
+  const kitchenEndMins = parseTime(form.get("kitchenEnd"), "close");
+  const deliveryStartMins = parseTime(form.get("deliveryStart"), "open");
+  const deliveryEndMins = parseTime(form.get("deliveryEnd"), "close");
+
+  const allValidHours =
+    openStartMins !== null &&
+    openEndMins !== null &&
+    kitchenStartMins !== null &&
+    kitchenEndMins !== null &&
+    deliveryStartMins !== null &&
+    deliveryEndMins !== null &&
+    openStartMins < openEndMins &&
+    kitchenStartMins < kitchenEndMins &&
+    deliveryStartMins < deliveryEndMins;
+
+  if (!allValidHours) {
+    return context.redirect(withQuery("/admin/operativa", { hoursError: "invalid-hours" }));
+  }
+
+  const feeCents = parseEuroToCents(form.get("deliveryFeeEur"));
+  if (feeCents === null) {
+    return context.redirect(withQuery("/admin/operativa", { hoursError: "invalid-hours" }));
+  }
+
+  const nextOperatingHours: OperatingHoursSetting = {
+    open: { start: openStart, end: openEnd },
+    kitchen: { start: kitchenStart, end: kitchenEnd },
+    delivery: { start: deliveryStart, end: deliveryEnd },
   };
 
-  const deliveryFee: DeliveryFeeSetting = {
-    cents: toCents(String(form.get("deliveryFeeEur") ?? "0")),
-  };
-
-  const opsFlags: OpsFlagsSetting = {
+  const nextDeliveryFee: DeliveryFeeSetting = { cents: feeCents };
+  const nextOpsFlags: OpsFlagsSetting = {
     pauseOrders: form.get("pauseOrders") === "on",
     forcePickup: form.get("forcePickup") === "on",
   };
 
-  await upsertSetting("operatingHours", operatingHours);
-  await upsertSetting("deliveryFee", deliveryFee);
-  await upsertSetting("opsFlags", opsFlags);
+  const previousOperatingHours = await getSettingValue<OperatingHoursSetting>(
+    "operatingHours",
+    DEFAULT_OPERATING_HOURS
+  );
+  const previousDeliveryFee = await getSettingValue<DeliveryFeeSetting>(
+    "deliveryFee",
+    DEFAULT_DELIVERY_FEE
+  );
+  const previousLegacyFees = await getSettingValue<LegacyFeesSetting>("fees", {
+    deliveryFeeCents: DEFAULT_DELIVERY_FEE.cents,
+  });
+  const previousOpsFlags = await getSettingValue<OpsFlagsSetting>("opsFlags", DEFAULT_OPS_FLAGS);
 
-  const [legacyFees] = await db
-    .select({ key: AppSetting.key })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, "fees"))
-    .limit(1);
+  const nextLegacyFees: LegacyFeesSetting = {
+    ...(previousLegacyFees.value ?? {}),
+    deliveryFeeCents: feeCents,
+  };
 
-  if (legacyFees) {
-    await db
-      .update(AppSetting)
-      .set({
-        value: { deliveryFeeCents: deliveryFee.cents },
-        updatedAt: new Date(),
-      })
-      .where(eq(AppSetting.key, "fees"));
+  await upsertSetting("operatingHours", nextOperatingHours, previousOperatingHours.id);
+  await upsertSetting("deliveryFee", nextDeliveryFee, previousDeliveryFee.id);
+  await upsertSetting("fees", nextLegacyFees, previousLegacyFees.id);
+  await upsertSetting("opsFlags", nextOpsFlags, previousOpsFlags.id);
+
+  const { ip, userAgent } = getRequestAuditMeta(context.request);
+  const actorUserId = user.id;
+
+  try {
+    await writeAuditLog({
+      actorUserId,
+      action: "OPERATING_HOURS_UPDATED",
+      entityType: "operating_hours",
+      entityId: "operatingHours",
+      diff: {
+        previous: previousOperatingHours.value,
+        next: nextOperatingHours,
+      },
+      ip,
+      userAgent,
+    });
+
+    await writeAuditLog({
+      actorUserId,
+      action: "FEES_SETTINGS_UPDATED",
+      entityType: "app_setting",
+      entityId: "deliveryFee",
+      diff: {
+        previous: {
+          deliveryFee: previousDeliveryFee.value,
+          fees: previousLegacyFees.value,
+        },
+        next: {
+          deliveryFee: nextDeliveryFee,
+          fees: nextLegacyFees,
+        },
+      },
+      ip,
+      userAgent,
+    });
+
+    await writeAuditLog({
+      actorUserId,
+      action: "OPS_FLAGS_UPDATED",
+      entityType: "ops_flags",
+      entityId: "opsFlags",
+      diff: {
+        previous: previousOpsFlags.value,
+        next: nextOpsFlags,
+      },
+      ip,
+      userAgent,
+    });
+  } catch (error) {
+    console.error("[audit] operativa save failed", error);
   }
 
-  return context.redirect("/admin/operativa?saved=1");
+  return context.redirect(withQuery("/admin/operativa", { saved: "1" }));
 };

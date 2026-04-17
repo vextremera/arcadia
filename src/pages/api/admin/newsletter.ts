@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import nodemailer from "nodemailer";
 import { db, NewsletterSubscriber, eq } from "astro:db";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -99,6 +100,9 @@ export const POST: APIRoute = async (context) => {
     return context.redirect("/admin/login");
   }
 
+  const { ip, userAgent } = getRequestAuditMeta(context.request);
+  const actorUserId = user.id;
+
   const form = await context.request.formData();
   const intent = safeText(form.get("intent"));
   const redirectPath = "/admin/newsletter";
@@ -114,7 +118,11 @@ export const POST: APIRoute = async (context) => {
     }
 
     const [subscriber] = await db
-      .select({ id: NewsletterSubscriber.id })
+      .select({
+        id: NewsletterSubscriber.id,
+        email: NewsletterSubscriber.email,
+        active: NewsletterSubscriber.active,
+      })
       .from(NewsletterSubscriber)
       .where(eq(NewsletterSubscriber.id, subscriberId))
       .limit(1);
@@ -130,12 +138,31 @@ export const POST: APIRoute = async (context) => {
       .set({ active, updatedAt: new Date() })
       .where(eq(NewsletterSubscriber.id, subscriberId));
 
+    try {
+      await writeAuditLog({
+        actorUserId,
+        action: active ? "NEWSLETTER_SUBSCRIBER_ENABLED" : "NEWSLETTER_SUBSCRIBER_DISABLED",
+        entityType: "newsletter_subscriber",
+        entityId: String(subscriberId),
+        diff: {
+          email: subscriber.email,
+          previousActive: subscriber.active,
+          nextActive: active,
+        },
+        ip,
+        userAgent,
+      });
+    } catch (error) {
+      console.error("[audit] newsletter toggle failed", error);
+    }
+
     return context.redirect(withQuery(redirectPath, { saved: "subscriber" }));
   }
 
   if (intent === "send") {
     const subject = safeText(form.get("subject"));
     const body = safeText(form.get("body"));
+    const preset = safeText(form.get("preset")) || "GENERAL";
 
     if (!subject) {
       return context.redirect(
@@ -150,7 +177,10 @@ export const POST: APIRoute = async (context) => {
     }
 
     const activeSubscribers = await db
-      .select({ email: NewsletterSubscriber.email })
+      .select({
+        id: NewsletterSubscriber.id,
+        email: NewsletterSubscriber.email,
+      })
       .from(NewsletterSubscriber)
       .where(eq(NewsletterSubscriber.active, true));
 
@@ -174,6 +204,26 @@ export const POST: APIRoute = async (context) => {
         subject,
         body,
       });
+
+      try {
+        await writeAuditLog({
+          actorUserId,
+          action: "NEWSLETTER_SENT",
+          entityType: "newsletter_broadcast",
+          entityId: new Date().toISOString(),
+          diff: {
+            preset,
+            subject,
+            recipients: recipients.length,
+            sent: result.sent,
+            failed: result.failed,
+          },
+          ip,
+          userAgent,
+        });
+      } catch (error) {
+        console.error("[audit] newsletter send failed", error);
+      }
 
       return context.redirect(
         withQuery(redirectPath, {

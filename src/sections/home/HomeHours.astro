@@ -1,6 +1,7 @@
 ---
 import { getWeeklyHours } from "@/features/hours/server/weeklyHours";
 import { getArcadiaAvailability } from "@/server/time/madrid";
+import { buildOperationalMessage } from "@/server/time/publicMessages";
 
 const weeklyHours = await getWeeklyHours();
 const availability = await getArcadiaAvailability();
@@ -41,17 +42,7 @@ const liveCards = [
   },
 ];
 
-const specialNotes = availability.specialDateNotes ?? [];
-
-const operationalMessage = availability.pauseOrders
-  ? "Los pedidos están pausados temporalmente desde operativa. Puedes consultar horarios, pero el canal de pedidos puede no estar disponible en este momento."
-  : availability.forcePickup
-    ? availability.sourceNotes.delivery?.trim()
-      ? `Ahora mismo el delivery está desactivado temporalmente y el sistema puede forzar recogida. ${availability.sourceNotes.delivery.trim()}`
-      : "Ahora mismo el delivery está desactivado temporalmente y el sistema puede forzar recogida."
-    : specialNotes.length > 0
-      ? specialNotes.map((item) => `${item.channel}: ${item.note}`).join(" · ")
-      : "";
+const operationalMessage = buildOperationalMessage(availability);
 
 const operationalTone = availability.pauseOrders
   ? "border-rose-200 bg-rose-50 text-rose-900"

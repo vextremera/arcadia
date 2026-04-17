@@ -1,57 +1,132 @@
 import type { APIRoute } from "astro";
 import { db, AppSetting, eq } from "astro:db";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 type DeliveryFeeSetting = {
   cents: number;
 };
 
-function parseEurToCents(v: string) {
-  const n = Number(String(v ?? "").replace(",", "."));
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.round(n * 100));
+type LegacyFeesSetting = {
+  deliveryFeeCents?: number;
+  [key: string]: unknown;
+};
+
+function withQuery(path: string, params: Record<string, string>) {
+  const url = new URL(path, "http://local");
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
 }
 
-export const POST: APIRoute = async (context) => {
-  const u = context.locals.user;
-  if (!u || (u.role !== "ADMIN" && u.role !== "STAFF")) {
-    return context.redirect("/admin/login");
-  }
+function safeText(value: FormDataEntryValue | null) {
+  return String(value ?? "").trim();
+}
 
-  const form = await context.request.formData();
-  const deliveryFeeEur = String(form.get("deliveryFeeEur") ?? "0");
-  const cents = parseEurToCents(deliveryFeeEur);
-  const value: DeliveryFeeSetting = { cents };
+function parseEuroToCents(value: FormDataEntryValue | null) {
+  const raw = safeText(value).replace(",", ".");
+  if (!raw) return null;
 
-  const [existing] = await db
-    .select({ key: AppSetting.key })
+  const amount = Number(raw);
+  if (!Number.isFinite(amount) || amount < 0) return null;
+
+  return Math.round(amount * 100);
+}
+
+async function getNextId() {
+  const rows = await db.select({ id: AppSetting.id }).from(AppSetting);
+  return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
+}
+
+async function getSettingValue<T>(key: string, fallback: T): Promise<{ id?: number; value: T }> {
+  const [row] = await db
+    .select({
+      id: AppSetting.id,
+      value: AppSetting.value,
+    })
     .from(AppSetting)
-    .where(eq(AppSetting.key, "deliveryFee"))
+    .where(eq(AppSetting.key, key))
     .limit(1);
 
-  if (existing) {
-    await db
-      .update(AppSetting)
-      .set({ value, updatedAt: new Date() })
-      .where(eq(AppSetting.key, "deliveryFee"));
-  } else {
-    await db.insert(AppSetting).values({ key: "deliveryFee", value });
-  }
+  return {
+    id: row?.id,
+    value: (row?.value ?? fallback) as T,
+  };
+}
 
-  const [legacy] = await db
-    .select({ key: AppSetting.key })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, "fees"))
-    .limit(1);
-
-  if (legacy) {
+async function upsertSetting(key: string, value: unknown, id?: number) {
+  if (id) {
     await db
       .update(AppSetting)
       .set({
-        value: { deliveryFeeCents: cents },
+        value,
         updatedAt: new Date(),
       })
-      .where(eq(AppSetting.key, "fees"));
+      .where(eq(AppSetting.id, id));
+
+    return id;
   }
 
-  return context.redirect("/admin/ajustes/fees?saved=1");
+  const nextId = await getNextId();
+  await db.insert(AppSetting).values({
+    id: nextId,
+    key,
+    value,
+    updatedAt: new Date(),
+  });
+
+  return nextId;
+}
+
+export const POST: APIRoute = async (context) => {
+  const user = context.locals.user;
+  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
+  if (!allowed) {
+    return context.redirect("/admin/login");
+  }
+
+  const cents = parseEuroToCents((await context.request.formData()).get("deliveryFeeEur"));
+  if (cents === null) {
+    return context.redirect(withQuery("/admin/ajustes/fees", { error: "invalid-fee" }));
+  }
+
+  const { ip, userAgent } = getRequestAuditMeta(context.request);
+  const actorUserId = user.id;
+
+  const previousDeliveryFee = await getSettingValue<DeliveryFeeSetting>("deliveryFee", { cents: 0 });
+  const previousLegacyFees = await getSettingValue<LegacyFeesSetting>("fees", { deliveryFeeCents: 0 });
+
+  const nextDeliveryFee: DeliveryFeeSetting = { cents };
+  const nextLegacyFees: LegacyFeesSetting = {
+    ...(previousLegacyFees.value ?? {}),
+    deliveryFeeCents: cents,
+  };
+
+  await upsertSetting("deliveryFee", nextDeliveryFee, previousDeliveryFee.id);
+  await upsertSetting("fees", nextLegacyFees, previousLegacyFees.id);
+
+  try {
+    await writeAuditLog({
+      actorUserId,
+      action: "FEES_SETTINGS_UPDATED",
+      entityType: "app_setting",
+      entityId: "deliveryFee",
+      diff: {
+        previous: {
+          deliveryFee: previousDeliveryFee.value,
+          fees: previousLegacyFees.value,
+        },
+        next: {
+          deliveryFee: nextDeliveryFee,
+          fees: nextLegacyFees,
+        },
+      },
+      ip,
+      userAgent,
+    });
+  } catch (error) {
+    console.error("[audit] fees settings failed", error);
+  }
+
+  return context.redirect(withQuery("/admin/ajustes/fees", { saved: "1" }));
 };

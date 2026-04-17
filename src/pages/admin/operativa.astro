@@ -26,6 +26,9 @@ type ChannelEditor = {
   isClosed: boolean;
   open: string;
   close: string;
+  resolutionSource: "OPENING_HOUR" | "APP_SETTING";
+  resolutionLabel: string;
+  resolutionTone: string;
 };
 
 type WeeklyRow = {
@@ -152,6 +155,20 @@ function sourceLabel(source: string) {
   return "Fallback AppSetting";
 }
 
+function weeklySourceMeta(source: "OPENING_HOUR" | "APP_SETTING") {
+  if (source === "OPENING_HOUR") {
+    return {
+      label: "OpeningHour",
+      tone: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
+    };
+  }
+
+  return {
+    label: "Fallback AppSetting",
+    tone: "border-amber-400/20 bg-amber-400/10 text-amber-200",
+  };
+}
+
 const availability = await getArcadiaAvailability(new Date());
 
 const operatingHours = await getSetting<OperatingHoursSetting>(
@@ -239,6 +256,8 @@ const weeklyRows: WeeklyRow[] = DAYS.map((day) => ({
   channels: CHANNELS.map((channel) => {
     const fallback = fallbackWindowForChannel(channel.key, operatingHours);
     const row = openingHourByKey.get(`${day.key}:${channel.key}`);
+    const resolutionSource = row ? "OPENING_HOUR" : "APP_SETTING";
+    const resolutionMeta = weeklySourceMeta(resolutionSource);
 
     return {
       key: channel.key,
@@ -248,6 +267,9 @@ const weeklyRows: WeeklyRow[] = DAYS.map((day) => ({
       isClosed: row?.isClosed ?? false,
       open: row ? minsToHHMM(row.openMins) : fallback.start,
       close: row ? minsToHHMM(row.closeMins) : fallback.end,
+      resolutionSource,
+      resolutionLabel: resolutionMeta.label,
+      resolutionTone: resolutionMeta.tone,
     };
   }),
 }));
@@ -296,6 +318,22 @@ const specialDatesErrorMessage =
               : "";
 
 const structuredHoursEnabled = openingHourRows.length > 0;
+const totalWeeklySlots = DAYS.length * CHANNELS.length;
+const structuredWeeklySlots = weeklyRows.reduce(
+  (count, day) =>
+    count +
+    day.channels.filter((channel) => channel.resolutionSource === "OPENING_HOUR").length,
+  0
+);
+const fallbackWeeklySlots = totalWeeklySlots - structuredWeeklySlots;
+const fullyStructuredWeeklyHours = structuredWeeklySlots === totalWeeklySlots;
+const partiallyStructuredWeeklyHours =
+  structuredWeeklySlots > 0 && structuredWeeklySlots < totalWeeklySlots;
+const weeklyResolutionHelp = fullyStructuredWeeklyHours
+  ? "Cobertura completa en OpeningHour"
+  : structuredWeeklySlots === 0
+    ? "Ahora mismo todo cae a AppSetting"
+    : `${structuredWeeklySlots}/${totalWeeklySlots} franjas en OpeningHour · ${fallbackWeeklySlots} en fallback`;
 const todayDateISO = availability.todayDateISO;
 const todaySpecialDates = specialDates.filter((row) => row.dateISO === todayDateISO);
 const upcomingSpecialDates = specialDates.filter((row) => row.dateISO >= todayDateISO);
@@ -359,7 +397,7 @@ const statusCards = [
 <AdminLayout
   title="Operativa · Admin · Arcadia"
   heading="Operativa"
-  description="Control central del negocio: base legacy, horario semanal estructurado y excepciones por fecha sin romper checkout ni flags actuales."
+  description="Control central del negocio con precedencia real visible: SpecialDate > OpeningHour > AppSetting, manteniendo kitchen y flags en la capa base."
   actions={true}
 >
   <Fragment slot="actions">
@@ -427,6 +465,63 @@ const statusCards = [
         <p class="mt-2 text-sm text-white/75">{card.help}</p>
       </article>
     ))}
+  </section>
+
+  <section class="mt-6 grid gap-4 xl:grid-cols-3">
+    <article class="rounded-3xl border border-white/10 bg-slate-950/70 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        Precedencia real
+      </div>
+      <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+        SpecialDate → OpeningHour → AppSetting
+      </div>
+      <p class="mt-2 text-sm leading-6 text-slate-400">
+        La resolución es por canal y por fecha. Si falta una franja semanal concreta, no se cae todo el sistema: solo esa celda vuelve al fallback base.
+      </p>
+    </article>
+
+    <article class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+        Cobertura semanal
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {structuredWeeklySlots}/{totalWeeklySlots}
+      </div>
+      <p class="mt-2 text-sm text-cyan-100/80">
+        Franjas resueltas desde OpeningHour
+      </p>
+    </article>
+
+    <article
+      class:list={[
+        "rounded-3xl border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+        fallbackWeeklySlots > 0
+          ? "border-amber-400/20 bg-amber-400/10"
+          : "border-emerald-400/20 bg-emerald-400/10",
+      ]}
+    >
+      <div
+        class:list={[
+          "text-[11px] font-semibold uppercase tracking-[0.22em]",
+          fallbackWeeklySlots > 0 ? "text-amber-200" : "text-emerald-200",
+        ]}
+      >
+        Dependencia base
+      </div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+        {fallbackWeeklySlots}
+      </div>
+      <p
+        class:list={[
+          "mt-2 text-sm",
+          fallbackWeeklySlots > 0 ? "text-amber-100/80" : "text-emerald-100/80",
+        ]}
+      >
+        {fallbackWeeklySlots > 0
+          ? "Franjas que siguen usando AppSetting"
+          : "Sin dependencia semanal del fallback"}
+      </p>
+    </article>
   </section>
 
   {todaySpecialDates.length > 0 ? (
@@ -690,14 +785,20 @@ const statusCards = [
             Horario semanal estructurado por canal
           </h2>
           <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Aquí sí escribes sobre la tabla real <code>OpeningHour</code>. Si guardas esta sección, el sistema deja de depender solo de la ventana genérica y pasa a resolver local, pickup y delivery por día de la semana.
+            Aquí sí escribes sobre la tabla real <code>OpeningHour</code>. La cobertura es por día y por canal: una franja guardada pisa el fallback base solo en esa celda, y lo que falte sigue resolviéndose desde <code>AppSetting</code>.
           </p>
         </div>
 
         <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-          {structuredHoursEnabled ? "Horario semanal activo" : "Ahora mismo se usa fallback AppSetting"}
+          {weeklyResolutionHelp}
         </div>
       </div>
+
+      {partiallyStructuredWeeklyHours ? (
+        <div class="mt-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+          Hay cobertura semanal parcial: algunas celdas ya viven en <span class="font-semibold text-amber-200">OpeningHour</span> y otras siguen cayendo al fallback base. Esto es válido, pero conviene terminar la matriz para evitar lecturas ambiguas.
+        </div>
+      ) : null}
 
       <div class="mt-6 overflow-x-auto rounded-3xl border border-white/10 bg-slate-950/40">
         <table class="min-w-full border-collapse">
@@ -737,6 +838,21 @@ const statusCards = [
                           />
                           Cerrado
                         </label>
+                      </div>
+
+                      <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
+                        <span class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
+                          channel.resolutionTone,
+                        ]}>
+                          {channel.resolutionLabel}
+                        </span>
+
+                        {channel.resolutionSource === "APP_SETTING" ? (
+                          <span class="text-xs text-slate-400">
+                            Esta celda sigue usando la ventana base
+                          </span>
+                        ) : null}
                       </div>
 
                       <div class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1033,21 +1149,21 @@ const statusCards = [
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
             <div class="text-sm font-semibold text-white">Prioridad real</div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              <code>SpecialDate</code> pisa primero. Si no hay excepción, se usa <code>OpeningHour</code>. Si aún no hay horario semanal, se cae al fallback legacy de <code>AppSetting</code>.
+              <code>SpecialDate</code> pisa primero. Si no hay excepción para ese canal y fecha, se usa <code>OpeningHour</code> del día. Si falta esa franja concreta, se cae solo esa resolución al fallback de <code>AppSetting</code>.
             </p>
           </div>
 
           <div class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4">
             <div class="text-sm font-semibold text-amber-200">Límite actual del schema</div>
             <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              La cocina no tiene canal propio en <code>OpeningHour</code>, así que su ventana sigue viviendo en la configuración base.
+              La cocina no tiene canal propio en <code>OpeningHour</code>, así que su ventana sigue viviendo en la configuración base aunque local, pickup y delivery ya puedan resolverse por día/canal.
             </p>
           </div>
 
           <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
             <div class="text-sm font-semibold text-white">Impacto real</div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              Checkout y disponibilidad pública ya pasan por esta resolución. No estás montando pantallas decorativas: estás moviendo la lógica real del negocio a tablas más expresivas.
+              Checkout, disponibilidad pública y la home ya pasan por esta resolución. La pantalla de operativa debe reflejar esa precedencia real para que no parezca que todo está en <code>OpeningHour</code> cuando aún quedan celdas en fallback.
             </p>
           </div>
         </div>

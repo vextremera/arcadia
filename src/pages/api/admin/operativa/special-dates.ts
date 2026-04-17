@@ -1,8 +1,19 @@
 import type { APIRoute } from "astro";
 import { db, SpecialDate, eq } from "astro:db";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 const CHANNELS = ["DINE_IN", "DELIVERY", "PICKUP"] as const;
+
 type ChannelKey = (typeof CHANNELS)[number];
+
+type SpecialDateAuditShape = {
+  dateISO: string;
+  channel: ChannelKey;
+  isClosed: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  note: string | null;
+};
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -49,6 +60,38 @@ function parseTime(value: FormDataEntryValue | null, mode: "open" | "close") {
   return hour * 60 + minute;
 }
 
+function minsToHHMM(mins: number | null | undefined) {
+  if (!Number.isFinite(Number(mins))) return null;
+  const value = Math.max(0, Math.min(24 * 60, Math.trunc(Number(mins))));
+  if (value === 24 * 60) return "00:00";
+  const h = Math.floor(value / 60);
+  const mm = value % 60;
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function toAuditShape(row: {
+  dateISO: string;
+  channel: ChannelKey;
+  isClosed: boolean;
+  openMins: number | null | undefined;
+  closeMins: number | null | undefined;
+  note: string | null | undefined;
+}): SpecialDateAuditShape {
+  return {
+    dateISO: row.dateISO,
+    channel: row.channel,
+    isClosed: !!row.isClosed,
+    openTime: minsToHHMM(row.openMins),
+    closeTime: minsToHHMM(row.closeMins),
+    note: row.note ? String(row.note).trim() || null : null,
+  };
+}
+
+async function getNextId() {
+  const rows = await db.select({ id: SpecialDate.id }).from(SpecialDate);
+  return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
+}
+
 const REDIRECT_PATH = "/admin/operativa";
 
 export const POST: APIRoute = async (context) => {
@@ -59,6 +102,7 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
   const intent = String(form.get("intent") ?? "").trim();
+  const { ip, userAgent } = getRequestAuditMeta(context.request);
 
   if (intent === "create") {
     const dateISO = parseDateISO(form.get("dateISO"));
@@ -81,7 +125,10 @@ export const POST: APIRoute = async (context) => {
     }
 
     const existingSameDate = await db
-      .select({ id: SpecialDate.id, channel: SpecialDate.channel })
+      .select({
+        id: SpecialDate.id,
+        channel: SpecialDate.channel,
+      })
       .from(SpecialDate)
       .where(eq(SpecialDate.dateISO, dateISO));
 
@@ -91,8 +138,7 @@ export const POST: APIRoute = async (context) => {
       );
     }
 
-    const existing = await db.select({ id: SpecialDate.id }).from(SpecialDate);
-    const nextId = existing.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+    const nextId = await getNextId();
 
     await db.insert(SpecialDate).values({
       id: nextId,
@@ -103,6 +149,30 @@ export const POST: APIRoute = async (context) => {
       closeMins: isClosed ? undefined : closeMins ?? undefined,
       note: note ?? undefined,
     });
+
+    try {
+      await writeAuditLog({
+        actorUserId: user.id,
+        action: "SPECIAL_DATE_SAVED",
+        entityType: "special_date",
+        entityId: `${dateISO}:${channel}`,
+        diff: {
+          previous: null,
+          next: toAuditShape({
+            dateISO,
+            channel,
+            isClosed,
+            openMins: isClosed ? null : openMins,
+            closeMins: isClosed ? null : closeMins,
+            note,
+          }),
+        },
+        ip,
+        userAgent,
+      });
+    } catch (error) {
+      console.error("[audit] special date create failed", error);
+    }
 
     return context.redirect(withQuery(REDIRECT_PATH, { specialDatesSaved: "1" }));
   }
@@ -115,14 +185,33 @@ export const POST: APIRoute = async (context) => {
   }
 
   const [existingRow] = await db
-    .select({ id: SpecialDate.id })
+    .select({
+      id: SpecialDate.id,
+      dateISO: SpecialDate.dateISO,
+      channel: SpecialDate.channel,
+      isClosed: SpecialDate.isClosed,
+      openMins: SpecialDate.openMins,
+      closeMins: SpecialDate.closeMins,
+      note: SpecialDate.note,
+    })
     .from(SpecialDate)
     .where(eq(SpecialDate.id, specialDateId))
     .limit(1);
 
   if (!existingRow) {
-    return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "invalid-special-date" }));
+    return context.redirect(
+      withQuery(REDIRECT_PATH, { specialDatesError: "invalid-special-date" })
+    );
   }
+
+  const previousAuditShape = toAuditShape({
+    dateISO: existingRow.dateISO,
+    channel: existingRow.channel as ChannelKey,
+    isClosed: !!existingRow.isClosed,
+    openMins: typeof existingRow.openMins === "number" ? existingRow.openMins : null,
+    closeMins: typeof existingRow.closeMins === "number" ? existingRow.closeMins : null,
+    note: existingRow.note ? String(existingRow.note) : null,
+  });
 
   if (intent === "update") {
     const dateISO = parseDateISO(form.get("dateISO"));
@@ -145,7 +234,10 @@ export const POST: APIRoute = async (context) => {
     }
 
     const existingSameDate = await db
-      .select({ id: SpecialDate.id, channel: SpecialDate.channel })
+      .select({
+        id: SpecialDate.id,
+        channel: SpecialDate.channel,
+      })
       .from(SpecialDate)
       .where(eq(SpecialDate.dateISO, dateISO));
 
@@ -167,11 +259,52 @@ export const POST: APIRoute = async (context) => {
       })
       .where(eq(SpecialDate.id, specialDateId));
 
+    try {
+      await writeAuditLog({
+        actorUserId: user.id,
+        action: "SPECIAL_DATE_SAVED",
+        entityType: "special_date",
+        entityId: `${dateISO}:${channel}`,
+        diff: {
+          previous: previousAuditShape,
+          next: toAuditShape({
+            dateISO,
+            channel,
+            isClosed,
+            openMins: isClosed ? null : openMins,
+            closeMins: isClosed ? null : closeMins,
+            note,
+          }),
+        },
+        ip,
+        userAgent,
+      });
+    } catch (error) {
+      console.error("[audit] special date update failed", error);
+    }
+
     return context.redirect(withQuery(REDIRECT_PATH, { specialDatesSaved: "1" }));
   }
 
   if (intent === "delete") {
     await db.delete(SpecialDate).where(eq(SpecialDate.id, specialDateId));
+
+    try {
+      await writeAuditLog({
+        actorUserId: user.id,
+        action: "SPECIAL_DATE_DELETED",
+        entityType: "special_date",
+        entityId: `${existingRow.dateISO}:${existingRow.channel}`,
+        diff: {
+          deleted: previousAuditShape,
+        },
+        ip,
+        userAgent,
+      });
+    } catch (error) {
+      console.error("[audit] special date delete failed", error);
+    }
+
     return context.redirect(withQuery(REDIRECT_PATH, { specialDatesSaved: "1" }));
   }
 

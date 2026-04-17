@@ -11,6 +11,7 @@ import {
   Refund,
   UserProfile,
 } from "astro:db";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 type OrderStatus =
   | "PENDING"
@@ -160,7 +161,7 @@ function calcPointsFromSubtotal(subtotalCents: number) {
 
 async function getNextLedgerId() {
   const rows = await db.select({ id: LoyaltyLedger.id }).from(LoyaltyLedger);
-  return rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+  return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
 }
 
 async function getOrCreateProfile(userId: number) {
@@ -588,6 +589,9 @@ export const POST: APIRoute = async (context) => {
     return context.redirect("/admin/login");
   }
 
+  const { ip, userAgent } = getRequestAuditMeta(context.request);
+  const actorUserId = user.id;
+
   const publicId = String(context.params.publicId ?? "").trim();
   if (!publicId) {
     return new Response("Missing publicId", { status: 400 });
@@ -743,6 +747,9 @@ export const POST: APIRoute = async (context) => {
     snapshotChanged = true;
   }
 
+  let auditAction = "";
+  let auditDiff: Record<string, unknown> | null = null;
+
   if (intent === "create-refund") {
     if (method !== "CARD") {
       return context.redirect(redirectWith(redirectTo, { error: "refund-only-card" }));
@@ -825,6 +832,15 @@ export const POST: APIRoute = async (context) => {
       by: actor,
     });
     snapshotChanged = true;
+
+    auditAction = "ORDER_REFUND_CREATED";
+    auditDiff = {
+      orderPublicId: order.publicId,
+      paymentId: payment.id,
+      refundStatus,
+      refundAmountCents,
+      note: note || null,
+    };
 
     ({ payments, refunds } = await getOrderPaymentsAndRefunds(order.id));
     const derivedRefundPaymentStatus = deriveRefundPaymentStatus({ payments, refunds });
@@ -931,6 +947,54 @@ export const POST: APIRoute = async (context) => {
     }
   } catch (error) {
     console.error("[payments] sync failed", error);
+  }
+
+  try {
+    if (!auditAction) {
+      if (intent === "update-status" && statusRaw) {
+        auditAction = "ORDER_STATUS_UPDATED";
+        auditDiff = {
+          orderPublicId: order.publicId,
+          previousStatus: order.status,
+          nextStatus,
+          note: note || null,
+        };
+      } else if (intent === "update-payment" && paymentRaw) {
+        auditAction = "ORDER_PAYMENT_UPDATED";
+        auditDiff = {
+          orderPublicId: order.publicId,
+          previousPaymentStatus: order.paymentStatus,
+          nextPaymentStatus: nextPayment,
+          note: note || null,
+        };
+      } else if (intent === "save-admin-note") {
+        auditAction = "ORDER_ADMIN_NOTE_UPDATED";
+        auditDiff = {
+          orderPublicId: order.publicId,
+          hasAdminNote: Boolean(adminInternalNote),
+        };
+      } else if (intent === "add-activity-note") {
+        auditAction = "ORDER_ACTIVITY_NOTE_ADDED";
+        auditDiff = {
+          orderPublicId: order.publicId,
+          note,
+        };
+      }
+    }
+
+    if (auditAction && auditDiff) {
+      await writeAuditLog({
+        actorUserId,
+        action: auditAction,
+        entityType: "order",
+        entityId: String(order.id),
+        diff: auditDiff,
+        ip,
+        userAgent,
+      });
+    }
+  } catch (error) {
+    console.error("[audit] order update failed", error);
   }
 
   const saved =

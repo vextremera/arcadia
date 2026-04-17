@@ -1,0 +1,226 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import { db, AuditLog, User, inArray } from "astro:db";
+
+type AuditRow = {
+  id: number;
+  actorUserId: number | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  diff: unknown;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+};
+
+type UserRow = {
+  id: number;
+  email: string;
+  name: string | null;
+};
+
+function formatDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Madrid",
+  }).format(date);
+}
+
+function toneForAction(action: string) {
+  if (action.includes("REFUND")) {
+    return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
+  }
+  if (action.includes("PAYMENT")) {
+    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+  }
+  if (action.includes("NEWSLETTER")) {
+    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  }
+  if (action.includes("OPS") || action.includes("HOURS") || action.includes("SPECIAL_DATE")) {
+    return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+  }
+  return "border-white/10 bg-white/5 text-slate-300";
+}
+
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+
+const rows = (await db
+  .select({
+    id: AuditLog.id,
+    actorUserId: AuditLog.actorUserId,
+    action: AuditLog.action,
+    entityType: AuditLog.entityType,
+    entityId: AuditLog.entityId,
+    diff: AuditLog.diff,
+    ip: AuditLog.ip,
+    userAgent: AuditLog.userAgent,
+    createdAt: AuditLog.createdAt,
+  })
+  .from(AuditLog)) as AuditRow[];
+
+const sorted = [...rows].sort(
+  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+);
+
+const actorIds = sorted
+  .map((row) => row.actorUserId)
+  .filter((value): value is number => Number.isFinite(value));
+
+const actors = actorIds.length
+  ? ((await db
+      .select({
+        id: User.id,
+        email: User.email,
+        name: User.name,
+      })
+      .from(User)
+      .where(inArray(User.id, actorIds))) as UserRow[])
+  : [];
+
+const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+
+const filtered = sorted.filter((row) => {
+  if (!q) return true;
+  const actor = row.actorUserId ? actorById.get(row.actorUserId) : null;
+  const haystack = [
+    row.action,
+    row.entityType,
+    row.entityId,
+    row.ip ?? "",
+    actor?.name ?? "",
+    actor?.email ?? "",
+    JSON.stringify(row.diff ?? {}),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(q);
+});
+
+const last24h = filtered.filter(
+  (row) => new Date(row.createdAt).getTime() >= Date.now() - 24 * 60 * 60 * 1000,
+).length;
+---
+
+<AdminLayout
+  title="Audit · Admin · Arcadia"
+  heading="Audit log"
+  description="Trazabilidad básica de cambios administrativos relevantes."
+  actions={true}
+>
+  <Fragment slot="actions">
+    <div class="flex flex-wrap gap-3">
+      <a
+        href="/admin"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Volver al dashboard
+      </a>
+    </div>
+  </Fragment>
+
+  <section class="grid gap-4 md:grid-cols-3">
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Total</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{filtered.length}</div>
+      <p class="mt-2 text-sm text-slate-400">Eventos visibles</p>
+    </article>
+
+    <article class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80">Últimas 24h</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{last24h}</div>
+      <p class="mt-2 text-sm text-cyan-100/70">Actividad reciente</p>
+    </article>
+
+    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Actores</div>
+      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{new Set(filtered.map((row) => row.actorUserId).filter(Boolean)).size}</div>
+      <p class="mt-2 text-sm text-slate-400">Usuarios que han dejado rastro</p>
+    </article>
+  </section>
+
+  <section class="mt-6 rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+    <div class="border-b border-white/10 px-6 py-5">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">Consulta</div>
+          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Eventos auditados</h2>
+        </div>
+
+        <form method="get" class="flex gap-3">
+          <input
+            type="search"
+            name="q"
+            value={url.searchParams.get("q") ?? ""}
+            placeholder="Buscar acción, actor, entidad..."
+            class="w-72 rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+          />
+          <button
+            type="submit"
+            class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+          >
+            Filtrar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {filtered.length === 0 ? (
+      <div class="px-6 py-12 text-center text-sm text-slate-400">
+        No hay eventos para ese filtro.
+      </div>
+    ) : (
+      <div class="space-y-4 px-6 py-6">
+        {filtered.map((row) => {
+          const actor = row.actorUserId ? actorById.get(row.actorUserId) : null;
+          return (
+            <article class="rounded-3xl border border-white/10 bg-white/4 p-5">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class:list={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      toneForAction(row.action),
+                    ]}>
+                      {row.action}
+                    </span>
+
+                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                      {row.entityType}
+                    </span>
+                  </div>
+
+                  <div class="mt-3 text-sm text-slate-300">
+                    Entidad: <span class="font-semibold text-white">{row.entityId}</span>
+                  </div>
+
+                  <div class="mt-1 text-sm text-slate-400">
+                    Actor: <span class="font-semibold text-white">{actor?.name?.trim() || actor?.email || "Sistema / desconocido"}</span>
+                  </div>
+
+                  {row.ip ? (
+                    <div class="mt-1 text-sm text-slate-500">
+                      IP: {row.ip}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div class="text-sm text-slate-400">
+                  {formatDate(row.createdAt)}
+                </div>
+              </div>
+
+              {row.diff ? (
+                <pre class="mt-4 overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs leading-6 text-slate-300">{JSON.stringify(row.diff, null, 2)}</pre>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</AdminLayout>

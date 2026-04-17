@@ -67,8 +67,8 @@ function fmtWindow(w?: Partial<Window> | null) {
 
 /**
  * Horarios semanales para el landing.
- * - Si hay datos en OpeningHour (canales DINE_IN / DELIVERY), usa eso.
- * - Si no, cae a AppSetting("operatingHours") y repite el mismo horario toda la semana.
+ * - Resuelve por día y canal usando OpeningHour cuando exista.
+ * - Si falta una celda concreta, cae solo esa franja a AppSetting("operatingHours").
  */
 export async function getWeeklyHours(): Promise<WeeklyHoursRow[]> {
   const rows = await db
@@ -83,80 +83,65 @@ export async function getWeeklyHours(): Promise<WeeklyHoursRow[]> {
     .where(inArray(OpeningHour.channel, ["DINE_IN", "DELIVERY"]))
     .orderBy(OpeningHour.dayOfWeek);
 
-  // 1) Caso ideal: usamos OpeningHour
-  if (rows.length > 0) {
-    const byDayChannel = new Map<
-      string,
-      { isClosed: boolean; openMins: number; closeMins: number }
-    >();
+  const operatingHours = await getSetting("operatingHours", DEFAULTS.operatingHours);
 
-    for (const r of rows) {
-      const dayKey = normalizeDow(r.dayOfWeek);
-      const key = `${dayKey}:${r.channel}`;
-
-      // Si hay duplicados, nos quedamos con el rango más amplio.
-      const prev = byDayChannel.get(key);
-      const isClosed = !!r.isClosed;
-      const openMins = Number(r.openMins ?? 0);
-      const closeMins = Number(r.closeMins ?? 0);
-
-      if (!prev) {
-        byDayChannel.set(key, { isClosed, openMins, closeMins });
-        continue;
-      }
-
-      // Si cualquiera marca cerrado, lo tratamos como cerrado.
-      if (prev.isClosed || isClosed) {
-        byDayChannel.set(key, {
-          isClosed: true,
-          openMins: prev.openMins,
-          closeMins: prev.closeMins,
-        });
-        continue;
-      }
-
-      byDayChannel.set(key, {
-        isClosed: false,
-        openMins: Math.min(prev.openMins, openMins),
-        closeMins: Math.max(prev.closeMins, closeMins),
-      });
-    }
-
-    return DAYS.map((d) => {
-      const local = byDayChannel.get(`${d.key}:DINE_IN`);
-      const del = byDayChannel.get(`${d.key}:DELIVERY`);
-      return {
-        dayKey: d.key,
-        dayLabel: d.label,
-        local: !local
-          ? "—"
-          : local.isClosed
-          ? "Descanso"
-          : fmtRange(local.openMins, local.closeMins),
-        delivery: !del
-          ? "—"
-          : del.isClosed
-          ? "Descanso"
-          : fmtRange(del.openMins, del.closeMins),
-      };
-    });
-  }
-
-  // 2) Fallback simple: AppSetting operatingHours (mismo horario toda la semana)
-  const operatingHours = await getSetting(
-    "operatingHours",
-    DEFAULTS.operatingHours
-  );
-
-  const localStr = fmtWindow(operatingHours?.open ?? DEFAULTS.operatingHours.open);
-  const deliveryStr = fmtWindow(
+  const localFallback = fmtWindow(operatingHours?.open ?? DEFAULTS.operatingHours.open);
+  const deliveryFallback = fmtWindow(
     operatingHours?.delivery ?? DEFAULTS.operatingHours.delivery
   );
 
-  return DAYS.map((d) => ({
-    dayKey: d.key,
-    dayLabel: d.label,
-    local: localStr,
-    delivery: deliveryStr,
-  }));
+  const byDayChannel = new Map<
+    string,
+    { isClosed: boolean; openMins: number; closeMins: number }
+  >();
+
+  for (const r of rows) {
+    const dayKey = normalizeDow(r.dayOfWeek);
+    const key = `${dayKey}:${r.channel}`;
+
+    const prev = byDayChannel.get(key);
+    const isClosed = !!r.isClosed;
+    const openMins = Number(r.openMins ?? 0);
+    const closeMins = Number(r.closeMins ?? 0);
+
+    if (!prev) {
+      byDayChannel.set(key, { isClosed, openMins, closeMins });
+      continue;
+    }
+
+    if (prev.isClosed || isClosed) {
+      byDayChannel.set(key, {
+        isClosed: true,
+        openMins: prev.openMins,
+        closeMins: prev.closeMins,
+      });
+      continue;
+    }
+
+    byDayChannel.set(key, {
+      isClosed: false,
+      openMins: Math.min(prev.openMins, openMins),
+      closeMins: Math.max(prev.closeMins, closeMins),
+    });
+  }
+
+  return DAYS.map((d) => {
+    const local = byDayChannel.get(`${d.key}:DINE_IN`);
+    const del = byDayChannel.get(`${d.key}:DELIVERY`);
+
+    return {
+      dayKey: d.key,
+      dayLabel: d.label,
+      local: !local
+        ? localFallback
+        : local.isClosed
+          ? "Descanso"
+          : fmtRange(local.openMins, local.closeMins),
+      delivery: !del
+        ? deliveryFallback
+        : del.isClosed
+          ? "Descanso"
+          : fmtRange(del.openMins, del.closeMins),
+    };
+  });
 }

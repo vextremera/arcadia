@@ -1,0 +1,236 @@
+---
+import { db, AuditLog, User, inArray } from "astro:db";
+
+interface Props {
+  limit?: number;
+  title?: string;
+  description?: string;
+}
+
+type AuditRow = {
+  id: number;
+  actorUserId: number | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  diff: unknown;
+  createdAt: Date;
+};
+
+type UserRow = {
+  id: number;
+  email: string;
+  name: string | null;
+};
+
+const {
+  limit = 10,
+  title = "Actividad reciente",
+  description = "Últimos cambios relevantes en pedidos, pagos, operativa y newsletter.",
+} = Astro.props as Props;
+
+function formatDate(value: Date | string) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Madrid",
+  }).format(date);
+}
+
+function toneForAction(action: string) {
+  if (action.includes("REFUND")) {
+    return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
+  }
+  if (action.includes("PAYMENT")) {
+    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+  }
+  if (action.includes("NEWSLETTER")) {
+    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  }
+  if (action.includes("OPS") || action.includes("HOURS") || action.includes("SPECIAL_DATE") || action.includes("FEES")) {
+    return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+  }
+  if (action.includes("STATUS") || action.includes("ORDER")) {
+    return "border-sky-400/20 bg-sky-400/10 text-sky-300";
+  }
+  return "border-white/10 bg-white/5 text-slate-300";
+}
+
+function actionLabel(action: string) {
+  switch (action) {
+    case "ORDER_STATUS_UPDATED":
+      return "Estado de pedido";
+    case "ORDER_PAYMENT_UPDATED":
+      return "Estado de pago";
+    case "ORDER_REFUND_CREATED":
+      return "Refund";
+    case "ORDER_ADMIN_NOTE_UPDATED":
+      return "Nota interna";
+    case "ORDER_ACTIVITY_NOTE_ADDED":
+      return "Anotación";
+    case "OPS_FLAGS_UPDATED":
+      return "Flags operativos";
+    case "OPERATING_HOURS_UPDATED":
+      return "Horarios";
+    case "SPECIAL_DATE_SAVED":
+      return "Excepción operativa";
+    case "SPECIAL_DATE_DELETED":
+      return "Excepción eliminada";
+    case "PAYMENTS_SETTINGS_UPDATED":
+      return "Métodos de pago";
+    case "FEES_SETTINGS_UPDATED":
+      return "Fees";
+    case "NEWSLETTER_SENT":
+      return "Newsletter enviado";
+    case "NEWSLETTER_SUBSCRIBER_ENABLED":
+      return "Suscriptor activado";
+    case "NEWSLETTER_SUBSCRIBER_DISABLED":
+      return "Suscriptor desactivado";
+    default:
+      return action.replaceAll("_", " ");
+  }
+}
+
+function summaryForRow(row: AuditRow) {
+  const diff = (row.diff ?? {}) as Record<string, unknown>;
+
+  if (row.action === "ORDER_STATUS_UPDATED") {
+    return `${String(diff.previousStatus ?? "—")} → ${String(diff.nextStatus ?? "—")}`;
+  }
+
+  if (row.action === "ORDER_PAYMENT_UPDATED") {
+    return `${String(diff.previousPaymentStatus ?? "—")} → ${String(diff.nextPaymentStatus ?? "—")}`;
+  }
+
+  if (row.action === "ORDER_REFUND_CREATED") {
+    const cents = Number(diff.refundAmountCents ?? 0);
+    const eur = (cents / 100).toFixed(2);
+    return `${String(diff.refundStatus ?? "REFUND")} · ${eur} €`;
+  }
+
+  if (row.action === "NEWSLETTER_SENT") {
+    return `${String(diff.sent ?? 0)} enviados · ${String(diff.failed ?? 0)} fallidos`;
+  }
+
+  if (row.action === "NEWSLETTER_SUBSCRIBER_ENABLED" || row.action === "NEWSLETTER_SUBSCRIBER_DISABLED") {
+    return String(diff.email ?? row.entityId);
+  }
+
+  if (row.action === "SPECIAL_DATE_SAVED" || row.action === "SPECIAL_DATE_DELETED") {
+    return row.entityId;
+  }
+
+  if (row.action === "OPS_FLAGS_UPDATED" || row.action === "OPERATING_HOURS_UPDATED" || row.action === "PAYMENTS_SETTINGS_UPDATED" || row.action === "FEES_SETTINGS_UPDATED") {
+    return row.entityId;
+  }
+
+  if (row.action === "ORDER_ADMIN_NOTE_UPDATED") {
+    return "Nota interna actualizada";
+  }
+
+  if (row.action === "ORDER_ACTIVITY_NOTE_ADDED") {
+    return String(diff.note ?? "Anotación manual");
+  }
+
+  return row.entityId;
+}
+
+const allRows = (await db
+  .select({
+    id: AuditLog.id,
+    actorUserId: AuditLog.actorUserId,
+    action: AuditLog.action,
+    entityType: AuditLog.entityType,
+    entityId: AuditLog.entityId,
+    diff: AuditLog.diff,
+    createdAt: AuditLog.createdAt,
+  })
+  .from(AuditLog)) as AuditRow[];
+
+const rows = [...allRows]
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .slice(0, limit);
+
+const actorIds = rows
+  .map((row) => row.actorUserId)
+  .filter((value): value is number => Number.isFinite(value));
+
+const actors = actorIds.length
+  ? ((await db
+      .select({
+        id: User.id,
+        email: User.email,
+        name: User.name,
+      })
+      .from(User)
+      .where(inArray(User.id, actorIds))) as UserRow[])
+  : [];
+
+const actorById = new Map(actors.map((actor) => [actor.id, actor]));
+---
+
+<section class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+  <div class="border-b border-white/10 px-6 py-5">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+          Audit
+        </div>
+        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">{title}</h2>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
+      </div>
+
+      <a
+        href="/admin/audit"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+      >
+        Ver audit completo
+      </a>
+    </div>
+  </div>
+
+  {rows.length === 0 ? (
+    <div class="px-6 py-12 text-center text-sm text-slate-400">
+      Aún no hay actividad auditada.
+    </div>
+  ) : (
+    <div class="space-y-4 px-6 py-6">
+      {rows.map((row) => {
+        const actor = row.actorUserId ? actorById.get(row.actorUserId) : null;
+        return (
+          <article class="rounded-3xl border border-white/10 bg-white/4 p-5">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class:list={[
+                    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                    toneForAction(row.action),
+                  ]}>
+                    {actionLabel(row.action)}
+                  </span>
+
+                  <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                    {row.entityType}
+                  </span>
+                </div>
+
+                <div class="mt-3 text-sm text-slate-300">
+                  {summaryForRow(row)}
+                </div>
+
+                <div class="mt-1 text-sm text-slate-500">
+                  {actor?.name?.trim() || actor?.email || "Sistema / desconocido"}
+                </div>
+              </div>
+
+              <div class="text-sm text-slate-400">
+                {formatDate(row.createdAt)}
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  )}
+</section>
