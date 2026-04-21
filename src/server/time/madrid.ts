@@ -1,4 +1,5 @@
 import { db, AppSetting, OpeningHour, SpecialDate, eq, inArray } from "astro:db";
+import { DEFAULT_DELIVERY_AREA_RULE } from "@/server/delivery/area";
 
 export type ArcadiaChannel = "DINE_IN" | "DELIVERY" | "PICKUP";
 export type AvailabilitySource =
@@ -117,6 +118,7 @@ const DEFAULTS = {
   },
   deliveryFee: { cents: 0 },
   opsFlags: { pauseOrders: false, forcePickup: false },
+  deliveryAreaRule: DEFAULT_DELIVERY_AREA_RULE,
 };
 
 function fallbackWindowForChannel(
@@ -142,6 +144,7 @@ export async function getArcadiaAvailability(now = new Date()) {
   const operatingHours = await getSetting("operatingHours", DEFAULTS.operatingHours);
   const deliveryFee = await getSetting("deliveryFee", DEFAULTS.deliveryFee);
   const opsFlags = await getSetting("opsFlags", DEFAULTS.opsFlags);
+  const deliveryAreaRule = await getSetting("deliveryAreaRule", DEFAULTS.deliveryAreaRule);
 
   const openingRows = await db
     .select({
@@ -303,6 +306,7 @@ export async function getArcadiaAvailability(now = new Date()) {
     deliveryAvailable,
 
     deliveryFeeCents: Number(deliveryFee?.cents ?? 0),
+    deliveryAreaRule,
 
     windows: {
       open: {

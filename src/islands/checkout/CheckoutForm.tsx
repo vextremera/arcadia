@@ -15,6 +15,9 @@ type Availability = {
     kitchen: { start: string; end: string };
     delivery: { start: string; end: string };
   };
+  deliveryAreaRule?: {
+    enabled: boolean;
+  };
 };
 
 type CartResponse = {
@@ -97,6 +100,21 @@ async function safeJson<T>(url: string): Promise<T | null> {
   }
 }
 
+function normalizeAreaText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isDeliveryAreaAllowed(city: string, postalCode: string) {
+  const normalizedCity = normalizeAreaText(city);
+  const normalizedPostalCode = String(postalCode ?? "").trim();
+
+  return normalizedCity === "lloret de mar" && normalizedPostalCode === "17310";
+}
+
 const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
 
 export default function CheckoutForm() {
@@ -142,7 +160,35 @@ export default function CheckoutForm() {
   } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
 
+  const deliveryAreaRuleEnabled = Boolean(avail?.deliveryAreaRule?.enabled);
+
+  const deliveryAreaStatus = useMemo(() => {
+    if (type !== "DELIVERY") return "IDLE" as const;
+    if (!deliveryAreaRuleEnabled) return "DISABLED" as const;
+    if (!city.trim() || !postalCode.trim()) return "INCOMPLETE" as const;
+    return isDeliveryAreaAllowed(city, postalCode) ? ("INSIDE" as const) : ("OUTSIDE" as const);
+  }, [type, deliveryAreaRuleEnabled, city, postalCode]);
+
+  const deliveryAreaMessage = useMemo(() => {
+    if (type !== "DELIVERY" || !deliveryAreaRuleEnabled) return "";
+    if (deliveryAreaStatus === "INCOMPLETE") {
+      return "Completa ciudad y código postal para comprobar si entra en la zona de reparto.";
+    }
+    if (deliveryAreaStatus === "OUTSIDE") {
+      return "Esta dirección está fuera de la zona de reparto. Solo repartimos en Lloret de Mar (17310).";
+    }
+    return "Dirección dentro de la zona de reparto.";
+  }, [type, deliveryAreaRuleEnabled, deliveryAreaStatus]);
+
   const deliveryDisabled = useMemo(() => !avail?.deliveryAvailable, [avail]);
+
+  const checkoutBlocked = useMemo(() => {
+    if (avail?.pauseOrders) return true;
+    if (type === "DELIVERY" && deliveryAreaRuleEnabled) {
+      return deliveryAreaStatus === "OUTSIDE" || deliveryAreaStatus === "INCOMPLETE";
+    }
+    return false;
+  }, [avail, type, deliveryAreaRuleEnabled, deliveryAreaStatus]);
 
   const deliveryFeeCents = useMemo(() => {
     if (type !== "DELIVERY") return 0;
@@ -377,6 +423,9 @@ export default function CheckoutForm() {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (data?.error === "OUTSIDE_DELIVERY_AREA") {
+        setType("PICKUP");
+      }
       alert(data?.message || data?.error || "Error al crear el pedido");
       return;
     }
@@ -606,6 +655,20 @@ export default function CheckoutForm() {
               </div>
             </div>
 
+            {deliveryAreaRuleEnabled ? (
+              <div
+                class={`mt-4 rounded-xl border p-3 text-sm ${deliveryAreaStatus === "INSIDE"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : deliveryAreaStatus === "OUTSIDE"
+                      ? "border-rose-200 bg-rose-50 text-rose-900"
+                      : "border-zinc-200 bg-zinc-50 text-zinc-700"
+                  }`}
+              >
+                <div class="font-semibold">Zona de reparto</div>
+                <p class="mt-1 leading-6">{deliveryAreaMessage}</p>
+              </div>
+            ) : null}
+
             {isLoggedIn && !selectedAddressId ? (
               <label class="mt-4 flex items-center gap-2 text-sm text-zinc-700">
                 <input
@@ -796,12 +859,11 @@ export default function CheckoutForm() {
           </div>
 
           <button
-            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${
-              avail?.pauseOrders ? "opacity-60 pointer-events-none" : ""
-            }`}
+            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${checkoutBlocked ? "opacity-60 pointer-events-none" : ""
+              }`}
             type="button"
             onClick={submit}
-            disabled={!!avail?.pauseOrders}
+            disabled={checkoutBlocked}
           >
             Confirmar pedido
           </button>

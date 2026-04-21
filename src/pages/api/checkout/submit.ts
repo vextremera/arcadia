@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import {
   db,
+  AppSetting,
   Order,
   OrderItem,
   Product,
@@ -20,6 +21,7 @@ import { getArcadiaAvailability } from "@/server/time/madrid";
 import { validateCheckoutCoupon } from "@/server/checkout/coupons";
 import { normalizePaymentMethod } from "@/server/payments/settings";
 import { randomUUID } from "node:crypto";
+import { validateDeliveryAddressByArea } from "@/server/delivery/area";
 
 type CartItemSession = {
   lineId: string;
@@ -47,6 +49,8 @@ type AvailabilityLike = Awaited<ReturnType<typeof getArcadiaAvailability>> & {
   };
   todayDateISO?: string;
 };
+
+const DELIVERY_AREA_RULE = { enabled: true };
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -256,12 +260,50 @@ export const POST: APIRoute = async ({ request, session }) => {
     );
   }
 
+  let deliveryAreaMeta:
+    | { enabled: boolean; status: string; message: string }
+    | null = null;
+
   if (type === "DELIVERY") {
     if (!address.line1 || !address.city || !address.postalCode) {
       return json(
         {
           error: "MISSING_ADDRESS",
           message: "Dirección, ciudad y código postal son obligatorios.",
+        },
+        400
+      );
+    }
+
+    const deliveryAreaRuleValue = await session?.get?.("noop"); // no-op para mantener flow sin romper
+    void deliveryAreaRuleValue;
+
+    const deliveryAreaCheck = validateDeliveryAddressByArea(
+      {
+        city: address.city,
+        postalCode: address.postalCode,
+      },
+      ((await db
+        .select({ value: AppSetting.value })
+        .from(AppSetting)
+        .where(eq(AppSetting.key, "deliveryAreaRule"))
+        .limit(1)
+        .then((rows) => rows[0]?.value)) as { enabled?: boolean } | undefined)?.enabled === true
+        ? { enabled: true }
+        : { enabled: false }
+    );
+
+    deliveryAreaMeta = {
+      enabled: deliveryAreaCheck.enabled,
+      status: deliveryAreaCheck.status,
+      message: deliveryAreaCheck.message,
+    };
+
+    if (deliveryAreaCheck.enabled && !deliveryAreaCheck.allowed) {
+      return json(
+        {
+          error: "OUTSIDE_DELIVERY_AREA",
+          message: deliveryAreaCheck.message,
         },
         400
       );
@@ -461,6 +503,7 @@ export const POST: APIRoute = async ({ request, session }) => {
       couponAppliedMessage,
       deliveryResolutionSource: availability.sources?.delivery ?? null,
       deliveryResolutionNote: availability.sourceNotes?.delivery ?? null,
+      deliveryArea: deliveryAreaMeta,
       address: type === "DELIVERY" ? address : null,
       now: availability.now,
       dateISO: availability.todayDateISO ?? null,

@@ -22,6 +22,10 @@ type OpsFlagsSetting = {
   forcePickup: boolean;
 };
 
+type DeliveryAreaRuleSetting = {
+  enabled: boolean;
+};
+
 const DEFAULT_OPERATING_HOURS: OperatingHoursSetting = {
   open: { start: "07:30", end: "00:00" },
   kitchen: { start: "08:00", end: "23:20" },
@@ -30,6 +34,7 @@ const DEFAULT_OPERATING_HOURS: OperatingHoursSetting = {
 
 const DEFAULT_DELIVERY_FEE: DeliveryFeeSetting = { cents: 0 };
 const DEFAULT_OPS_FLAGS: OpsFlagsSetting = { pauseOrders: false, forcePickup: false };
+const DEFAULT_DELIVERY_AREA_RULE: DeliveryAreaRuleSetting = { enabled: false };
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -170,6 +175,9 @@ export const POST: APIRoute = async (context) => {
     pauseOrders: form.get("pauseOrders") === "on",
     forcePickup: form.get("forcePickup") === "on",
   };
+  const nextDeliveryAreaRule: DeliveryAreaRuleSetting = {
+    enabled: form.get("deliveryAreaEnabled") === "on",
+  };
 
   const previousOperatingHours = await getSettingValue<OperatingHoursSetting>(
     "operatingHours",
@@ -183,6 +191,10 @@ export const POST: APIRoute = async (context) => {
     deliveryFeeCents: DEFAULT_DELIVERY_FEE.cents,
   });
   const previousOpsFlags = await getSettingValue<OpsFlagsSetting>("opsFlags", DEFAULT_OPS_FLAGS);
+  const previousDeliveryAreaRule = await getSettingValue<DeliveryAreaRuleSetting>(
+    "deliveryAreaRule",
+    DEFAULT_DELIVERY_AREA_RULE
+  );
 
   const nextLegacyFees: LegacyFeesSetting = {
     ...(previousLegacyFees.value ?? {}),
@@ -193,6 +205,7 @@ export const POST: APIRoute = async (context) => {
   await upsertSetting("deliveryFee", nextDeliveryFee, previousDeliveryFee.id);
   await upsertSetting("fees", nextLegacyFees, previousLegacyFees.id);
   await upsertSetting("opsFlags", nextOpsFlags, previousOpsFlags.id);
+  await upsertSetting("deliveryAreaRule", nextDeliveryAreaRule, previousDeliveryAreaRule.id);
 
   const { ip, userAgent } = getRequestAuditMeta(context.request);
   const actorUserId = user.id;
@@ -238,6 +251,19 @@ export const POST: APIRoute = async (context) => {
       diff: {
         previous: previousOpsFlags.value,
         next: nextOpsFlags,
+      },
+      ip,
+      userAgent,
+    });
+
+    await writeAuditLog({
+      actorUserId,
+      action: "DELIVERY_AREA_RULE_UPDATED",
+      entityType: "app_setting",
+      entityId: "deliveryAreaRule",
+      diff: {
+        previous: previousDeliveryAreaRule.value,
+        next: nextDeliveryAreaRule,
       },
       ip,
       userAgent,
