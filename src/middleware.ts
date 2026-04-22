@@ -1,46 +1,66 @@
 import { defineMiddleware } from "astro:middleware";
 
-const DISABLE_ORDERS = import.meta.env.DISABLE_ORDERS === "1";
-const DISABLE_AUTH = import.meta.env.DISABLE_AUTH === "1";
+type RouteAccess = "public" | "account" | "admin";
 
-function isOrdersPage(pathname: string) {
-  return pathname === "/pedir" || pathname === "/checkout" || pathname.startsWith("/pedido/");
+function normalizePathname(pathname: string) {
+  if (!pathname) return "/";
+  return pathname !== "/" && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
 }
 
-function isOrdersApi(pathname: string) {
-  return pathname.startsWith("/api/cart/") || pathname === "/api/cart" || pathname.startsWith("/api/checkout/");
+function isAdminRole(user: App.Locals["user"]) {
+  return user?.role === "ADMIN" || user?.role === "STAFF";
 }
 
-function isAuthPage(pathname: string) {
-  return pathname === "/login" || pathname === "/registro" || pathname.startsWith("/cuenta");
+function resolveRouteAccess(pathname: string): RouteAccess {
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return pathname === "/admin/login" ? "public" : "admin";
+  }
+
+  if (pathname === "/cuenta" || pathname.startsWith("/cuenta/")) {
+    return "account";
+  }
+
+  return "public";
+}
+
+function buildLoginRedirect(pathname: string, search: string) {
+  const next = `${pathname}${search}`;
+  return `/login?next=${encodeURIComponent(next)}`;
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  // Cargar user en locals (si existe)
-  const user = await context.session?.get("user");
-  if (user) context.locals.user = user;
+  const url = new URL(context.request.url);
+  const pathname = normalizePathname(url.pathname);
 
-  const { pathname } = new URL(context.request.url);
-
-  // ✅ Bloqueos públicos (solo si activas flags en producción)
-  // Páginas
-  if (DISABLE_ORDERS && isOrdersPage(pathname)) return context.redirect("/proximamente", 302);
-  if (DISABLE_AUTH && isAuthPage(pathname)) return context.redirect("/proximamente", 302);
-
-  // APIs (mejor 404 para que parezca “no existe”)
-  if (DISABLE_ORDERS && isOrdersApi(pathname)) return new Response("Not Found", { status: 404 });
-
-  // Admin: protege todo /admin excepto /admin/login
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const u = context.locals.user;
-    const allowed = u && (u.role === "ADMIN" || u.role === "STAFF");
-    if (!allowed) return context.redirect("/admin/login");
+  const sessionUser = await context.session?.get("user");
+  if (sessionUser) {
+    context.locals.user = sessionUser;
   }
 
-  // Cuenta: protege /cuenta (cuando auth esté habilitado)
-  if (pathname.startsWith("/cuenta")) {
-    const u = context.locals.user;
-    if (!u) return context.redirect(`/login?next=${encodeURIComponent(pathname)}`);
+  const user = context.locals.user;
+  const access = resolveRouteAccess(pathname);
+
+  // Cuenta: solo usuarios autenticados
+  if (access === "account" && !user) {
+    return context.redirect(buildLoginRedirect(pathname, url.search), 302);
+  }
+
+  // Admin: solo ADMIN / STAFF
+  if (access === "admin" && !isAdminRole(user)) {
+    return context.redirect("/admin/login", 302);
+  }
+
+  // Si ya hay sesión, evitamos mostrar pantallas de login/registro sin sentido
+  if (user) {
+    if (pathname === "/admin/login" && isAdminRole(user)) {
+      return context.redirect("/admin", 302);
+    }
+
+    if (pathname === "/login" || pathname === "/registro") {
+      return context.redirect(isAdminRole(user) ? "/admin" : "/cuenta", 302);
+    }
   }
 
   return next();

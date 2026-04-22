@@ -27,12 +27,7 @@ const DEFAULT_MENU_CONFIG: MenuConfig = {
   FESTIVO: { active: true, priceCents: 1590 },
 };
 
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-}
+const REDIRECT_PATH = "/admin/menu";
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -45,13 +40,6 @@ function withQuery(path: string, params: Record<string, string>) {
 function parseId(value: FormDataEntryValue | null) {
   const n = Number(String(value ?? "").trim());
   return Number.isFinite(n) ? n : null;
-}
-
-function parseIntValue(value: FormDataEntryValue | null, fallback = 0) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : fallback;
 }
 
 function parseEuroToCents(value: FormDataEntryValue | null) {
@@ -83,11 +71,6 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-function toNullableText(value: FormDataEntryValue | null) {
-  const text = String(value ?? "").trim();
-  return text ? text : null;
-}
-
 function extractPriceFromTitle(title: string, fallbackCents: number) {
   const match = String(title).match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
   if (!match) return fallbackCents;
@@ -98,7 +81,7 @@ function extractPriceFromTitle(title: string, fallbackCents: number) {
 
 function isWithin(
   row: { validFrom: Date | null; validTo: Date | null },
-  now: Date
+  now: Date,
 ) {
   if (row.validFrom && now < row.validFrom) return false;
   if (row.validTo && now > row.validTo) return false;
@@ -115,7 +98,7 @@ function pickBestLegacy(
     validFrom: Date | null;
     validTo: Date | null;
   }>,
-  now: Date
+  now: Date,
 ) {
   const candidates = rows.filter((row) => row.kind === kind && row.active);
   const within = candidates.filter((row) => isWithin(row, now));
@@ -195,9 +178,7 @@ async function buildUniqueDishSlug(name: string, excludeDishId?: number) {
     .from(MenuDish);
 
   const used = new Set(
-    rows
-      .filter((row) => row.id !== excludeDishId)
-      .map((row) => row.slug)
+    rows.filter((row) => row.id !== excludeDishId).map((row) => row.slug),
   );
 
   if (!used.has(base)) return base;
@@ -207,7 +188,17 @@ async function buildUniqueDishSlug(name: string, excludeDishId?: number) {
   return `${base}-${i}`;
 }
 
-const REDIRECT_PATH = "/admin/menu";
+async function nextMenuDishId() {
+  const rows = await db.select({ id: MenuDish.id }).from(MenuDish);
+  return rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+}
+
+async function nextAssignmentId() {
+  const rows = await db
+    .select({ id: MenuDishAssignment.id })
+    .from(MenuDishAssignment);
+  return rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+}
 
 export const POST: APIRoute = async (context) => {
   const user = context.locals.user;
@@ -242,17 +233,9 @@ export const POST: APIRoute = async (context) => {
 
   if (intent === "create-dish") {
     const name = String(form.get("name") ?? "").trim();
-    const course = String(form.get("course") ?? "").trim();
-    const description = toNullableText(form.get("description"));
-    const sortOrder = parseIntValue(form.get("sortOrder"), 0);
-    const active = form.get("active") === "on";
 
     if (!name) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
-    }
-
-    if (!isCourse(course)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
     }
 
     const slug = await buildUniqueDishSlug(name);
@@ -260,17 +243,12 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
     }
 
-    const existing = await db.select({ id: MenuDish.id }).from(MenuDish);
-    const nextId = existing.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+    const nextId = await nextMenuDishId();
 
     await db.insert(MenuDish).values({
       id: nextId,
       name,
       slug,
-      description: description ?? undefined,
-      course,
-      active,
-      sortOrder,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -299,17 +277,8 @@ export const POST: APIRoute = async (context) => {
     }
 
     const name = String(form.get("name") ?? "").trim();
-    const course = String(form.get("course") ?? "").trim();
-    const description = toNullableText(form.get("description"));
-    const sortOrder = parseIntValue(form.get("sortOrder"), 0);
-    const active = form.get("active") === "on";
-
     if (!name) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
-    }
-
-    if (!isCourse(course)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
     }
 
     const slug =
@@ -324,10 +293,6 @@ export const POST: APIRoute = async (context) => {
       .set({
         name,
         slug,
-        description: description ?? undefined,
-        course,
-        active,
-        sortOrder,
         updatedAt: new Date(),
       })
       .where(eq(MenuDish.id, dishId));
@@ -357,6 +322,7 @@ export const POST: APIRoute = async (context) => {
   if (intent === "assign-dish") {
     const dishId = parseId(form.get("dishId"));
     const kind = String(form.get("kind") ?? "").trim();
+    const course = String(form.get("course") ?? "").trim();
 
     if (!dishId) {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-dish" }));
@@ -366,12 +332,12 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-kind" }));
     }
 
+    if (!isCourse(course)) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
+    }
+
     const [dish] = await db
-      .select({
-        id: MenuDish.id,
-        course: MenuDish.course,
-        active: MenuDish.active,
-      })
+      .select({ id: MenuDish.id })
       .from(MenuDish)
       .where(eq(MenuDish.id, dishId))
       .limit(1);
@@ -380,46 +346,98 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { error: "dish-not-found" }));
     }
 
-    if (!dish.active) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "inactive-dish" }));
-    }
-
-    const existingAssignmentsForDish = await db
+    const existingAssignments = await db
       .select({
         id: MenuDishAssignment.id,
+        kind: MenuDishAssignment.kind,
+        course: MenuDishAssignment.course,
         dishId: MenuDishAssignment.dishId,
       })
       .from(MenuDishAssignment)
-      .where(eq(MenuDishAssignment.kind, kind));
+      .where(eq(MenuDishAssignment.dishId, dishId));
 
-    if (existingAssignmentsForDish.some((row) => row.dishId === dishId)) {
+    const existingForKind = existingAssignments.find((row) => row.kind === kind);
+
+    if (existingForKind) {
+      if (existingForKind.course !== course) {
+        await db
+          .update(MenuDishAssignment)
+          .set({ course })
+          .where(eq(MenuDishAssignment.id, existingForKind.id));
+      }
+
       return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
     }
 
-    const sameKindRows = await db
-      .select({
-        id: MenuDishAssignment.id,
-        sortOrder: MenuDishAssignment.sortOrder,
-        course: MenuDish.course,
-      })
-      .from(MenuDishAssignment)
-      .innerJoin(MenuDish, eq(MenuDishAssignment.dishId, MenuDish.id))
-      .where(eq(MenuDishAssignment.kind, kind));
-
-    const maxSort = sameKindRows
-      .filter((row) => row.course === dish.course)
-      .reduce((max, row) => Math.max(max, row.sortOrder), -1);
-
-    const existing = await db.select({ id: MenuDishAssignment.id }).from(MenuDishAssignment);
-    const nextId = existing.reduce((max, row) => Math.max(max, row.id), 0) + 1;
+    const nextId = await nextAssignmentId();
 
     await db.insert(MenuDishAssignment).values({
       id: nextId,
       kind,
+      course,
       dishId,
-      sortOrder: maxSort + 1,
       createdAt: new Date(),
     });
+
+    return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+  }
+
+  if (intent === "move-assignment") {
+    const assignmentId = parseId(form.get("assignmentId"));
+    const kind = String(form.get("kind") ?? "").trim();
+    const course = String(form.get("course") ?? "").trim();
+
+    if (!assignmentId) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-assignment" }));
+    }
+
+    if (!isKind(kind)) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-kind" }));
+    }
+
+    if (!isCourse(course)) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
+    }
+
+    const [assignment] = await db
+      .select({
+        id: MenuDishAssignment.id,
+        kind: MenuDishAssignment.kind,
+        dishId: MenuDishAssignment.dishId,
+      })
+      .from(MenuDishAssignment)
+      .where(eq(MenuDishAssignment.id, assignmentId))
+      .limit(1);
+
+    if (!assignment) {
+      return context.redirect(withQuery(REDIRECT_PATH, { error: "assignment-not-found" }));
+    }
+
+    const duplicates = await db
+      .select({
+        id: MenuDishAssignment.id,
+        kind: MenuDishAssignment.kind,
+        dishId: MenuDishAssignment.dishId,
+      })
+      .from(MenuDishAssignment)
+      .where(eq(MenuDishAssignment.dishId, assignment.dishId));
+
+    const duplicateInTargetKind = duplicates.find(
+      (row) => row.kind === kind && row.id !== assignmentId,
+    );
+
+    if (duplicateInTargetKind) {
+      await db.delete(MenuDishAssignment).where(eq(MenuDishAssignment.id, assignmentId));
+      return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+    }
+
+    await db
+      .update(MenuDishAssignment)
+      .set({
+        kind,
+        course,
+      })
+      .where(eq(MenuDishAssignment.id, assignmentId));
 
     return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
   }
@@ -432,46 +450,6 @@ export const POST: APIRoute = async (context) => {
 
     await db.delete(MenuDishAssignment).where(eq(MenuDishAssignment.id, assignmentId));
     return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
-  }
-
-  if (intent === "reorder-assignments") {
-    const kind = String(form.get("kind") ?? "").trim();
-    const course = String(form.get("course") ?? "").trim();
-    const orderedIds = String(form.get("orderedIds") ?? "")
-      .split(",")
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isFinite(value));
-
-    if (!isKind(kind) || !isCourse(course) || orderedIds.length === 0) {
-      return json({ ok: false, error: "invalid-reorder" }, 400);
-    }
-
-    const rows = await db
-      .select({
-        id: MenuDishAssignment.id,
-        kind: MenuDishAssignment.kind,
-        course: MenuDish.course,
-      })
-      .from(MenuDishAssignment)
-      .innerJoin(MenuDish, eq(MenuDishAssignment.dishId, MenuDish.id))
-      .where(inArray(MenuDishAssignment.id, orderedIds));
-
-    const validIds = rows
-      .filter((row) => row.kind === kind && row.course === course)
-      .map((row) => row.id);
-
-    if (validIds.length !== orderedIds.length) {
-      return json({ ok: false, error: "invalid-reorder-scope" }, 400);
-    }
-
-    for (let index = 0; index < orderedIds.length; index += 1) {
-      await db
-        .update(MenuDishAssignment)
-        .set({ sortOrder: index })
-        .where(eq(MenuDishAssignment.id, orderedIds[index]));
-    }
-
-    return json({ ok: true });
   }
 
   if (intent === "import-legacy") {
@@ -538,15 +516,12 @@ export const POST: APIRoute = async (context) => {
 
     const products = productIds.length
       ? await db
-          .select({
-            id: Product.id,
-            name: Product.name,
-            description: Product.description,
-            details: Product.details,
-            active: Product.active,
-          })
-          .from(Product)
-          .where(inArray(Product.id, productIds))
+        .select({
+          id: Product.id,
+          name: Product.name,
+        })
+        .from(Product)
+        .where(inArray(Product.id, productIds))
       : [];
 
     const productById = new Map(products.map((product) => [product.id, product]));
@@ -555,21 +530,21 @@ export const POST: APIRoute = async (context) => {
     const nextConfig: MenuConfig = {
       DIARIO: diario
         ? {
-            active: diario.active,
-            priceCents: extractPriceFromTitle(
-              diario.title,
-              DEFAULT_MENU_CONFIG.DIARIO.priceCents
-            ),
-          }
+          active: diario.active,
+          priceCents: extractPriceFromTitle(
+            diario.title,
+            DEFAULT_MENU_CONFIG.DIARIO.priceCents,
+          ),
+        }
         : DEFAULT_MENU_CONFIG.DIARIO,
       FESTIVO: festivo
         ? {
-            active: festivo.active,
-            priceCents: extractPriceFromTitle(
-              festivo.title,
-              DEFAULT_MENU_CONFIG.FESTIVO.priceCents
-            ),
-          }
+          active: festivo.active,
+          priceCents: extractPriceFromTitle(
+            festivo.title,
+            DEFAULT_MENU_CONFIG.FESTIVO.priceCents,
+          ),
+        }
         : DEFAULT_MENU_CONFIG.FESTIVO,
     };
 
@@ -580,10 +555,6 @@ export const POST: APIRoute = async (context) => {
       id: number;
       name: string;
       slug: string;
-      description?: string;
-      course: MenuCourse;
-      active: boolean;
-      sortOrder: number;
       createdAt: Date;
       updatedAt: Date;
     }> = [];
@@ -591,13 +562,14 @@ export const POST: APIRoute = async (context) => {
     const assignmentsToInsert: Array<{
       id: number;
       kind: MenuKind;
+      course: MenuCourse;
       dishId: number;
-      sortOrder: number;
       createdAt: Date;
     }> = [];
 
-    const dishKeyToId = new Map<string, number>();
+    const productIdToDishId = new Map<number, number>();
     const usedSlugs = new Set<string>();
+    const assignedDishByKind = new Set<string>();
 
     function uniqueSlug(name: string) {
       const base = slugify(name) || "menu-dish";
@@ -619,17 +591,6 @@ export const POST: APIRoute = async (context) => {
       return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
     });
 
-    const courseSortCursor: Record<MenuCourse, number> = {
-      PRIMERO: 0,
-      SEGUNDO: 0,
-      POSTRE: 0,
-    };
-
-    const assignmentSortCursor: Record<MenuKind, Record<MenuCourse, number>> = {
-      DIARIO: { PRIMERO: 0, SEGUNDO: 0, POSTRE: 0 },
-      FESTIVO: { PRIMERO: 0, SEGUNDO: 0, POSTRE: 0 },
-    };
-
     for (const item of sortedItems) {
       const menu = menuById.get(item.menuId);
       const product = productById.get(item.productId);
@@ -637,32 +598,32 @@ export const POST: APIRoute = async (context) => {
       if (!menu || !product) continue;
       if (!isCourse(item.course)) continue;
 
-      const description = String(product.details ?? product.description ?? "").trim();
-      const key = `${item.course}::${product.name.trim().toLowerCase()}::${description.toLowerCase()}`;
-
-      let dishId = dishKeyToId.get(key) ?? null;
+      let dishId = productIdToDishId.get(product.id) ?? null;
       if (!dishId) {
         dishId = nextDishId++;
-        dishKeyToId.set(key, dishId);
+        productIdToDishId.set(product.id, dishId);
 
         dishesToInsert.push({
           id: dishId,
           name: product.name,
           slug: uniqueSlug(product.name),
-          description: description || undefined,
-          course: item.course,
-          active: product.active,
-          sortOrder: courseSortCursor[item.course]++,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
       }
 
+      const kindDishKey = `${menu.kind}:${dishId}`;
+      if (assignedDishByKind.has(kindDishKey)) {
+        continue;
+      }
+
+      assignedDishByKind.add(kindDishKey);
+
       assignmentsToInsert.push({
         id: nextAssignmentId++,
         kind: menu.kind,
+        course: item.course,
         dishId,
-        sortOrder: assignmentSortCursor[menu.kind][item.course]++,
         createdAt: new Date(),
       });
     }
@@ -672,7 +633,6 @@ export const POST: APIRoute = async (context) => {
     }
 
     await saveMenuConfig(nextConfig);
-
     await db.insert(MenuDish).values(dishesToInsert);
     await db.insert(MenuDishAssignment).values(assignmentsToInsert);
 

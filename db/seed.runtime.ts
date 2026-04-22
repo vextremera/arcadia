@@ -21,8 +21,6 @@ type LegacyMenuRow = {
   productId: number;
   productName: string;
   productSlug: string;
-  productDescription: string | null;
-  productDetails: string | null;
 };
 
 const DEFAULT_OPERATING_HOURS = {
@@ -190,8 +188,6 @@ async function seedMenuV2FromLegacyIfEmpty() {
       productId: Product.id,
       productName: Product.name,
       productSlug: Product.slug,
-      productDescription: Product.description,
-      productDetails: Product.details,
     })
     .from(MenuItem)
     .innerJoin(Menu, eq(MenuItem.menuId, Menu.id))
@@ -199,10 +195,20 @@ async function seedMenuV2FromLegacyIfEmpty() {
 
   if (legacyRows.length === 0) return;
 
+  const courseOrder: Record<MenuCourse, number> = {
+    PRIMERO: 1,
+    SEGUNDO: 2,
+    POSTRE: 3,
+  };
+
   const sortedLegacyRows = [...legacyRows].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind.localeCompare(b.kind, "es");
-    if (a.course !== b.course) return a.course.localeCompare(b.course, "es");
+
+    const byCourse = courseOrder[a.course] - courseOrder[b.course];
+    if (byCourse !== 0) return byCourse;
+
     if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+
     return a.productName.localeCompare(b.productName, "es");
   });
 
@@ -222,10 +228,6 @@ async function seedMenuV2FromLegacyIfEmpty() {
       id: dishId,
       name: row.productName,
       slug: row.productSlug,
-      description: row.productDescription ?? row.productDetails ?? null,
-      course: row.course,
-      active: true,
-      sortOrder: row.sortOrder,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -249,8 +251,8 @@ async function seedMenuV2FromLegacyIfEmpty() {
     assignmentRows.push({
       id: nextAssignmentId++,
       kind: row.kind,
+      course: row.course,
       dishId,
-      sortOrder: row.sortOrder,
       createdAt: new Date(),
     });
   }
@@ -266,5 +268,7 @@ export default async function seedRuntime() {
   await seedLoyaltyTiersIfEmpty();
   await seedMenuV2FromLegacyIfEmpty();
 
-  console.log("✅ Runtime seed: settings, openingHours, loyalty tiers y menú V2 listos.");
+  console.log(
+    "✅ Runtime seed: settings, openingHours, loyalty tiers y menú V2 listos."
+  );
 }

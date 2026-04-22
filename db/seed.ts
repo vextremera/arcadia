@@ -2335,7 +2335,7 @@ export default async function seed() {
 
   await db.insert(MenuItem).values(rows);
 
-  console.log("✅ Seed menú: DIARIO/FESTIVO creados (6 primeros, 6 segundos, 5 postres).");
+  // console.log("✅ Seed menú: DIARIO/FESTIVO creados (6 primeros, 6 segundos, 5 postres).");
   // ----------------------------------------------------------
   // FIN seed
   // ----------------------------------------------------------

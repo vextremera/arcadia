@@ -122,18 +122,16 @@ function buildV2MenuData(
   config: MenuConfig,
   rows: Array<{
     kind: MenuKind;
-    sortOrder: number;
+    course: DbCourse;
     dishName: string;
-    dishDescription: string | null;
-    dishCourse: DbCourse;
-    dishActive: boolean;
-    dishSortOrder: number;
+    assignmentId: number;
+    assignmentCreatedAt: Date;
   }>
 ): PublicMenuData | null {
   const currentConfig = config[kind];
   if (!currentConfig.active) return null;
 
-  const filtered = rows.filter((row) => row.kind === kind && row.dishActive);
+  const filtered = rows.filter((row) => row.kind === kind);
   if (!filtered.length) return null;
 
   const grouped: Record<DbCourse, Array<{ name: string; desc: string | null }>> = {
@@ -143,9 +141,9 @@ function buildV2MenuData(
   };
 
   for (const row of filtered) {
-    grouped[row.dishCourse].push({
+    grouped[row.course].push({
       name: row.dishName,
-      desc: row.dishDescription ? String(row.dishDescription).trim() || null : null,
+      desc: null,
     });
   }
 
@@ -167,40 +165,40 @@ export async function getPublicMenuState(): Promise<PublicMenuState> {
 
   const v2Rows = await db
     .select({
+      assignmentId: MenuDishAssignment.id,
       kind: MenuDishAssignment.kind,
-      sortOrder: MenuDishAssignment.sortOrder,
+      course: MenuDishAssignment.course,
+      assignmentCreatedAt: MenuDishAssignment.createdAt,
       dishName: MenuDish.name,
-      dishDescription: MenuDish.description,
-      dishCourse: MenuDish.course,
-      dishActive: MenuDish.active,
-      dishSortOrder: MenuDish.sortOrder,
     })
     .from(MenuDishAssignment)
     .innerJoin(MenuDish, eq(MenuDishAssignment.dishId, MenuDish.id));
 
+  const courseOrder: Record<DbCourse, number> = {
+    PRIMERO: 1,
+    SEGUNDO: 2,
+    POSTRE: 3,
+  };
+
   const v2Assignments = [...v2Rows].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind.localeCompare(b.kind, "es");
 
-    const courseOrder: Record<DbCourse, number> = {
-      PRIMERO: 1,
-      SEGUNDO: 2,
-      POSTRE: 3,
-    };
-
     const byCourse =
-      courseOrder[a.dishCourse as DbCourse] - courseOrder[b.dishCourse as DbCourse];
+      courseOrder[a.course as DbCourse] - courseOrder[b.course as DbCourse];
     if (byCourse !== 0) return byCourse;
-    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-    if (a.dishSortOrder !== b.dishSortOrder) return a.dishSortOrder - b.dishSortOrder;
-    return a.dishName.localeCompare(b.dishName, "es");
+
+    const byCreatedAt =
+      new Date(a.assignmentCreatedAt).getTime() -
+      new Date(b.assignmentCreatedAt).getTime();
+    if (byCreatedAt !== 0) return byCreatedAt;
+
+    return a.assignmentId - b.assignmentId;
   }) as Array<{
+    assignmentId: number;
     kind: MenuKind;
-    sortOrder: number;
+    course: DbCourse;
+    assignmentCreatedAt: Date;
     dishName: string;
-    dishDescription: string | null;
-    dishCourse: DbCourse;
-    dishActive: boolean;
-    dishSortOrder: number;
   }>;
 
   let diarioData = buildV2MenuData("DIARIO", config, v2Assignments);
@@ -265,28 +263,28 @@ export async function getPublicMenuState(): Promise<PublicMenuState> {
 
   const items = menuIds.length
     ? ((await db
-        .select({
-          id: LegacyMenuItem.id,
-          menuId: LegacyMenuItem.menuId,
-          productId: LegacyMenuItem.productId,
-          course: LegacyMenuItem.course,
-          sortOrder: LegacyMenuItem.sortOrder,
-        })
-        .from(LegacyMenuItem)
-        .where(inArray(LegacyMenuItem.menuId, menuIds))) as unknown as LegacyMenuItemRow[])
+      .select({
+        id: LegacyMenuItem.id,
+        menuId: LegacyMenuItem.menuId,
+        productId: LegacyMenuItem.productId,
+        course: LegacyMenuItem.course,
+        sortOrder: LegacyMenuItem.sortOrder,
+      })
+      .from(LegacyMenuItem)
+      .where(inArray(LegacyMenuItem.menuId, menuIds))) as unknown as LegacyMenuItemRow[])
     : [];
 
   const productIds = [...new Set(items.map((item) => item.productId))];
   const products = productIds.length
     ? ((await db
-        .select({
-          id: Product.id,
-          name: Product.name,
-          description: Product.description,
-          details: Product.details,
-        })
-        .from(Product)
-        .where(inArray(Product.id, productIds))) as unknown as ProductRow[])
+      .select({
+        id: Product.id,
+        name: Product.name,
+        description: Product.description,
+        details: Product.details,
+      })
+      .from(Product)
+      .where(inArray(Product.id, productIds))) as unknown as ProductRow[])
     : [];
 
   const productById = new Map(products.map((product) => [product.id, product]));
