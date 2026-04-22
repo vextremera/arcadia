@@ -43,9 +43,7 @@ const sessionConfig = hasUpstash
 
 export default defineConfig({
   output: "server",
-  adapter: vercel({
-    edgeMiddleware: true,
-  }),
+  adapter: vercel(),
 
   integrations: [db(), preact()],
 
