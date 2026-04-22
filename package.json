@@ -3,28 +3,34 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build --remote",
     "preview": "astro preview",
     "db:push": "astro db push",
-    "db:seed": "astro db execute db/seed.ts"
+    "db:seed": "astro db execute db/seed.ts",
+    "db:push:remote": "astro db push --remote",
+    "db:seed:remote": "astro db execute db/seed.ts --remote"
   },
   "dependencies": {
-    "@astrojs/db": "^0.19.0",
-    "@astrojs/preact": "^4.0.0",
-    "@astrojs/vercel": "^8.2.11",
+    "@astrojs/db": "^0.20.1",
+    "@astrojs/preact": "^5.1.1",
+    "@astrojs/vercel": "^10.0.4",
     "@upstash/redis": "^1.35.3",
     "@vercel/blob": "^1.1.1",
-    "astro": "^5.18.0",
+    "astro": "^6.0.0",
     "nodemailer": "^8.0.4",
     "preact": "^10.22.0"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.8",
     "@tailwindcss/vite": "^4.2.1",
     "@types/nodemailer": "^6.4.17",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.5.0",
+    "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.0.0"
   }
 }

@@ -50,9 +50,13 @@ const sortedSubscribers = [...subscribers].sort((a, b) => {
   return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 });
 
-const activeCount = sortedSubscribers.filter((subscriber) => subscriber.active).length;
+const activeCount = sortedSubscribers.filter(
+  (subscriber) => subscriber.active,
+).length;
 const inactiveCount = sortedSubscribers.length - activeCount;
-const linkedCount = sortedSubscribers.filter((subscriber) => !!subscriber.userId).length;
+const linkedCount = sortedSubscribers.filter(
+  (subscriber) => !!subscriber.userId,
+).length;
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") ?? "";
@@ -62,8 +66,8 @@ const error = url.searchParams.get("error") ?? "";
 
 const smtpReady = Boolean(
   import.meta.env.SMTP_HOST &&
-    import.meta.env.SMTP_PORT &&
-    import.meta.env.SMTP_FROM,
+  import.meta.env.SMTP_PORT &&
+  import.meta.env.SMTP_FROM,
 );
 
 const successMessage =
@@ -106,80 +110,152 @@ const presets = {
     body: "Hola,\n\nQueríamos avisarte de un nuevo evento en Arcadia.\n\nReserva o pásate a disfrutarlo con nosotros.",
   },
 };
+
+const summaryCards = [
+  {
+    label: "Activos",
+    value: activeCount,
+    note: "Recibirán el envío manual",
+    tone: "border-emerald-400/15 bg-emerald-400/8",
+  },
+  {
+    label: "Ligados a cuenta",
+    value: linkedCount,
+    note: "Tienen usuario registrado",
+    tone: "border-sky-400/15 bg-sky-400/8",
+  },
+  {
+    label: "Inactivos",
+    value: inactiveCount,
+    note: "Bajas o desactivados",
+    tone: "border-white/10 bg-white/[0.03]",
+  },
+];
+
+function formatDateTime(value: Date | string) {
+  return new Intl.DateTimeFormat("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Madrid",
+  }).format(new Date(value));
+}
 ---
 
 <AdminLayout
   title="Newsletter · Admin · Arcadia"
   heading="Newsletter"
-  description="Listado simple de suscriptores y envío manual de correos a la base activa."
+  description="Base simple de suscriptores y envío manual. He rehecho esta pantalla para que respire más y para que el bloque de envío tenga mucho más peso visual que la simple lista técnica."
   actions={true}
 >
   <Fragment slot="actions">
     <div class="flex flex-wrap gap-3">
       <a
         href="/admin"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
       >
         Volver al dashboard
       </a>
     </div>
   </Fragment>
 
-  {successMessage ? (
-    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
-      {successMessage}
-    </section>
-  ) : null}
+  {
+    successMessage ? (
+      <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+        {successMessage}
+      </section>
+    ) : null
+  }
 
-  {errorMessage ? (
-    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {errorMessage}
-    </section>
-  ) : null}
+  {
+    errorMessage ? (
+      <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {errorMessage}
+      </section>
+    ) : null
+  }
 
   <section class="grid gap-4 md:grid-cols-3">
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Activos</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeCount}</div>
-      <p class="mt-2 text-sm text-slate-400">Suscriptores que recibirán correos</p>
-    </article>
-
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Ligados a cuenta</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{linkedCount}</div>
-      <p class="mt-2 text-sm text-slate-400">Suscriptores con usuario registrado</p>
-    </article>
-
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Inactivos</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{inactiveCount}</div>
-      <p class="mt-2 text-sm text-slate-400">Bajas o correos desactivados</p>
-    </article>
+    {
+      summaryCards.map((card) => (
+        <article
+          class:list={[
+            "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
+            card.tone,
+          ]}
+        >
+          <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {card.label}
+          </div>
+          <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
+            {card.value}
+          </div>
+          <p class="mt-3 text-sm leading-6 text-slate-400">{card.note}</p>
+        </article>
+      ))
+    }
   </section>
 
-  <section class="mt-6 grid gap-6 xl:grid-cols-[440px_minmax(0,1fr)]">
+  <section class="mt-6 grid gap-6 xl:grid-cols-[460px_minmax(0,1fr)]">
     <aside class="space-y-6">
-      <article class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Envío manual</div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Nuevo correo</h2>
-        <p class="mt-2 text-sm leading-6 text-slate-400">
-          El administrador redacta y envía manualmente el mensaje a todos los suscriptores activos.
+      <article
+        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
+          Envío manual
+        </div>
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+          Nuevo correo
+        </h2>
+        <p class="mt-3 text-sm leading-7 text-slate-400">
+          El administrador redacta y lanza el envío manual a toda la base
+          activa. Aquí no hay automatización compleja: solo una herramienta
+          clara para campañas simples.
         </p>
 
-        {!smtpReady ? (
-          <div class="mt-5 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100/85">
-            Falta configurar SMTP para poder enviar. Revisa <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">SMTP_HOST</code>, <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">SMTP_PORT</code> y <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">SMTP_FROM</code>.
-          </div>
-        ) : null}
+        {
+          !smtpReady ? (
+            <div class="mt-6 rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100/85">
+              Falta configurar SMTP para poder enviar. Revisa{" "}
+              <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">
+                SMTP_HOST
+              </code>
+              ,{" "}
+              <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">
+                SMTP_PORT
+              </code>{" "}
+              y{" "}
+              <code class="rounded-lg border border-amber-300/20 bg-black/20 px-2 py-1 text-xs text-amber-100">
+                SMTP_FROM
+              </code>
+              .
+            </div>
+          ) : (
+            <div class="mt-6 rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100/85">
+              SMTP listo. El envío saldrá a los{" "}
+              <strong class="text-emerald-100">{activeCount}</strong>{" "}
+              suscriptores activos.
+            </div>
+          )
+        }
 
-        <form method="post" action="/api/admin/newsletter" class="mt-6 grid gap-4">
+        <form
+          method="post"
+          action="/api/admin/newsletter"
+          class="mt-7 grid gap-5"
+        >
           <input type="hidden" name="intent" value="send" />
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Preset</span>
+            <span
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
+              Preset
+            </span>
             <select
               id="newsletter-preset"
-              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
               name="preset"
             >
               <option value="GENERAL">General</option>
@@ -190,10 +266,14 @@ const presets = {
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Asunto</span>
+            <span
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
+              Asunto
+            </span>
             <input
               id="newsletter-subject"
-              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
               type="text"
               name="subject"
               value={presets.GENERAL.subject}
@@ -202,22 +282,26 @@ const presets = {
           </label>
 
           <label class="block">
-            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Cuerpo</span>
+            <span
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
+              Cuerpo
+            </span>
             <textarea
               id="newsletter-body"
-              class="min-h-56 w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              class="min-h-64 w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
               name="body"
-              required
-            >{presets.GENERAL.body}</textarea>
+              required>{presets.GENERAL.body}</textarea
+            >
           </label>
 
           <button
             type="submit"
             class:list={[
-              "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+              "inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
               smtpReady
-                ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300"
-                : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                ? "border border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:border-cyan-400/30 hover:bg-cyan-400/15"
+                : "cursor-not-allowed border border-white/10 bg-white/[0.03] text-slate-500",
             ]}
             disabled={!smtpReady}
           >
@@ -225,91 +309,210 @@ const presets = {
           </button>
         </form>
       </article>
+
+      <article
+        class="rounded-[32px] border border-white/10 bg-[#0b1220]/90 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
+          Criterio
+        </div>
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+          Uso de esta pantalla
+        </h2>
+
+        <div class="mt-6 space-y-4">
+          <article
+            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+          >
+            <div class="text-sm font-semibold text-white">Manual y simple</div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              No intenta ser una plataforma de marketing. Sirve para envíos
+              manuales básicos desde la base activa.
+            </p>
+          </article>
+
+          <article
+            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+          >
+            <div class="text-sm font-semibold text-white">
+              Presets editables
+            </div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Los presets solo rellenan asunto y cuerpo. Antes de enviar, el
+              admin puede reescribir ambos campos.
+            </p>
+          </article>
+
+          <article
+            class="rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4"
+          >
+            <div class="text-sm font-semibold text-amber-200">
+              Dependencia SMTP
+            </div>
+            <p class="mt-2 text-sm leading-6 text-amber-100/80">
+              Sin configuración SMTP válida, la pantalla sigue siendo útil como
+              editor, pero el envío se bloquea.
+            </p>
+          </article>
+        </div>
+      </article>
     </aside>
 
-    <section class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-      <div class="border-b border-white/10 px-6 py-5">
+    <section
+      class="overflow-hidden rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+    >
+      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
         <div class="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">Base</div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">Suscriptores</h2>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Base
+            </div>
+            <h2
+              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
+            >
+              Suscriptores
+            </h2>
+            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+              Lista ordenada por estado y actividad reciente. Cada suscriptor
+              muestra si está vinculado a una cuenta y cuándo se dio de alta o
+              cambió de estado.
+            </p>
           </div>
 
-          <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+          <div
+            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-300"
+          >
             {sortedSubscribers.length} registros
           </div>
         </div>
       </div>
 
-      {sortedSubscribers.length === 0 ? (
-        <div class="px-6 py-12 text-center text-sm text-slate-400">
-          Aún no hay suscriptores registrados.
-        </div>
-      ) : (
-        <div class="space-y-4 px-6 py-6">
-          {sortedSubscribers.map((subscriber) => {
-            const linkedUser = subscriber.userId ? userById.get(subscriber.userId) : null;
-            return (
-              <article class="rounded-3xl border border-white/10 bg-white/4 p-5">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div class="text-base font-semibold text-white">{subscriber.email}</div>
-                    <div class="mt-2 flex flex-wrap gap-2">
-                      <span class:list={[
-                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                        subscriber.active
-                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                          : "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
-                      ]}>
-                        {subscriber.active ? "Activo" : "Inactivo"}
-                      </span>
+      {
+        sortedSubscribers.length === 0 ? (
+          <div class="px-6 py-16 text-center lg:px-8">
+            <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-[#091121] p-8">
+              <div class="text-lg font-semibold text-white">
+                Aún no hay suscriptores
+              </div>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                La base de newsletter está vacía.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div class="space-y-5 px-6 py-6 lg:px-8 lg:py-8">
+            {sortedSubscribers.map((subscriber) => {
+              const linkedUser = subscriber.userId
+                ? userById.get(subscriber.userId)
+                : null;
 
-                      {linkedUser ? (
-                        <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
-                          Ligado a cuenta
-                        </span>
-                      ) : (
-                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                          Sin cuenta
-                        </span>
-                      )}
-                    </div>
-
-                    <div class="mt-3 text-sm text-slate-400">
-                      Alta: {new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(subscriber.createdAt))}
-                    </div>
-                    <div class="mt-1 text-sm text-slate-500">
-                      Último cambio: {new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Madrid" }).format(new Date(subscriber.updatedAt))}
-                    </div>
-                    {linkedUser ? (
-                      <div class="mt-2 text-sm text-slate-400">
-                        Cuenta: <span class="font-semibold text-white">{linkedUser.name?.trim() || linkedUser.email}</span>
+              return (
+                <article class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.22)] lg:p-6">
+                  <div class="flex flex-col gap-5 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <div class="break-all text-lg font-semibold text-white">
+                        {subscriber.email}
                       </div>
-                    ) : null}
+
+                      <div class="mt-3 flex flex-wrap gap-2.5">
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                            subscriber.active
+                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                              : "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+                          ]}
+                        >
+                          {subscriber.active ? "Activo" : "Inactivo"}
+                        </span>
+
+                        {linkedUser ? (
+                          <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
+                            Ligado a cuenta
+                          </span>
+                        ) : (
+                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                            Sin cuenta
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <form method="post" action="/api/admin/newsletter">
+                      <input
+                        type="hidden"
+                        name="intent"
+                        value="toggle-subscriber"
+                      />
+                      <input
+                        type="hidden"
+                        name="subscriberId"
+                        value={subscriber.id}
+                      />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={subscriber.active ? "0" : "1"}
+                      />
+                      <button
+                        type="submit"
+                        class:list={[
+                          "inline-flex min-h-10 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition",
+                          subscriber.active
+                            ? "border border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+                            : "border border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:border-cyan-400/30 hover:bg-cyan-400/15",
+                        ]}
+                      >
+                        {subscriber.active ? "Desactivar" : "Reactivar"}
+                      </button>
+                    </form>
                   </div>
 
-                  <form method="post" action="/api/admin/newsletter">
-                    <input type="hidden" name="intent" value="toggle-subscriber" />
-                    <input type="hidden" name="subscriberId" value={subscriber.id} />
-                    <input type="hidden" name="active" value={subscriber.active ? "0" : "1"} />
-                    <button
-                      type="submit"
-                      class:list={[
-                        "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                        subscriber.active
-                          ? "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white"
-                          : "bg-cyan-400 text-slate-950 hover:bg-cyan-300",
-                      ]}
-                    >
-                      {subscriber.active ? "Desactivar" : "Reactivar"}
-                    </button>
-                  </form>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                  <div class="mt-6 grid gap-4 xl:grid-cols-3">
+                    <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Alta
+                      </div>
+                      <div class="mt-3 text-sm font-semibold text-white">
+                        {formatDateTime(subscriber.createdAt)}
+                      </div>
+                    </section>
+
+                    <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Último cambio
+                      </div>
+                      <div class="mt-3 text-sm font-semibold text-white">
+                        {formatDateTime(subscriber.updatedAt)}
+                      </div>
+                    </section>
+
+                    <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                      <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Cuenta vinculada
+                      </div>
+                      <div class="mt-3 text-sm font-semibold text-white">
+                        {linkedUser
+                          ? linkedUser.name?.trim() || linkedUser.email
+                          : "No"}
+                      </div>
+                      {linkedUser ? (
+                        <div class="mt-2 break-all text-sm text-slate-500">
+                          {linkedUser.email}
+                        </div>
+                      ) : null}
+                    </section>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )
+      }
     </section>
   </section>
 </AdminLayout>

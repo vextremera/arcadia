@@ -1,0 +1,103 @@
+import { c as createComponent } from './astro-component_BmOi03Hm.mjs';
+import 'piccolore';
+import { T as renderTemplate, B as maybeRenderHead, a4 as addAttribute } from './sequence_BvZ5THv7.mjs';
+import { r as renderComponent } from './entrypoint_BPbdkgv6.mjs';
+import { $ as $$SiteLayout } from './SiteLayout_CblPac9t.mjs';
+import { d as db, C as Category, e as Product, b as Allergen, P as ProductAllergen } from './_astro_db_Bcz5lWRF.mjs';
+import { eq, and, inArray, asc } from '@astrojs/db/dist/runtime/virtual.js';
+
+const $$Index = createComponent(async ($$result, $$props, $$slots) => {
+  function money(cents) {
+    return `${(cents / 100).toFixed(2)} €`;
+  }
+  function allergenIconPath(allergen) {
+    return allergen.iconUrl ?? `/images/allergens/${allergen.slug}.webp`;
+  }
+  const categories = await db.select({
+    id: Category.id,
+    name: Category.name,
+    slug: Category.slug,
+    sortOrder: Category.sortOrder
+  }).from(Category).where(eq(Category.active, true)).orderBy(Category.sortOrder);
+  const products = await db.select({
+    id: Product.id,
+    categoryId: Product.categoryId,
+    name: Product.name,
+    description: Product.description,
+    details: Product.details,
+    priceCents: Product.priceCents
+  }).from(Product).where(eq(Product.active, true)).orderBy(Product.name);
+  const productIds = products.map((product) => product.id);
+  const allergenRows = productIds.length ? await db.select({
+    productId: ProductAllergen.productId,
+    slug: Allergen.slug,
+    name: Allergen.name,
+    iconUrl: Allergen.iconUrl
+  }).from(ProductAllergen).innerJoin(Allergen, eq(ProductAllergen.allergenId, Allergen.id)).where(and(inArray(ProductAllergen.productId, productIds), eq(Allergen.active, true))).orderBy(asc(ProductAllergen.productId), asc(Allergen.sortOrder), asc(Allergen.name)) : [];
+  const allergensByProduct = /* @__PURE__ */ new Map();
+  for (const allergen of allergenRows) {
+    const list = allergensByProduct.get(allergen.productId) ?? [];
+    list.push({
+      slug: allergen.slug,
+      name: allergen.name,
+      iconUrl: allergen.iconUrl
+    });
+    allergensByProduct.set(allergen.productId, list);
+  }
+  const productsByCategory = /* @__PURE__ */ new Map();
+  for (const product of products) {
+    const list = productsByCategory.get(product.categoryId) ?? [];
+    list.push({
+      ...product,
+      allergens: allergensByProduct.get(product.id) ?? []
+    });
+    productsByCategory.set(product.categoryId, list);
+  }
+  const NUMERIC_ORDER_CATEGORIES = /* @__PURE__ */ new Set(["platos-combinados", "platos-infantiles"]);
+  function leadingNumber(name) {
+    const match = name.trim().match(/^(\d+)\s*(?:[.: -]|-)/);
+    return match ? Number(match[1]) : null;
+  }
+  function sortProductsForCategory(categorySlug, items) {
+    if (!NUMERIC_ORDER_CATEGORIES.has(categorySlug)) return items;
+    return [...items].sort((a, b) => {
+      const aNumber = leadingNumber(a.name);
+      const bNumber = leadingNumber(b.name);
+      if (aNumber != null && bNumber != null) return aNumber - bNumber;
+      if (aNumber != null) return -1;
+      if (bNumber != null) return 1;
+      return a.name.localeCompare(b.name, "es");
+    });
+  }
+  const menu = categories.map((category) => ({
+    ...category,
+    products: sortProductsForCategory(category.slug, productsByCategory.get(category.id) ?? [])
+  })).filter((category) => category.products.length > 0);
+  const heroStyle = {
+    backgroundImage: "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 55%, rgba(0,0,0,0.15) 100%), url('/images/general/domicilio-header.jpg')",
+    backgroundSize: "cover",
+    backgroundPosition: "center"
+  };
+  return renderTemplate`${renderComponent($$result, "SiteLayout", $$SiteLayout, { "title": "Carta · Arcadia", "fullWidth": true }, { "default": async ($$result2) => renderTemplate` ${maybeRenderHead()}<div class="w-full" id="top"> <section class="relative w-full overflow-hidden bg-zinc-900 rounded-t-4xl sm:rounded-t-[50px]"${addAttribute(heroStyle, "style")}> <div class="h-56 sm:h-150"></div> <div class="absolute inset-0"> <div class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]"></div> <div class="flex h-full w-full items-center justify-center px-4 pb-12 pt-8 text-center sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10"> <div class="text-white"> <div class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular">CARTA</div> <div class="mt-1 text-sm sm:text-[20px] text-white/80">
+Consulta nuestra carta organizada por categorías.
+</div> </div> </div> </div> </section> <div class="w-full px-4 py-8 sm:px-10 sm:py-10"> <div class="mx-auto w-full max-w-6xl 2xl:max-w-7xl"> ${menu.length === 0 ? renderTemplate`<div class="text-sm text-zinc-600">No hay productos disponibles.</div>` : renderTemplate`<div class="space-y-10 sm:space-y-12"> ${menu.map((category) => renderTemplate`<section${addAttribute(`cat-${category.slug}`, "id")} class="scroll-mt-24"> <div class="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"> <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular"> ${category.name} </h2> <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
+↑ arriba
+</a> </div> <div class="mt-4 divide-y divide-zinc-200/70 rounded-3xl border border-zinc-200 bg-bg shadow-sm sm:mt-5"> ${category.products.map((product) => {
+    const description = (product.details ?? product.description ?? "").trim();
+    return renderTemplate`<div class="px-4 py-4 sm:px-6"> <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_minmax(3rem,1fr)_auto] sm:gap-x-5"> <div class="min-w-0"> <div class="font-semibold text-zinc-900 wrap-break-words">${product.name}</div> ${description ? renderTemplate`<div class="mt-1 text-sm text-zinc-600 line-clamp-3"> ${description} </div>` : null} ${product.allergens.length > 0 ? renderTemplate`<div class="mt-3 flex flex-wrap gap-2"> ${product.allergens.map((allergen) => renderTemplate`<img${addAttribute(allergenIconPath(allergen), "src")}${addAttribute(allergen.name, "alt")}${addAttribute(allergen.name, "title")} class="h-7 w-7 object-contain sm:h-8 sm:w-8" loading="lazy">`)} </div>` : null} </div> <div class="hidden sm:block self-center border-b border-dotted border-zinc-300/80 -translate-y-0.5" aria-hidden="true"></div> <div class="justify-self-end text-right shrink-0 font-semibold text-zinc-900 tabular-nums"> ${money(product.priceCents)} </div> </div> </div>`;
+  })} </div> </section>`)} </div>`} </div> </div> </div> ` })}`;
+}, "C:/Users/vicre/Dev/arcadia/src/pages/carta/index.astro", void 0);
+
+const $$file = "C:/Users/vicre/Dev/arcadia/src/pages/carta/index.astro";
+const $$url = "/carta";
+
+const _page = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: $$Index,
+  file: $$file,
+  url: $$url
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const page = () => _page;
+
+export { page };

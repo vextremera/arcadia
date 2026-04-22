@@ -1,0 +1,115 @@
+import { c as createComponent } from './astro-component_BmOi03Hm.mjs';
+import 'piccolore';
+import { T as renderTemplate, a4 as addAttribute, F as Fragment, B as maybeRenderHead } from './sequence_BvZ5THv7.mjs';
+import { r as renderComponent } from './entrypoint_BPbdkgv6.mjs';
+import { $ as $$AdminLayout } from './AdminLayout_DMcBXVbD.mjs';
+import { d as db, A as AppSetting } from './_astro_db_Bcz5lWRF.mjs';
+import { eq } from '@astrojs/db/dist/runtime/virtual.js';
+
+const $$Fees = createComponent(async ($$result, $$props, $$slots) => {
+  const Astro2 = $$result.createAstro($$props, $$slots);
+  Astro2.self = $$Fees;
+  const DEFAULT_DELIVERY_FEE = { cents: 0 };
+  const [rowDelivery] = await db.select({ value: AppSetting.value }).from(AppSetting).where(eq(AppSetting.key, "deliveryFee")).limit(1);
+  const [rowLegacy] = await db.select({ value: AppSetting.value }).from(AppSetting).where(eq(AppSetting.key, "fees")).limit(1);
+  const legacyValue = rowLegacy?.value;
+  const deliveryFee = rowDelivery?.value ?? (typeof legacyValue?.deliveryFeeCents === "number" ? { cents: Number(legacyValue.deliveryFeeCents) } : DEFAULT_DELIVERY_FEE);
+  const deliveryFeeEur = (Number(deliveryFee.cents ?? 0) / 100).toFixed(2);
+  const hasLegacyOnly = Boolean(rowLegacy && !rowDelivery);
+  const url = new URL(Astro2.request.url);
+  const saved = url.searchParams.get("saved") === "1";
+  const error = url.searchParams.get("error") ?? "";
+  const errorMessage = error === "invalid-fee" ? "Introduce un importe válido en euros para la tarifa de delivery." : "";
+  const summaryCards = [
+    {
+      label: "Fee actual",
+      value: `${deliveryFeeEur} €`,
+      note: "Importe aplicado a pedidos DELIVERY",
+      tone: "border-sky-400/20 bg-sky-400/10"
+    },
+    {
+      label: "Source of truth",
+      value: "deliveryFee",
+      note: "Key que consume el checkout actual",
+      tone: "border-violet-400/20 bg-violet-400/10"
+    },
+    {
+      label: "Compatibilidad",
+      value: hasLegacyOnly ? "Legacy detectado" : "Configuración alineada",
+      note: hasLegacyOnly ? "Al guardar se migra a la key moderna" : "Sin dependencia problemática del ajuste antiguo",
+      tone: hasLegacyOnly ? "border-amber-400/20 bg-amber-400/10" : "border-emerald-400/20 bg-emerald-400/10"
+    }
+  ];
+  return renderTemplate`${renderComponent($$result, "AdminLayout", $$AdminLayout, { "title": "Fees · Admin · Arcadia", "heading": "Fees", "description": "Gestión de la tarifa de delivery con compatibilidad con el ajuste legacy. El checkout consume la key moderna deliveryFee y esta pantalla deja claro qué configuración manda realmente.", "actions": true }, { "actions": async ($$result2) => renderTemplate`${renderComponent($$result2, "Fragment", Fragment, { "slot": "actions" }, { "default": async ($$result3) => renderTemplate` ${maybeRenderHead()}<div class="flex flex-wrap gap-3"> <a href="/admin/operativa" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white">
+Ir a operativa
+</a> <a href="/admin/ajustes/pagos" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+Ajustes de pago
+</a> </div> ` })}`, "default": async ($$result2) => renderTemplate`  ${saved ? renderTemplate`<section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+Fee guardado correctamente.
+</section>` : null}${errorMessage ? renderTemplate`<section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200"> ${errorMessage} </section>` : null}<section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"> ${summaryCards.map((card) => renderTemplate`<article${addAttribute([
+    "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
+    card.tone
+  ], "class:list")}> <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500"> ${card.label} </div> <div class="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white"> ${card.value} </div> <p class="mt-3 text-sm leading-6 text-slate-300">${card.note}</p> </article>`)} </section> <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_380px]"> <article class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+Configuración
+</div> <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]">
+Tarifa de delivery
+</h2> <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+Esta tarifa se suma únicamente a pedidos a domicilio. El valor se guarda
+        en la key moderna${" "} <code class="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white">deliveryFee</code>${" "}
+con formato${" "} <code class="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white">${`{ cents }`}</code>.
+</p> <form class="mt-7 grid gap-6" method="post" action="/api/admin/settings/fees"> <div class="max-w-md"> <label class="block"> <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+Importe en €
+</span> <input class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="number" step="0.01" min="0" name="deliveryFeeEur"${addAttribute(deliveryFeeEur, "value")} required> </label> <p class="mt-3 text-sm text-slate-400">
+Ejemplo: <span class="font-semibold text-white">2.50</span> </p> </div> <div class="grid gap-4 md:grid-cols-2"> <article class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"> <div class="text-sm font-semibold text-white">Dónde aplica</div> <p class="mt-3 text-sm leading-7 text-slate-400">
+Solo en pedidos <strong class="text-slate-200">DELIVERY</strong>.
+              No afecta a pickup ni a sala.
+</p> </article> <article class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"> <div class="text-sm font-semibold text-white">Cómo viaja</div> <p class="mt-3 text-sm leading-7 text-slate-400">
+El checkout lee la key moderna y la tarifa acaba reflejada en el
+              total del pedido y en su snapshot operativo.
+</p> </article> </div> <div class="flex flex-wrap gap-3"> <button class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15" type="submit">
+Guardar fee
+</button> <a href="/admin" class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white">
+Volver al dashboard
+</a> </div> </form> </article> <aside class="space-y-6"> <section class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+Compatibilidad
+</div> <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+Estado del ajuste
+</h2> <div class="mt-6 space-y-4"> <article class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"> <div class="text-sm font-semibold text-white">Key nueva</div> <p class="mt-2 text-sm leading-6 text-slate-400"> <code class="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white">deliveryFee</code>${" "}
+es la que usa el checkout y la operativa actual.
+</p> </article> <article class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"> <div class="text-sm font-semibold text-white">Key antigua</div> <p class="mt-2 text-sm leading-6 text-slate-400"> <code class="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-white">fees</code>${" "}
+se mantiene por compatibilidad si todavía existe en la base.
+</p> </article> ${hasLegacyOnly ? renderTemplate`<article class="rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4"> <div class="text-sm font-semibold text-amber-200">
+Ajuste legacy detectado
+</div> <p class="mt-2 text-sm leading-6 text-amber-100/80">
+Ahora mismo se está leyendo desde el ajuste antiguo. Al
+                  guardar, la configuración pasa a la key moderna y el legacy
+                  queda sincronizado.
+</p> </article>` : renderTemplate`<article class="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-4"> <div class="text-sm font-semibold text-emerald-200">
+Configuración alineada
+</div> <p class="mt-2 text-sm leading-6 text-emerald-100/80">
+El ajuste actual ya está en el formato correcto para checkout
+                  y operativa.
+</p> </article>`} </div> </section> <section class="rounded-[32px] border border-sky-400/20 bg-sky-400/10 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)] lg:p-7"> <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">
+Nota funcional
+</div> <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+Alcance real
+</h2> <p class="mt-3 text-sm leading-7 text-sky-100/80">
+Esta pantalla solo gobierna la tarifa de envío. La disponibilidad del
+          canal delivery sigue dependiendo de operativa, horarios, special dates
+          y force pickup.
+</p> </section> </aside> </section> ` })}`;
+}, "C:/Users/vicre/Dev/arcadia/src/pages/admin/ajustes/fees.astro", void 0);
+
+const $$file = "C:/Users/vicre/Dev/arcadia/src/pages/admin/ajustes/fees.astro";
+const $$url = "/admin/ajustes/fees";
+
+const _page = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: $$Fees,
+  file: $$file,
+  url: $$url
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const page = () => _page;
+
+export { page };

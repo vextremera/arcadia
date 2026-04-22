@@ -59,7 +59,7 @@ const specialCards: PublicChannelCard[] = [
     start: availability.windows.delivery.start,
     end: availability.windows.delivery.end,
     state: availability.forcePickup
-      ? "Forzado a pickup"
+      ? "Solo recogida"
       : availability.deliveryAvailable
         ? "Disponible"
         : "No disponible",
@@ -141,7 +141,7 @@ const hasSpecialResolution = specialCards.length > 0;
 
         {availability.forcePickup ? (
           <div class="mt-4 rounded-xl border border-amber-200 bg-white/70 px-4 py-3 text-sm text-amber-900">
-            El reparto está forzado a recogida desde operativa, así que aunque exista franja especial de delivery el checkout te llevará por pickup.
+            Ahora mismo trabajamos solo recogida desde operativa, así que aunque hoy exista una franja especial de delivery el checkout seguirá por pickup.
           </div>
         ) : null}
       </section>
