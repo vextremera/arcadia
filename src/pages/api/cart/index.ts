@@ -130,7 +130,6 @@ async function hydrateCart(items: CartItemSession[]) {
 
 
         modifiers: modifierObjs,
-        notes: i.notes,
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
