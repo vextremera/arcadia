@@ -2,12 +2,6 @@
 import "@/styles/global.css";
 import AdminSidebar from "@/components/admin/AdminSidebar.astro";
 
-type UserLike = {
-  name?: string | null;
-  email?: string | null;
-  role?: string | null;
-};
-
 type Props = {
   title?: string;
   heading?: string;
@@ -22,27 +16,10 @@ const {
   actions = false,
 } = Astro.props as Props;
 
-const user = Astro.locals.user as UserLike | null;
 const pathname = Astro.url.pathname;
 const pageHeading = heading ?? "Admin";
 const pageDescription = description ?? "";
 const pageTitle = title;
-
-function initialsFromUser(value: UserLike | null) {
-  const base = value?.name?.trim() || value?.email?.trim() || "A";
-  const clean = base.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, "").trim();
-  const parts = clean.split(/\s+/).filter(Boolean);
-
-  if (parts.length >= 2) {
-    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
-  }
-
-  return clean.slice(0, 2).toUpperCase() || "A";
-}
-
-const userInitials = initialsFromUser(user);
-const displayName = user?.name?.trim() || user?.email?.trim() || "Sesión admin";
-const displayRole = user?.role?.trim() || "STAFF";
 ---
 
 <!doctype html>
@@ -55,151 +32,180 @@ const displayRole = user?.role?.trim() || "STAFF";
     <title>{pageTitle}</title>
   </head>
 
-  <body class="min-h-dvh bg-[#0b1120] text-slate-100 antialiased">
+  <body class="h-dvh overflow-hidden bg-[#0b1120] text-slate-100 antialiased">
     <div
       id="admin-shell"
       data-sidebar-collapsed="false"
-      class="min-h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#0b1120_0%,#111827_100%)]"
+      class="h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#0b1120_0%,#111827_100%)]"
     >
-      <div class="mx-auto flex w-full max-w-480 gap-6 px-4 py-4 sm:px-6 sm:py-6 2xl:px-8">
-        <AdminSidebar currentPath={pathname} user={user} />
+      <div class="flex h-dvh w-full gap-0 overflow-hidden">
+        <AdminSidebar currentPath={pathname} />
 
-        <div class="min-w-0 flex-1">
-          <header class="sticky top-4 z-20 mb-6 rounded-[28px] border border-white/10 bg-slate-950/70 px-5 py-4 backdrop-blur xl:px-6">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div class="min-w-0">
-                <div class="flex items-center gap-3">
-                  <button
-                    type="button"
-                    id="admin-sidebar-toggle"
-                    class="hidden xl:inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-                    aria-label="Contraer o expandir sidebar"
-                    aria-pressed="false"
-                    title="Contraer o expandir sidebar"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      class="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M4 6h16"></path>
-                      <path d="M4 12h16"></path>
-                      <path d="M4 18h16"></path>
-                    </svg>
-                  </button>
-
+        <div class="min-w-0 flex-1 xl:border-l xl:border-white/5">
+          <div class="flex h-dvh min-w-0 flex-col overflow-hidden">
+            <header
+              class="shrink-0 border-b border-white/[0.08] bg-[#0d1628]/92 backdrop-blur"
+            >
+              <div
+                class="flex flex-col gap-3 px-5 py-3 sm:px-6 lg:px-8 xl:px-10 xl:py-3.5"
+              >
+                <div
+                  class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"
+                >
                   <div class="min-w-0">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <div
+                      class="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500"
+                    >
                       Arcadia · Administración
                     </div>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-[2rem]">
+
+                    <h1
+                      class="mt-1.5 text-[1.55rem] font-semibold tracking-[-0.04em] text-white sm:text-[1.85rem]"
+                    >
                       {pageHeading}
                     </h1>
+
+                    {
+                      pageDescription ? (
+                        <p class="mt-1.5 max-w-4xl text-sm leading-6 text-slate-400">
+                          {pageDescription}
+                        </p>
+                      ) : null
+                    }
+                  </div>
+
+                  <div class="flex shrink-0 items-center gap-3 lg:justify-end">
+                    <form method="post" action="/api/admin/logout">
+                      <button
+                        type="submit"
+                        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+                      >
+                        Cerrar sesión
+                      </button>
+                    </form>
                   </div>
                 </div>
 
                 {
-                  pageDescription ? (
-                    <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
-                      {pageDescription}
-                    </p>
+                  actions ? (
+                    <div class="border-t border-white/[0.08] pt-3">
+                      <slot name="actions" />
+                    </div>
                   ) : null
                 }
               </div>
+            </header>
 
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="hidden rounded-2xl border border-white/10 bg-white/5 px-4 py-3 md:flex md:items-center md:gap-3">
-                  <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-400/15 text-sm font-bold text-sky-300 ring-1 ring-sky-300/15">
-                    {userInitials}
-                  </div>
-
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-semibold text-white">
-                      {displayName}
-                    </div>
-                    <div class="text-xs uppercase tracking-[0.16em] text-slate-400">
-                      {displayRole}
-                    </div>
-                  </div>
-                </div>
-
-                <form method="post" action="/api/admin/logout">
-                  <button
-                    type="submit"
-                    class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
-                  >
-                    Cerrar sesión
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {
-              actions ? (
-                <div class="mt-4">
-                  <slot name="actions" />
-                </div>
-              ) : null
-            }
-          </header>
-
-          <main class="pb-10">
-            <slot />
-          </main>
+            <main
+              data-admin-main-scroll
+              class="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6 lg:px-8 xl:px-10 xl:py-8"
+            >
+              <slot />
+            </main>
+          </div>
         </div>
       </div>
     </div>
 
     <style is:global>
+      #admin-shell {
+        --admin-sidebar-width: 17rem;
+      }
+
+      [data-admin-main-scroll] {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(56, 189, 248, 0.32) transparent;
+      }
+
+      [data-admin-main-scroll]::-webkit-scrollbar {
+        width: 12px;
+      }
+
+      [data-admin-main-scroll]::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      [data-admin-main-scroll]::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        border: 3px solid transparent;
+        background: rgba(56, 189, 248, 0.26);
+        background-clip: padding-box;
+      }
+
+      [data-admin-main-scroll]::-webkit-scrollbar-thumb:hover {
+        background: rgba(56, 189, 248, 0.4);
+        background-clip: padding-box;
+      }
+
       @media (min-width: 1280px) {
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar] {
-          width: 6rem;
+        #admin-shell[data-sidebar-collapsed="true"] {
+          --admin-sidebar-width: 5rem;
         }
 
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-brand-text],
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-session],
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-group-title],
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-copy],
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-footer-text] {
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar] {
+          width: var(--admin-sidebar-width);
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-brand-text],
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-group-title],
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-item-copy],
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-footer-text] {
           display: none;
         }
 
         #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-nav] {
-          padding-left: 0.75rem;
-          padding-right: 0.75rem;
+          padding-left: 0.625rem;
+          padding-right: 0.625rem;
         }
 
         #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item] {
+          padding-left: 0.625rem;
+          padding-right: 0.625rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-item-row] {
+          justify-content: center;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-top] {
           padding-left: 0.75rem;
           padding-right: 0.75rem;
         }
 
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-row] {
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-footer] {
+          padding-left: 0.625rem;
+          padding-right: 0.625rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-brand-row] {
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.625rem;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-brand-link] {
+          flex: 0 0 auto;
+          width: auto;
+        }
+
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-brand-inner] {
           justify-content: center;
         }
 
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-item-dot] {
-          margin-top: 0;
-          height: 0.75rem;
-          width: 0.75rem;
-        }
-
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-top] {
-          padding-left: 1rem;
-          padding-right: 1rem;
-        }
-
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-footer] {
-          padding: 1rem;
-        }
-
-        #admin-shell[data-sidebar-collapsed="true"] [data-admin-sidebar-logo-wrap] {
-          justify-content: center;
+        #admin-shell[data-sidebar-collapsed="true"]
+          [data-admin-sidebar-toggle] {
+          height: 2.5rem;
+          width: 2.5rem;
         }
       }
     </style>
@@ -229,11 +235,18 @@ const displayRole = user?.role?.trim() || "STAFF";
         }
 
         function applyState(collapsed) {
-          root.setAttribute("data-sidebar-collapsed", collapsed ? "true" : "false");
+          root.setAttribute(
+            "data-sidebar-collapsed",
+            collapsed ? "true" : "false",
+          );
           toggle.setAttribute("aria-pressed", collapsed ? "true" : "false");
           toggle.setAttribute(
             "title",
-            collapsed ? "Expandir sidebar" : "Contraer sidebar"
+            collapsed ? "Expandir sidebar" : "Contraer sidebar",
+          );
+          toggle.setAttribute(
+            "aria-label",
+            collapsed ? "Expandir sidebar" : "Contraer sidebar",
           );
         }
 

@@ -391,7 +391,7 @@ const errorMessage =
 <AdminLayout
   title="Menú · Admin · Arcadia"
   heading="Menú del día"
-  description="Sistema nuevo del menú diario y festivo, completamente separado del catálogo de productos real de delivery, pickup y sala."
+  description="Sistema nuevo del menú diario y festivo, separado del catálogo real de delivery, pickup y sala. Esta versión visual deja mucho más claro qué publica, qué es fallback y qué sigue pendiente de cerrar."
   actions={true}
 >
   <Fragment slot="actions">
@@ -400,14 +400,14 @@ const errorMessage =
         href="/menu"
         target="_blank"
         rel="noreferrer"
-        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15"
       >
         Ver página pública
       </a>
 
       <a
         href="/admin"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
       >
         Volver al dashboard
       </a>
@@ -416,7 +416,7 @@ const errorMessage =
 
   {
     successMessage ? (
-      <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
         {successMessage}
       </section>
     ) : null
@@ -424,7 +424,7 @@ const errorMessage =
 
   {
     errorMessage ? (
-      <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
         {errorMessage}
       </section>
     ) : null
@@ -432,7 +432,7 @@ const errorMessage =
 
   {
     hasBlockedV2Transition ? (
-      <section class="mb-6 rounded-3xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+      <section class="mb-6 rounded-[26px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
         Hay datos en V2, pero todavía no existe una variante publicable. La
         página pública sigue leyendo el menú legacy y la importación ya está
         bloqueada porque el sistema nuevo no está vacío. Revisa publicación,
@@ -441,55 +441,59 @@ const errorMessage =
     ) : null
   }
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
     <article
-      class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500"
       >
         Biblioteca
       </div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+      <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
         {totalDishes}
       </div>
-      <p class="mt-2 text-sm text-slate-400">Platos propios del menú</p>
+      <p class="mt-3 text-sm leading-6 text-slate-400">
+        Platos propios del menú
+      </p>
     </article>
 
     <article
-      class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
+      class="rounded-[28px] border border-emerald-400/15 bg-emerald-400/8 p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-200/80"
+        class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-200/80"
       >
         Activos
       </div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+      <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
         {activeDishes}
       </div>
-      <p class="mt-2 text-sm text-emerald-100/70">Visibles para asignar</p>
+      <p class="mt-3 text-sm leading-6 text-emerald-100/70">
+        Visibles para asignar
+      </p>
     </article>
 
     <article
       class:list={[
-        "rounded-[28px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+        "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
         kindStats.DIARIO.published
-          ? "border-sky-400/15 bg-sky-400/6"
-          : "border-amber-400/15 bg-amber-400/8",
+          ? "border-sky-400/15 bg-sky-400/8"
+          : "border-amber-400/15 bg-amber-400/10",
       ]}
     >
       <div
         class:list={[
-          "text-[11px] font-semibold uppercase tracking-[0.22em]",
+          "text-[11px] font-semibold uppercase tracking-[0.2em]",
           kindStats.DIARIO.published ? "text-sky-200/80" : "text-amber-200/80",
         ]}
       >
         Diario
       </div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+      <div class="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">
         {kindStats.DIARIO.published ? "Publicando" : "No publica"}
       </div>
-      <p class="mt-2 text-sm leading-6 text-white/75">
+      <p class="mt-3 text-sm leading-6 text-slate-300">
         {kindStats.DIARIO.activeAssignments}/{kindStats.DIARIO.totalAssignments} asignaciones
         publicables · {kindStats.DIARIO.reason}
       </p>
@@ -497,15 +501,15 @@ const errorMessage =
 
     <article
       class:list={[
-        "rounded-[28px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+        "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
         kindStats.FESTIVO.published
-          ? "border-violet-400/15 bg-violet-400/6"
-          : "border-amber-400/15 bg-amber-400/8",
+          ? "border-violet-400/15 bg-violet-400/8"
+          : "border-amber-400/15 bg-amber-400/10",
       ]}
     >
       <div
         class:list={[
-          "text-[11px] font-semibold uppercase tracking-[0.22em]",
+          "text-[11px] font-semibold uppercase tracking-[0.2em]",
           kindStats.FESTIVO.published
             ? "text-violet-200/80"
             : "text-amber-200/80",
@@ -513,10 +517,10 @@ const errorMessage =
       >
         Festivo
       </div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
+      <div class="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">
         {kindStats.FESTIVO.published ? "Publicando" : "No publica"}
       </div>
-      <p class="mt-2 text-sm leading-6 text-white/75">
+      <p class="mt-3 text-sm leading-6 text-slate-300">
         {kindStats.FESTIVO.activeAssignments}/{
           kindStats.FESTIVO.totalAssignments
         } asignaciones publicables · {kindStats.FESTIVO.reason}
@@ -525,137 +529,145 @@ const errorMessage =
   </section>
 
   <section
-    class="mt-6 rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+    class="mt-6 rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
   >
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300"
-        >
-          Configuración fija
+    <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div
+            class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          >
+            Configuración fija
+          </div>
+          <h2
+            class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
+          >
+            Menú diario y festivo
+          </h2>
+          <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+            Aquí solo existen las dos variantes reales del negocio. Ya no hay
+            CRUD infinito de menús: se configuran precio y publicación, y los
+            platos viven en su propia biblioteca.
+          </p>
         </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-          Menú diario y festivo
-        </h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-          Ya no existen múltiples menús editables. Aquí solo configuras las dos
-          variantes reales del negocio y su precio. Los platos viven en su
-          propia biblioteca y se asignan por separado.
-        </p>
-      </div>
 
-      <div class="flex flex-wrap gap-3">
-        {
-          canImportLegacy ? (
-            <form method="post" action="/api/admin/menu-v2">
-              <input type="hidden" name="intent" value="import-legacy" />
-              <button
-                type="submit"
-                class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
-              >
-                Importar menú legacy
-              </button>
-            </form>
-          ) : null
-        }
+        <div class="flex flex-wrap gap-3">
+          {
+            canImportLegacy ? (
+              <form method="post" action="/api/admin/menu-v2">
+                <input type="hidden" name="intent" value="import-legacy" />
+                <button
+                  type="submit"
+                  class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15"
+                >
+                  Importar menú legacy
+                </button>
+              </form>
+            ) : null
+          }
 
-        <div
-          class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300"
-        >
-          Separado completamente del catálogo real
+          <div
+            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-300"
+          >
+            Separado del catálogo real
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-6 grid gap-4 xl:grid-cols-3">
+    <div class="grid gap-4 px-6 py-6 lg:px-8 lg:py-8 xl:grid-cols-3">
       <article
-        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+        class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
         >
           Fuente pública actual
         </div>
-        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+        <div class="mt-3 text-lg font-semibold text-white">
           {publicSourceLabel}
         </div>
-        <p class="mt-2 text-sm leading-6 text-slate-400">
+        <p class="mt-3 text-sm leading-6 text-slate-400">
           {legacyGuidance}
         </p>
       </article>
 
       <article
-        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+        class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
         >
           Legacy detectado
         </div>
-        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+        <div class="mt-3 text-lg font-semibold text-white">
           {legacyStatusLabel}
         </div>
-        <p class="mt-2 text-sm leading-6 text-slate-400">
+        <p class="mt-3 text-sm leading-6 text-slate-400">
           {legacyMenusCount} menús legacy · {legacyMenuItemsCount} items legacy.
         </p>
       </article>
 
       <article
-        class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5"
+        class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
         >
           Publicación V2
         </div>
-        <div class="mt-3 text-lg font-semibold tracking-tight text-white">
+        <div class="mt-3 text-lg font-semibold text-white">
           {publicationStateLabel}
         </div>
-        <p class="mt-2 text-sm leading-6 text-slate-400">
+        <p class="mt-3 text-sm leading-6 text-slate-400">
           {publicationGuidance}
         </p>
       </article>
     </div>
 
-    <form method="post" action="/api/admin/menu-v2" class="mt-6">
+    <form
+      method="post"
+      action="/api/admin/menu-v2"
+      class="border-t border-white/[0.08] px-6 py-6 lg:px-8 lg:py-8"
+    >
       <input type="hidden" name="intent" value="save-config" />
 
       <div class="grid gap-6 xl:grid-cols-2">
         {
           KINDS.map((kind) => (
-            <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-              <div class="flex items-start justify-between gap-3">
+            <article class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6">
+              <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <span
                     class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
                       kind.tone,
                     ]}
                   >
                     {kind.label}
                   </span>
-                  <h3 class="mt-3 text-lg font-semibold text-white">
+                  <h3 class="mt-4 text-xl font-semibold text-white">
                     Menú {kind.label.toLowerCase()}
                   </h3>
                 </div>
 
-                <div class="text-right">
-                  <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
+                <div class="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-right">
+                  <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Precio actual
                   </div>
-                  <div class="mt-1 text-lg font-semibold text-white">
+                  <div class="mt-2 text-lg font-semibold text-white">
                     {money(config[kind.key].priceCents)}
                   </div>
                 </div>
               </div>
 
-              <div class="mt-5 grid gap-4 sm:grid-cols-[180px_auto]">
+              <div class="mt-6 grid gap-4 sm:grid-cols-[180px_auto]">
                 <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Precio €
                   </span>
                   <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                     type="number"
                     min="0"
                     step="0.01"
@@ -664,7 +676,7 @@ const errorMessage =
                   />
                 </label>
 
-                <label class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4">
+                <label class="flex items-end rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                   <div class="flex items-start gap-3">
                     <input
                       class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
@@ -691,7 +703,7 @@ const errorMessage =
 
       <div class="mt-6">
         <button
-          class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+          class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
           type="submit"
         >
           Guardar configuración del menú
@@ -703,50 +715,52 @@ const errorMessage =
   <section class="mt-6 space-y-6">
     {
       KINDS.map((kind) => (
-        <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Planner
-              </div>
-              <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-                Menú {kind.label.toLowerCase()}
-              </h2>
-            </div>
-
-            <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300">
+        <section class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]">
+          <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
+            <div class="flex flex-wrap items-center justify-between gap-4">
               <div>
-                {config[kind.key].active ? "Publicado" : "Oculto"} ·{" "}
-                {money(config[kind.key].priceCents)}
+                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Planner
+                </div>
+                <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]">
+                  Menú {kind.label.toLowerCase()}
+                </h2>
               </div>
-              <div class="mt-1 text-xs text-slate-500">
-                {kindStats[kind.key].activeAssignments}/
-                {kindStats[kind.key].totalAssignments} publicables ·{" "}
-                {kindStats[kind.key].reason}
+
+              <div class="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+                <div>
+                  {config[kind.key].active ? "Publicado" : "Oculto"} ·{" "}
+                  {money(config[kind.key].priceCents)}
+                </div>
+                <div class="mt-1 text-xs text-slate-500">
+                  {kindStats[kind.key].activeAssignments}/
+                  {kindStats[kind.key].totalAssignments} publicables ·{" "}
+                  {kindStats[kind.key].reason}
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="mt-6 grid gap-4 xl:grid-cols-3">
+          <div class="grid gap-4 px-6 py-6 lg:px-8 lg:py-8 xl:grid-cols-3">
             {COURSES.map((course) => (
               <section
                 class:list={[
-                  "rounded-[28px] border p-4",
+                  "rounded-[28px] border p-5",
                   kindStats[kind.key].byCourse[course.key].total > 0 &&
                   kindStats[kind.key].byCourse[course.key].active === 0
-                    ? "border-amber-400/20 bg-amber-400/8"
-                    : "border-white/10 bg-slate-950/40",
+                    ? "border-amber-400/20 bg-amber-400/10"
+                    : "border-white/10 bg-[#091121]/80",
                 ]}
               >
-                <div class="flex items-center justify-between gap-3">
+                <div class="flex items-start justify-between gap-3">
                   <div>
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       {course.key}
                     </div>
-                    <div class="mt-1 text-sm font-semibold text-white">
+                    <div class="mt-2 text-lg font-semibold text-white">
                       {course.label}
                     </div>
-                    <div class="mt-1 text-xs text-slate-500">
+                    <div class="mt-2 text-sm text-slate-400">
                       {kindStats[kind.key].byCourse[course.key].active}/
                       {kindStats[kind.key].byCourse[course.key].total}{" "}
                       publicables
@@ -755,11 +769,11 @@ const errorMessage =
 
                   <div
                     class:list={[
-                      "text-sm font-semibold",
+                      "text-lg font-semibold",
                       kindStats[kind.key].byCourse[course.key].total > 0 &&
                       kindStats[kind.key].byCourse[course.key].active === 0
                         ? "text-amber-200"
-                        : "text-slate-400",
+                        : "text-slate-300",
                     ]}
                   >
                     {planner[kind.key][course.key].length}
@@ -767,20 +781,21 @@ const errorMessage =
                 </div>
 
                 <div
-                  class="mt-4 space-y-3 min-h-16"
+                  class="mt-5 min-h-16 space-y-3"
                   data-menu-dropzone
                   data-kind={kind.key}
                   data-course={course.key}
                 >
                   {kindStats[kind.key].byCourse[course.key].total > 0 &&
                   kindStats[kind.key].byCourse[course.key].active === 0 ? (
-                    <div class="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+                    <div class="rounded-[22px] border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
                       Este curso tiene asignaciones, pero ninguna es publicable
                       porque todos los platos asignados están inactivos.
                     </div>
                   ) : null}
+
                   {planner[kind.key][course.key].length === 0 ? (
-                    <div class="rounded-2xl border border-dashed border-white/10 bg-white/3 px-4 py-4 text-sm text-slate-500">
+                    <div class="rounded-[22px] border border-dashed border-white/10 bg-white/[0.02] px-4 py-4 text-sm text-slate-500">
                       Sin platos asignados en este curso.
                     </div>
                   ) : (
@@ -790,7 +805,7 @@ const errorMessage =
                         data-menu-assignment-card={item.assignmentId}
                         data-kind={kind.key}
                         data-course={course.key}
-                        class="rounded-2xl border border-white/10 bg-white/5 p-4 cursor-move"
+                        class="cursor-move rounded-[24px] border border-white/10 bg-white/[0.04] p-4 transition hover:border-white/15 hover:bg-white/[0.05]"
                       >
                         <div class="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -798,7 +813,7 @@ const errorMessage =
                               {item.dishName}
                             </div>
                             {item.dishDescription ? (
-                              <p class="mt-1 text-sm leading-6 text-slate-400">
+                              <p class="mt-2 text-sm leading-6 text-slate-400">
                                 {item.dishDescription}
                               </p>
                             ) : null}
@@ -807,7 +822,7 @@ const errorMessage =
                           <div class="flex flex-wrap gap-2">
                             <span
                               class:list={[
-                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                                 item.dishActive
                                   ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                                   : "border-amber-400/20 bg-amber-400/10 text-amber-300",
@@ -818,8 +833,8 @@ const errorMessage =
                           </div>
                         </div>
 
-                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-                          <div class="text-xs uppercase tracking-[0.14em] text-slate-500">
+                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-4">
+                          <div class="text-[11px] uppercase tracking-[0.14em] text-slate-500">
                             Arrastrar para reordenar
                           </div>
 
@@ -836,7 +851,7 @@ const errorMessage =
                             />
                             <button
                               type="submit"
-                              class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                              class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
                             >
                               Quitar
                             </button>
@@ -854,31 +869,31 @@ const errorMessage =
     }
   </section>
 
-  <section class="mt-6 grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+  <section class="mt-6 grid gap-6 xl:grid-cols-[400px_minmax(0,1fr)]">
     <aside class="space-y-6">
       <section
-        class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
       >
         <div
           class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
         >
           Alta
         </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
           Nuevo plato de menú
         </h2>
 
-        <form method="post" action="/api/admin/menu-v2" class="mt-6 grid gap-4">
+        <form method="post" action="/api/admin/menu-v2" class="mt-7 grid gap-5">
           <input type="hidden" name="intent" value="create-dish" />
 
           <label class="block">
             <span
-              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
             >
               Nombre
             </span>
             <input
-              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
               type="text"
               name="name"
               placeholder="Canelones de carne gratinados"
@@ -888,12 +903,12 @@ const errorMessage =
 
           <label class="block">
             <span
-              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
             >
               Curso
             </span>
             <select
-              class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
               name="course"
             >
               <option value="PRIMERO">PRIMERO</option>
@@ -904,12 +919,12 @@ const errorMessage =
 
           <label class="block">
             <span
-              class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
             >
               Descripción
             </span>
             <textarea
-              class="min-h-28 w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+              class="min-h-28 w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
               name="description"
               placeholder="Texto corto para la parte pública del menú"
             ></textarea>
@@ -918,12 +933,12 @@ const errorMessage =
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
               <span
-                class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500"
+                class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
               >
                 Orden base
               </span>
               <input
-                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                 type="number"
                 min="0"
                 step="1"
@@ -933,7 +948,7 @@ const errorMessage =
             </label>
 
             <label
-              class="flex items-end rounded-3xl border border-white/10 bg-[#0b1120]/60 p-4"
+              class="flex items-end rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
             >
               <div class="flex items-start gap-3">
                 <input
@@ -954,7 +969,7 @@ const errorMessage =
 
           <button
             type="submit"
-            class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+            class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
           >
             Crear plato
           </button>
@@ -962,19 +977,21 @@ const errorMessage =
       </section>
 
       <section
-        class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+        class="rounded-[32px] border border-white/10 bg-[#0b1220]/90 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
       >
         <div
           class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
         >
           Criterio
         </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
           Modelo nuevo del menú
         </h2>
 
         <div class="mt-6 space-y-4">
-          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <article
+            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+          >
             <div class="text-sm font-semibold text-white">
               Separado del catálogo
             </div>
@@ -982,10 +999,10 @@ const errorMessage =
               Los platos del menú ya no dependen de <code>Product</code>. Tienen
               su propia biblioteca y su propia asignación.
             </p>
-          </div>
+          </article>
 
-          <div
-            class="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-4"
+          <article
+            class="rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4"
           >
             <div class="text-sm font-semibold text-amber-200">
               Dos variantes fijas
@@ -994,52 +1011,58 @@ const errorMessage =
               Solo existen <strong>DIARIO</strong> y <strong>FESTIVO</strong>.
               No hay CRUD de menús infinitos.
             </p>
-          </div>
+          </article>
 
-          <div class="rounded-3xl border border-white/10 bg-white/3 p-4">
+          <article
+            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+          >
             <div class="text-sm font-semibold text-white">
               Migración sin romper
             </div>
             <p class="mt-2 text-sm leading-6 text-slate-400">
               {legacyGuidance}
             </p>
-          </div>
+          </article>
         </div>
       </section>
     </aside>
 
     <section
-      class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
     >
-      <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div
-            class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-          >
-            Biblioteca
+      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+            >
+              Biblioteca
+            </div>
+            <h2
+              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
+            >
+              Platos propios del menú
+            </h2>
           </div>
-          <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-            Platos propios del menú
-          </h2>
-        </div>
 
-        <div
-          class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300"
-        >
-          Asignación rápida a diario / festivo
+          <div
+            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-300"
+          >
+            Asignación rápida a diario / festivo
+          </div>
         </div>
       </div>
 
-      <div class="mt-6 space-y-6">
+      <div class="space-y-6 px-6 py-6 lg:px-8 lg:py-8">
         {
           COURSES.map((course) => (
-            <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
+            <section class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6">
               <div class="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                     {course.key}
                   </div>
-                  <h3 class="mt-2 text-lg font-semibold text-white">
+                  <h3 class="mt-2 text-xl font-semibold text-white">
                     {course.label}
                   </h3>
                 </div>
@@ -1050,9 +1073,9 @@ const errorMessage =
                 </div>
               </div>
 
-              <div class="mt-4 space-y-4">
+              <div class="mt-5 space-y-4">
                 {dishesByCourse[course.key].length === 0 ? (
-                  <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-4 text-sm text-slate-400">
+                  <div class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
                     No hay platos creados en este curso.
                   </div>
                 ) : (
@@ -1066,19 +1089,21 @@ const errorMessage =
                     const canDelete = assignmentCount === 0;
 
                     return (
-                      <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div class="text-sm font-semibold text-white">
+                      <article class="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                          <div class="min-w-0 flex-1">
+                            <div class="text-base font-semibold text-white">
                               {dish.name}
                             </div>
-                            <div class="mt-1">
-                              <code class="rounded-xl border border-white/10 bg-[#0b1120] px-2.5 py-1.5 text-xs text-slate-300">
+
+                            <div class="mt-2">
+                              <code class="rounded-xl border border-white/10 bg-[#07101f] px-2.5 py-1.5 text-xs text-slate-300">
                                 {dish.slug}
                               </code>
                             </div>
+
                             {dish.description ? (
-                              <p class="mt-3 text-sm leading-6 text-slate-400">
+                              <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
                                 {dish.description}
                               </p>
                             ) : null}
@@ -1087,7 +1112,7 @@ const errorMessage =
                           <div class="flex flex-wrap gap-2">
                             <span
                               class:list={[
-                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                                 dish.active
                                   ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                                   : "border-amber-400/20 bg-amber-400/10 text-amber-300",
@@ -1097,19 +1122,19 @@ const errorMessage =
                             </span>
 
                             {!dish.active ? (
-                              <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-300">
+                              <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-300">
                                 No publicable
                               </span>
                             ) : null}
 
                             {assignedKinds.has("DIARIO") ? (
-                              <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">
+                              <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
                                 Diario
                               </span>
                             ) : null}
 
                             {assignedKinds.has("FESTIVO") ? (
-                              <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-violet-300">
+                              <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-300">
                                 Festivo
                               </span>
                             ) : null}
@@ -1130,11 +1155,11 @@ const errorMessage =
 
                           <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px]">
                             <label class="block">
-                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 Nombre
                               </span>
                               <input
-                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                                 type="text"
                                 name="name"
                                 value={dish.name}
@@ -1143,11 +1168,11 @@ const errorMessage =
                             </label>
 
                             <label class="block">
-                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 Curso
                               </span>
                               <select
-                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                                 name="course"
                               >
                                 <option
@@ -1172,11 +1197,11 @@ const errorMessage =
                             </label>
 
                             <label class="block">
-                              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 Orden
                               </span>
                               <input
-                                class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                                 type="number"
                                 min="0"
                                 step="1"
@@ -1187,11 +1212,11 @@ const errorMessage =
                           </div>
 
                           <label class="block">
-                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                               Descripción
                             </span>
                             <textarea
-                              class="min-h-24 w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                              class="min-h-24 w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
                               name="description"
                             >
                               {dish.description ?? ""}
@@ -1209,18 +1234,16 @@ const errorMessage =
                               Activo
                             </label>
 
-                            <div class="flex flex-wrap gap-2">
-                              <button
-                                type="submit"
-                                class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                              >
-                                Guardar plato
-                              </button>
-                            </div>
+                            <button
+                              type="submit"
+                              class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+                            >
+                              Guardar plato
+                            </button>
                           </div>
                         </form>
 
-                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-4">
                           <div class="flex flex-wrap gap-2">
                             {(["DIARIO", "FESTIVO"] as MenuKind[]).map(
                               (kind) => {
@@ -1251,14 +1274,14 @@ const errorMessage =
                                       type="submit"
                                       disabled={isDisabled}
                                       class:list={[
-                                        "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                                        "inline-flex min-h-10 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition",
                                         isAssigned
                                           ? kind === "DIARIO"
                                             ? "border border-sky-400/20 bg-sky-400/10 text-sky-300"
                                             : "border border-violet-400/20 bg-violet-400/10 text-violet-300"
                                           : isDisabled
-                                            ? "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"
-                                            : "border border-white/10 bg-white/5 text-slate-200 hover:border-white/15 hover:bg-white/10 hover:text-white",
+                                            ? "cursor-not-allowed border border-white/10 bg-white/[0.03] text-slate-500"
+                                            : "border border-white/10 bg-white/[0.03] text-slate-200 hover:border-white/15 hover:bg-white/[0.06] hover:text-white",
                                       ]}
                                     >
                                       {isAssigned
@@ -1288,10 +1311,10 @@ const errorMessage =
                               type="submit"
                               disabled={!canDelete}
                               class:list={[
-                                "inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                                "inline-flex min-h-10 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition",
                                 canDelete
                                   ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
-                                  : "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500",
+                                  : "cursor-not-allowed border border-white/10 bg-white/[0.03] text-slate-500",
                               ]}
                             >
                               Borrar plato

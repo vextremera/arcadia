@@ -1,12 +1,47 @@
 @import "tailwindcss";
 
-/* Opcional: estilos base del proyecto */
 :root {
   color-scheme: light;
 }
 
 @theme {
-  --color-bg: #FFFFF7;
+  --color-bg: #fffff7;
   --color-accent: #7b1f1f;
   --color-accent-hover: #6a1919;
+}
+
+body[data-admin-ui="true"] {
+  color-scheme: dark;
+  background-color: #090d14;
+}
+
+body[data-admin-ui="true"] ::selection {
+  background: rgba(96, 165, 250, 0.22);
+  color: #f8fafc;
+}
+
+body[data-admin-ui="true"] [data-admin-scrollable] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.6) transparent;
+}
+
+body[data-admin-ui="true"] [data-admin-scrollable]::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body[data-admin-ui="true"] [data-admin-scrollable]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body[data-admin-ui="true"] [data-admin-scrollable]::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: rgba(100, 116, 139, 0.45);
+  background-clip: padding-box;
+}
+
+body[data-admin-ui="true"] [data-admin-scrollable]::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+  background-clip: padding-box;
 }

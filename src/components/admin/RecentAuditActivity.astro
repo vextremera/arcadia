@@ -40,21 +40,26 @@ function formatDate(value: Date | string) {
 
 function toneForAction(action: string) {
   if (action.includes("REFUND")) {
-    return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
+    return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200";
   }
   if (action.includes("PAYMENT")) {
-    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
   }
   if (action.includes("NEWSLETTER")) {
-    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-200";
   }
-  if (action.includes("OPS") || action.includes("HOURS") || action.includes("SPECIAL_DATE") || action.includes("FEES")) {
-    return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+  if (
+    action.includes("OPS") ||
+    action.includes("HOURS") ||
+    action.includes("SPECIAL_DATE") ||
+    action.includes("FEES")
+  ) {
+    return "border-amber-400/20 bg-amber-400/10 text-amber-200";
   }
   if (action.includes("STATUS") || action.includes("ORDER")) {
-    return "border-sky-400/20 bg-sky-400/10 text-sky-300";
+    return "border-sky-400/20 bg-sky-400/10 text-sky-200";
   }
-  return "border-white/10 bg-white/5 text-slate-300";
+  return "border-white/10 bg-white/[0.04] text-slate-300";
 }
 
 function actionLabel(action: string) {
@@ -113,15 +118,26 @@ function summaryForRow(row: AuditRow) {
     return `${String(diff.sent ?? 0)} enviados · ${String(diff.failed ?? 0)} fallidos`;
   }
 
-  if (row.action === "NEWSLETTER_SUBSCRIBER_ENABLED" || row.action === "NEWSLETTER_SUBSCRIBER_DISABLED") {
+  if (
+    row.action === "NEWSLETTER_SUBSCRIBER_ENABLED" ||
+    row.action === "NEWSLETTER_SUBSCRIBER_DISABLED"
+  ) {
     return String(diff.email ?? row.entityId);
   }
 
-  if (row.action === "SPECIAL_DATE_SAVED" || row.action === "SPECIAL_DATE_DELETED") {
+  if (
+    row.action === "SPECIAL_DATE_SAVED" ||
+    row.action === "SPECIAL_DATE_DELETED"
+  ) {
     return row.entityId;
   }
 
-  if (row.action === "OPS_FLAGS_UPDATED" || row.action === "OPERATING_HOURS_UPDATED" || row.action === "PAYMENTS_SETTINGS_UPDATED" || row.action === "FEES_SETTINGS_UPDATED") {
+  if (
+    row.action === "OPS_FLAGS_UPDATED" ||
+    row.action === "OPERATING_HOURS_UPDATED" ||
+    row.action === "PAYMENTS_SETTINGS_UPDATED" ||
+    row.action === "FEES_SETTINGS_UPDATED"
+  ) {
     return row.entityId;
   }
 
@@ -149,7 +165,9 @@ const allRows = (await db
   .from(AuditLog)) as AuditRow[];
 
 const rows = [...allRows]
-  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
   .slice(0, limit);
 
 const actorIds = rows
@@ -170,67 +188,81 @@ const actors = actorIds.length
 const actorById = new Map(actors.map((actor) => [actor.id, actor]));
 ---
 
-<section class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-  <div class="border-b border-white/10 px-6 py-5">
+<section
+  class="overflow-hidden rounded-[30px] border border-white/10 bg-[#0f172a]/80 shadow-[0_28px_80px_rgba(2,6,23,0.36)]"
+>
+  <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Audit
         </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">{title}</h2>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+          {title}
+        </h2>
+        <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+          {description}
+        </p>
       </div>
 
       <a
         href="/admin/audit"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
       >
         Ver audit completo
       </a>
     </div>
   </div>
 
-  {rows.length === 0 ? (
-    <div class="px-6 py-12 text-center text-sm text-slate-400">
-      Aún no hay actividad auditada.
-    </div>
-  ) : (
-    <div class="space-y-4 px-6 py-6">
-      {rows.map((row) => {
-        const actor = row.actorUserId ? actorById.get(row.actorUserId) : null;
-        return (
-          <article class="rounded-3xl border border-white/10 bg-white/4 p-5">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class:list={[
-                    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                    toneForAction(row.action),
-                  ]}>
-                    {actionLabel(row.action)}
-                  </span>
+  {
+    rows.length === 0 ? (
+      <div class="px-6 py-16 text-center text-sm text-slate-400 lg:px-8">
+        Aún no hay actividad auditada.
+      </div>
+    ) : (
+      <div class="space-y-4 px-6 py-6 lg:px-8 lg:py-8">
+        {rows.map((row) => {
+          const actor = row.actorUserId ? actorById.get(row.actorUserId) : null;
+          return (
+            <article class="rounded-[26px] border border-white/[0.08] bg-white/[0.03] p-5 lg:p-6">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span
+                      class:list={[
+                        "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
+                        toneForAction(row.action),
+                      ]}
+                    >
+                      {actionLabel(row.action)}
+                    </span>
 
-                  <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
-                    {row.entityType}
-                  </span>
+                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
+                      {row.entityType}
+                    </span>
+                  </div>
+
+                  <div class="mt-4 text-sm leading-7 text-slate-200">
+                    {summaryForRow(row)}
+                  </div>
+
+                  <div class="mt-2 text-sm text-slate-500">
+                    {actor?.name?.trim() ||
+                      actor?.email ||
+                      "Sistema / desconocido"}
+                  </div>
                 </div>
 
-                <div class="mt-3 text-sm text-slate-300">
-                  {summaryForRow(row)}
-                </div>
-
-                <div class="mt-1 text-sm text-slate-500">
-                  {actor?.name?.trim() || actor?.email || "Sistema / desconocido"}
+                <div class="text-sm text-slate-500">
+                  {formatDate(row.createdAt)}
                 </div>
               </div>
-
-              <div class="text-sm text-slate-400">
-                {formatDate(row.createdAt)}
-              </div>
-            </div>
-          </article>
-        );
-      })}
-    </div>
-  )}
+            </article>
+          );
+        })}
+      </div>
+    )
+  }
 </section>

@@ -81,6 +81,7 @@ const products = categoryIds.length
     : [];
 
 const productIds = products.map((product) => product.id);
+
 const productIngredients = productIds.length
     ? await db
           .select({
@@ -202,26 +203,59 @@ const errorMessage =
                 : error === "invalid-intent"
                   ? "Acción no válida."
                   : "";
+
+const summaryCards = [
+    {
+        label: "Categorías",
+        value: totalCategories,
+        note: "Base total del catálogo",
+        tone: "border-white/10 bg-white/[0.03]",
+    },
+    {
+        label: "Con matriz",
+        value: categoriesWithMatrix,
+        note: "Ya usan whitelist real",
+        tone: "border-cyan-400/15 bg-cyan-400/8",
+    },
+    {
+        label: "Links",
+        value: totalLinks,
+        note: "Relaciones categoría ↔ ingrediente",
+        tone: "border-violet-400/15 bg-violet-400/8",
+    },
+    {
+        label: "Desvíos",
+        value: totalDrifts,
+        note: "Uso fuera de matriz",
+        tone: "border-rose-400/15 bg-rose-400/8",
+    },
+    {
+        label: "Huérfanos",
+        value: orphanIngredients,
+        note: "Sin uso ni whitelist",
+        tone: "border-amber-400/15 bg-amber-400/8",
+    },
+];
 ---
 
 <AdminLayout
     title="Compatibilidades · Admin · Arcadia"
     heading="Compatibilidad categoría ↔ ingrediente"
-    description="Cierra CategoryIngredient como whitelist real por categoría y muestra desvíos relacionales cuando un producto usa ingredientes fuera de su matriz."
+    description="Matriz real de whitelist por categoría. Esta pantalla ahora deja mucho más claro qué categorías ya están cerradas, cuáles siguen abiertas y dónde existen desvíos relacionales que conviene limpiar."
     actions={true}
 >
     <Fragment slot="actions">
         <div class="flex flex-wrap gap-3">
             <a
                 href="/admin/catalogo/productos"
-                class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15"
             >
                 Ver productos
             </a>
 
             <a
                 href="/admin/catalogo/ingredientes"
-                class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
+                class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2.5 text-sm font-semibold text-cyan-200 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
             >
                 Ver ingredientes
             </a>
@@ -230,7 +264,7 @@ const errorMessage =
 
     {
         saved ? (
-            <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+            <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
                 Compatibilidades actualizadas correctamente.
             </section>
         ) : null
@@ -238,136 +272,81 @@ const errorMessage =
 
     {
         errorMessage ? (
-            <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+            <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
                 {errorMessage}
             </section>
         ) : null
     }
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <article
-            class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
-        >
-            <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-                Categorías
-            </div>
-            <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-                {totalCategories}
-            </div>
-            <p class="mt-2 text-sm text-slate-400">Categorías del catálogo</p>
-        </article>
-
-        <article
-            class="rounded-[28px] border border-cyan-400/15 bg-cyan-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
-        >
-            <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200/80"
-            >
-                Con matriz
-            </div>
-            <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-                {categoriesWithMatrix}
-            </div>
-            <p class="mt-2 text-sm text-cyan-100/70">
-                Whitelists activas por categoría
-            </p>
-        </article>
-
-        <article
-            class="rounded-[28px] border border-violet-400/15 bg-violet-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
-        >
-            <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80"
-            >
-                Links
-            </div>
-            <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-                {totalLinks}
-            </div>
-            <p class="mt-2 text-sm text-violet-100/70">
-                Relaciones categoría ↔ ingrediente
-            </p>
-        </article>
-
-        <article
-            class="rounded-[28px] border border-rose-400/15 bg-rose-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
-        >
-            <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-rose-200/80"
-            >
-                Desvíos
-            </div>
-            <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-                {totalDrifts}
-            </div>
-            <p class="mt-2 text-sm text-rose-100/70">
-                Ingredientes fuera de su matriz
-            </p>
-        </article>
-
-        <article
-            class="rounded-[28px] border border-amber-400/15 bg-amber-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
-        >
-            <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/80"
-            >
-                Huérfanos
-            </div>
-            <div class="mt-3 text-2xl font-semibold tracking-tight text-white">
-                {orphanIngredients}
-            </div>
-            <p class="mt-2 text-sm text-amber-100/70">
-                Ingredientes sin uso ni whitelist
-            </p>
-        </article>
+    <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
+        {
+            summaryCards.map((card) => (
+                <article
+                    class:list={[
+                        "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
+                        card.tone,
+                    ]}
+                >
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        {card.label}
+                    </div>
+                    <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
+                        {card.value}
+                    </div>
+                    <p class="mt-3 text-sm leading-6 text-slate-400">
+                        {card.note}
+                    </p>
+                </article>
+            ))
+        }
     </section>
 
     <section
-        class="mt-6 rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+        class="mt-6 rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
     >
         <div
             class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
         >
             Criterio
         </div>
-        <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
             Cómo funciona la matriz
         </h2>
 
         <div class="mt-6 grid gap-4 xl:grid-cols-3">
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+            <article
+                class="rounded-[24px] border border-white/10 bg-white/[0.03] p-5"
+            >
                 <div class="text-sm font-semibold text-white">Sin matriz</div>
-                <p class="mt-2 text-sm leading-6 text-slate-400">
-                    Si una categoría no tiene compatibilidades, sus productos
-                    pueden enlazar cualquier ingrediente activo.
+                <p class="mt-3 text-sm leading-7 text-slate-400">
+                    Si una categoría no tiene compatibilidades registradas, sus
+                    productos pueden enlazar cualquier ingrediente activo.
                 </p>
-            </div>
+            </article>
 
-            <div
-                class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-4"
+            <article
+                class="rounded-[24px] border border-cyan-400/20 bg-cyan-400/10 p-5"
             >
                 <div class="text-sm font-semibold text-cyan-200">
                     Con matriz
                 </div>
-                <p class="mt-2 text-sm leading-6 text-cyan-100/80">
+                <p class="mt-3 text-sm leading-7 text-cyan-100/80">
                     En cuanto una categoría tiene al menos una compatibilidad,
-                    el editor de producto solo permite ingredientes incluidos en
-                    esa whitelist.
+                    el editor de producto pasa a usar esa whitelist como límite
+                    real.
                 </p>
-            </div>
+            </article>
 
-            <div
-                class="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-4"
+            <article
+                class="rounded-[24px] border border-rose-400/20 bg-rose-400/10 p-5"
             >
                 <div class="text-sm font-semibold text-rose-200">Desvíos</div>
-                <p class="mt-2 text-sm leading-6 text-rose-100/80">
-                    Si cambias una categoría o estrechas la whitelist, esta
-                    pantalla te muestra productos que han quedado fuera de la
-                    matriz para limpiarlos.
+                <p class="mt-3 text-sm leading-7 text-rose-100/80">
+                    Si un producto mantiene ingredientes fuera de la whitelist
+                    actual, aquí aparece como incidencia relacional para
+                    corregirlo.
                 </p>
-            </div>
+            </article>
         </div>
     </section>
 
@@ -380,8 +359,9 @@ const errorMessage =
                     const ingredientA = ingredientById.get(a.ingredientId);
                     const ingredientB = ingredientById.get(b.ingredientId);
                     if (!ingredientA || !ingredientB) return 0;
-                    if (ingredientA.sortOrder !== ingredientB.sortOrder)
+                    if (ingredientA.sortOrder !== ingredientB.sortOrder) {
                         return ingredientA.sortOrder - ingredientB.sortOrder;
+                    }
                     return ingredientA.name.localeCompare(
                         ingredientB.name,
                         "es",
@@ -433,8 +413,9 @@ const errorMessage =
                     .sort((a, b) => {
                         if (a.isCommon !== b.isCommon)
                             return a.isCommon ? -1 : 1;
-                        if (a.sortOrder !== b.sortOrder)
+                        if (a.sortOrder !== b.sortOrder) {
                             return a.sortOrder - b.sortOrder;
+                        }
                         return a.name.localeCompare(b.name, "es");
                     });
 
@@ -445,18 +426,18 @@ const errorMessage =
                 return (
                     <section
                         id={`categoria-${category.id}`}
-                        class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+                        class="overflow-hidden rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
                     >
-                        <div class="border-b border-white/10 px-6 py-5">
+                        <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
                             <div class="flex flex-wrap items-start justify-between gap-4">
                                 <div>
-                                    <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/80">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                                         Categoría
                                     </div>
-                                    <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+                                    <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
                                         {category.name}
                                     </h2>
-                                    <div class="mt-1 text-sm text-slate-500">
+                                    <div class="mt-2 text-sm text-slate-500">
                                         {category.slug}
                                     </div>
                                 </div>
@@ -464,7 +445,7 @@ const errorMessage =
                                 <div class="flex flex-wrap gap-2">
                                     <span
                                         class:list={[
-                                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                            "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                                             category.active
                                                 ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                                                 : "border-rose-400/20 bg-rose-400/10 text-rose-300",
@@ -475,44 +456,48 @@ const errorMessage =
                                             : "Inactiva"}
                                     </span>
 
-                                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                                         {compatibleIngredients.length} compat
                                     </span>
 
-                                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                                    <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                                         {productCount} producto
                                         {productCount === 1 ? "" : "s"}
                                     </span>
 
                                     {drifts.length > 0 ? (
-                                        <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-300">
+                                        <span class="inline-flex items-center rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-300">
                                             {drifts.length} desvío
                                             {drifts.length === 1 ? "" : "s"}
                                         </span>
-                                    ) : null}
+                                    ) : (
+                                        <span class="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                                            Sin desvíos
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
-                        <div class="grid gap-6 p-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+                        <div class="grid gap-6 px-6 py-6 lg:px-8 lg:py-8 xl:grid-cols-[400px_minmax(0,1fr)]">
                             <aside class="space-y-6">
-                                <section class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-5">
+                                <section class="rounded-[28px] border border-cyan-400/20 bg-cyan-400/10 p-5">
                                     <div class="text-sm font-semibold text-white">
                                         Añadir compatibilidad
                                     </div>
-                                    <p class="mt-2 text-sm leading-6 text-cyan-100/80">
-                                        Esta whitelist controla qué ingredientes
-                                        se pueden asignar a productos de{" "}
-                                        <span class="font-semibold text-white">
+                                    <p class="mt-3 text-sm leading-7 text-cyan-100/80">
+                                        La whitelist de{" "}
+                                        <strong class="text-white">
                                             {category.name}
-                                        </span>
-                                        .
+                                        </strong>{" "}
+                                        define qué ingredientes se pueden
+                                        asignar a sus productos desde el admin.
                                     </p>
 
                                     <form
                                         method="post"
                                         action="/api/admin/category-ingredients"
-                                        class="mt-4 grid gap-4"
+                                        class="mt-5 grid gap-4"
                                     >
                                         <input
                                             type="hidden"
@@ -531,11 +516,11 @@ const errorMessage =
                                         />
 
                                         <label class="block">
-                                            <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
+                                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
                                                 Ingrediente
                                             </span>
                                             <select
-                                                class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
+                                                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
                                                 name="ingredientId"
                                                 required
                                             >
@@ -574,7 +559,7 @@ const errorMessage =
                                                 availableIngredients.length ===
                                                 0
                                             }
-                                            class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                                            class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-300/15 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/30 hover:bg-cyan-300/20 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
                                             Añadir compatibilidad
                                         </button>
@@ -582,31 +567,33 @@ const errorMessage =
                                 </section>
 
                                 {drifts.length > 0 ? (
-                                    <section class="rounded-3xl border border-rose-400/20 bg-rose-400/10 p-5">
+                                    <section class="rounded-[28px] border border-rose-400/20 bg-rose-400/10 p-5">
                                         <div class="text-sm font-semibold text-white">
                                             Limpieza relacional
                                         </div>
-                                        <p class="mt-2 text-sm leading-6 text-rose-100/80">
-                                            Estos productos usan ingredientes
-                                            fuera de la matriz actual. Puedes
-                                            resolverlo ampliando la whitelist o
-                                            limpiando el producto.
+                                        <p class="mt-3 text-sm leading-7 text-rose-100/80">
+                                            Hay productos de{" "}
+                                            <strong class="text-white">
+                                                {category.name}
+                                            </strong>{" "}
+                                            usando ingredientes fuera de la
+                                            matriz actual.
                                         </p>
 
-                                        <div class="mt-4 space-y-3">
+                                        <div class="mt-5 space-y-3">
                                             {drifts.map((drift) => (
-                                                <div class="rounded-2xl border border-rose-300/15 bg-rose-300/10 p-3">
+                                                <div class="rounded-[24px] border border-rose-300/15 bg-rose-300/10 p-4">
                                                     <div class="text-sm font-semibold text-white">
                                                         {drift.productName}
                                                     </div>
-                                                    <div class="mt-1 text-sm text-rose-100/80">
+                                                    <div class="mt-2 text-sm text-rose-100/80">
                                                         Ingrediente fuera de
                                                         matriz:{" "}
                                                         {drift.ingredientName}
                                                     </div>
                                                     <a
                                                         href={`/admin/catalogo/productos/${drift.productId}#ingredientes`}
-                                                        class="mt-3 inline-flex items-center justify-center rounded-2xl border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-300/30 hover:bg-rose-300/15"
+                                                        class="mt-4 inline-flex min-h-9 items-center justify-center rounded-2xl border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-semibold text-rose-100 transition hover:border-rose-300/30 hover:bg-rose-300/15"
                                                     >
                                                         Abrir producto
                                                     </a>
@@ -615,11 +602,11 @@ const errorMessage =
                                         </div>
                                     </section>
                                 ) : (
-                                    <section class="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5">
+                                    <section class="rounded-[28px] border border-emerald-400/20 bg-emerald-400/10 p-5">
                                         <div class="text-sm font-semibold text-white">
                                             Sin desvíos
                                         </div>
-                                        <p class="mt-2 text-sm leading-6 text-emerald-100/80">
+                                        <p class="mt-3 text-sm leading-7 text-emerald-100/80">
                                             Los productos actuales de esta
                                             categoría están alineados con la
                                             matriz.
@@ -628,19 +615,26 @@ const errorMessage =
                                 )}
                             </aside>
 
-                            <section class="rounded-3xl border border-white/10 bg-white/4 p-5">
-                                <div class="flex flex-wrap items-center justify-between gap-3">
+                            <section class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6">
+                                <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
                                     <div>
-                                        <div class="text-sm font-semibold text-white">
-                                            Ingredientes compatibles
+                                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                            Whitelist actual
                                         </div>
-                                        <p class="mt-1 text-sm text-slate-400">
-                                            Whitelist actual para{" "}
-                                            {category.name}.
+                                        <h3 class="mt-2 text-xl font-semibold text-white">
+                                            Ingredientes compatibles
+                                        </h3>
+                                        <p class="mt-3 text-sm leading-7 text-slate-400">
+                                            Ingredientes permitidos para
+                                            productos de{" "}
+                                            <strong class="text-slate-200">
+                                                {category.name}
+                                            </strong>
+                                            .
                                         </p>
                                     </div>
 
-                                    <div class="text-sm text-slate-400">
+                                    <div class="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
                                         {compatibleIngredients.length}{" "}
                                         ingrediente
                                         {compatibleIngredients.length === 1
@@ -649,35 +643,38 @@ const errorMessage =
                                     </div>
                                 </div>
 
-                                <div class="mt-4 space-y-4">
+                                <div class="mt-5 space-y-4">
                                     {compatibleIngredients.length === 0 ? (
-                                        <div class="rounded-3xl border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
+                                        <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-6 text-sm leading-7 text-slate-400">
                                             Esta categoría todavía no tiene
-                                            whitelist. Sus productos aceptan
-                                            cualquier ingrediente activo.
+                                            matriz. Mientras siga así, sus
+                                            productos podrán usar cualquier
+                                            ingrediente activo.
                                         </div>
                                     ) : (
                                         compatibleIngredients.map(
                                             (ingredient) => (
-                                                <article class="rounded-3xl border border-white/10 bg-slate-950/40 p-4">
+                                                <article class="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
                                                     <div class="flex flex-wrap items-start justify-between gap-4">
-                                                        <div>
-                                                            <div class="text-sm font-semibold text-white">
+                                                        <div class="min-w-0 flex-1">
+                                                            <div class="text-base font-semibold text-white">
                                                                 {
                                                                     ingredient.name
                                                                 }
                                                             </div>
-                                                            <div class="mt-1 text-xs text-slate-500">
-                                                                {
-                                                                    ingredient.slug
-                                                                }
+                                                            <div class="mt-2">
+                                                                <code class="rounded-xl border border-white/10 bg-[#07101f] px-3 py-1.5 text-xs text-slate-300">
+                                                                    {
+                                                                        ingredient.slug
+                                                                    }
+                                                                </code>
                                                             </div>
                                                         </div>
 
                                                         <div class="flex flex-wrap gap-2">
                                                             <span
                                                                 class:list={[
-                                                                    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                                                                    "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
                                                                     ingredient.active
                                                                         ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                                                                         : "border-rose-400/20 bg-rose-400/10 text-rose-300",
@@ -689,12 +686,12 @@ const errorMessage =
                                                             </span>
 
                                                             {ingredient.isCommon ? (
-                                                                <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                                                                <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
                                                                     Common
                                                                 </span>
                                                             ) : null}
 
-                                                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                                                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                                                                 Uso{" "}
                                                                 {
                                                                     ingredient.usageCount
@@ -703,8 +700,8 @@ const errorMessage =
                                                         </div>
                                                     </div>
 
-                                                    <div class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-                                                        <div class="text-sm text-slate-400">
+                                                    <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center border-t border-white/[0.08] pt-4">
+                                                        <div class="text-sm leading-6 text-slate-400">
                                                             Extra global:{" "}
                                                             <span class="font-semibold text-white">
                                                                 {money(
@@ -736,7 +733,7 @@ const errorMessage =
                                                             />
                                                             <button
                                                                 type="submit"
-                                                                class="inline-flex items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                                                                class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2.5 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
                                                             >
                                                                 Quitar
                                                                 compatibilidad

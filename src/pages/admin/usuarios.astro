@@ -157,8 +157,10 @@ function paymentTone(status: PaymentStatus) {
 }
 
 function roleTone(role: UserRole) {
-  if (role === "ADMIN") return "border-violet-400/20 bg-violet-400/10 text-violet-300";
-  if (role === "STAFF") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  if (role === "ADMIN")
+    return "border-violet-400/20 bg-violet-400/10 text-violet-300";
+  if (role === "STAFF")
+    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
   return "border-sky-400/20 bg-sky-400/10 text-sky-300";
 }
 
@@ -175,10 +177,14 @@ function reasonTone(reason: LedgerRow["reason"]) {
 }
 
 function orderStatusTone(status: OrderStatus) {
-  if (status === "DELIVERED") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-  if (status === "CANCELLED") return "border-rose-400/20 bg-rose-400/10 text-rose-300";
-  if (status === "READY" || status === "OUT_FOR_DELIVERY") return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
-  if (status === "PREPARING" || status === "ACCEPTED") return "border-amber-400/20 bg-amber-400/10 text-amber-300";
+  if (status === "DELIVERED")
+    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+  if (status === "CANCELLED")
+    return "border-rose-400/20 bg-rose-400/10 text-rose-300";
+  if (status === "READY" || status === "OUT_FOR_DELIVERY")
+    return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
+  if (status === "PREPARING" || status === "ACCEPTED")
+    return "border-amber-400/20 bg-amber-400/10 text-amber-300";
   return "border-slate-400/20 bg-slate-400/10 text-slate-300";
 }
 
@@ -190,9 +196,13 @@ const url = new URL(Astro.request.url);
 
 const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
 const roleFilter = (url.searchParams.get("role") ?? "").trim().toUpperCase();
-const activeFilter = (url.searchParams.get("active") ?? "").trim().toLowerCase();
+const activeFilter = (url.searchParams.get("active") ?? "")
+  .trim()
+  .toLowerCase();
 const tierFilterRaw = (url.searchParams.get("tierId") ?? "").trim();
-const ordersFilter = (url.searchParams.get("orders") ?? "").trim().toLowerCase();
+const ordersFilter = (url.searchParams.get("orders") ?? "")
+  .trim()
+  .toLowerCase();
 const selectedUserIdParam = Number(url.searchParams.get("user") ?? "");
 
 const saved = url.searchParams.get("saved") ?? "";
@@ -251,7 +261,12 @@ const tiers = (await db
 
 const activeTiersAsc = [...tiers]
   .filter((tier) => tier.active)
-  .sort((a, b) => a.minPoints - b.minPoints || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "es"));
+  .sort(
+    (a, b) =>
+      a.minPoints - b.minPoints ||
+      a.sortOrder - b.sortOrder ||
+      a.name.localeCompare(b.name, "es"),
+  );
 
 const profileByUserId = new Map<number, ProfileRow>();
 for (const profile of profiles) {
@@ -290,29 +305,35 @@ const lastOrderAtByUserId = new Map<number, Date | string>();
 for (const order of orders) {
   if (typeof order.userId !== "number") continue;
 
-  orderCountByUserId.set(order.userId, (orderCountByUserId.get(order.userId) ?? 0) + 1);
+  orderCountByUserId.set(
+    order.userId,
+    (orderCountByUserId.get(order.userId) ?? 0) + 1,
+  );
 
   const previousLast = lastOrderAtByUserId.get(order.userId);
-  if (!previousLast || new Date(order.createdAt).getTime() > new Date(previousLast).getTime()) {
+  if (
+    !previousLast ||
+    new Date(order.createdAt).getTime() > new Date(previousLast).getTime()
+  ) {
     lastOrderAtByUserId.set(order.userId, order.createdAt);
   }
 
   if (isPaid(order.paymentStatus)) {
     paidOrderCountByUserId.set(
       order.userId,
-      (paidOrderCountByUserId.get(order.userId) ?? 0) + 1
+      (paidOrderCountByUserId.get(order.userId) ?? 0) + 1,
     );
 
     totalSpentByUserId.set(
       order.userId,
-      (totalSpentByUserId.get(order.userId) ?? 0) + order.totalCents
+      (totalSpentByUserId.get(order.userId) ?? 0) + order.totalCents,
     );
   }
 }
 
 const summaries: UserSummary[] = sortedUsers.map((user) => {
   const profile = profileByUserId.get(user.id) ?? null;
-  const tier = profile?.tierId ? tierById.get(profile.tierId) ?? null : null;
+  const tier = profile?.tierId ? (tierById.get(profile.tierId) ?? null) : null;
 
   return {
     user,
@@ -326,10 +347,14 @@ const summaries: UserSummary[] = sortedUsers.map((user) => {
 });
 
 const tierFilter = Number(tierFilterRaw);
-const validRoleFilter = roleFilter === "ADMIN" || roleFilter === "STAFF" || roleFilter === "CUSTOMER";
-const validActiveFilter = activeFilter === "active" || activeFilter === "inactive";
+const validRoleFilter =
+  roleFilter === "ADMIN" || roleFilter === "STAFF" || roleFilter === "CUSTOMER";
+const validActiveFilter =
+  activeFilter === "active" || activeFilter === "inactive";
 const validOrdersFilter =
-  ordersFilter === "with-orders" || ordersFilter === "without-orders" || ordersFilter === "paid-only";
+  ordersFilter === "with-orders" ||
+  ordersFilter === "without-orders" ||
+  ordersFilter === "paid-only";
 
 const filteredSummaries = summaries.filter((summary) => {
   if (q) {
@@ -360,8 +385,10 @@ const filteredSummaries = summaries.filter((summary) => {
 
   if (validOrdersFilter) {
     if (ordersFilter === "with-orders" && summary.orderCount <= 0) return false;
-    if (ordersFilter === "without-orders" && summary.orderCount > 0) return false;
-    if (ordersFilter === "paid-only" && summary.paidOrderCount <= 0) return false;
+    if (ordersFilter === "without-orders" && summary.orderCount > 0)
+      return false;
+    if (ordersFilter === "paid-only" && summary.paidOrderCount <= 0)
+      return false;
   }
 
   return true;
@@ -375,7 +402,9 @@ if (Number.isFinite(tierFilter)) filterParams.set("tierId", String(tierFilter));
 if (validOrdersFilter) filterParams.set("orders", ordersFilter);
 
 const selectedSummary =
-  filteredSummaries.find((summary) => summary.user.id === selectedUserIdParam) ??
+  filteredSummaries.find(
+    (summary) => summary.user.id === selectedUserIdParam,
+  ) ??
   summaries.find((summary) => summary.user.id === selectedUserIdParam) ??
   filteredSummaries[0] ??
   summaries[0] ??
@@ -408,39 +437,49 @@ const selectedOrders =
   typeof selectedUserId === "number"
     ? [...orders]
         .filter((order) => order.userId === selectedUserId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
         .slice(0, 10)
     : [];
 
 const selectedLedger =
   typeof selectedUserId === "number"
-    ? ((await db
-        .select({
-          id: LoyaltyLedger.id,
-          userId: LoyaltyLedger.userId,
-          orderId: LoyaltyLedger.orderId,
-          pointsDelta: LoyaltyLedger.pointsDelta,
-          reason: LoyaltyLedger.reason,
-          meta: LoyaltyLedger.meta,
-          createdAt: LoyaltyLedger.createdAt,
-        })
-        .from(LoyaltyLedger)
-        .where(eq(LoyaltyLedger.userId, selectedUserId))) as LedgerRow[])
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    ? (
+        (await db
+          .select({
+            id: LoyaltyLedger.id,
+            userId: LoyaltyLedger.userId,
+            orderId: LoyaltyLedger.orderId,
+            pointsDelta: LoyaltyLedger.pointsDelta,
+            reason: LoyaltyLedger.reason,
+            meta: LoyaltyLedger.meta,
+            createdAt: LoyaltyLedger.createdAt,
+          })
+          .from(LoyaltyLedger)
+          .where(eq(LoyaltyLedger.userId, selectedUserId))) as LedgerRow[]
+      )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
         .slice(0, 16)
     : [];
 
 const totalUsers = summaries.length;
-const customerCount = summaries.filter((summary) => summary.user.role === "CUSTOMER").length;
+const customerCount = summaries.filter(
+  (summary) => summary.user.role === "CUSTOMER",
+).length;
 const activeCustomerCount = summaries.filter(
-  (summary) => summary.user.role === "CUSTOMER" && summary.user.active
+  (summary) => summary.user.role === "CUSTOMER" && summary.user.active,
 ).length;
 const loyaltyUsers = summaries.filter(
-  (summary) => summary.user.role === "CUSTOMER" && summary.profile
+  (summary) => summary.user.role === "CUSTOMER" && summary.profile,
 ).length;
 const totalPoints = summaries.reduce(
   (sum, summary) => sum + Number(summary.profile?.pointsBalance ?? 0),
-  0
+  0,
 );
 
 const selectedProfile = selectedSummary?.profile ?? null;
@@ -463,8 +502,10 @@ const tierProgressPct =
         0,
         Math.min(
           100,
-          ((selectedPoints - currentTierFloor) / (nextTierMin - currentTierFloor)) * 100
-        )
+          ((selectedPoints - currentTierFloor) /
+            (nextTierMin - currentTierFloor)) *
+            100,
+        ),
       )
     : 100;
 
@@ -513,6 +554,33 @@ const errorMessage =
                         : error === "invalid-intent"
                           ? "Acción no válida."
                           : "";
+
+const summaryCards = [
+  {
+    label: "Usuarios",
+    value: totalUsers,
+    note: "Todas las cuentas registradas",
+    tone: "border-white/10 bg-white/[0.03]",
+  },
+  {
+    label: "Clientes activos",
+    value: activeCustomerCount,
+    note: `${customerCount} clientes en total`,
+    tone: "border-sky-400/15 bg-sky-400/8",
+  },
+  {
+    label: "Con loyalty",
+    value: loyaltyUsers,
+    note: "Perfiles con puntos",
+    tone: "border-violet-400/15 bg-violet-400/8",
+  },
+  {
+    label: "Puntos totales",
+    value: totalPoints,
+    note: "Saldo agregado actual",
+    tone: "border-amber-400/15 bg-amber-400/8",
+  },
+];
 ---
 
 <AdminLayout
@@ -525,64 +593,67 @@ const errorMessage =
     <div class="flex flex-wrap gap-3">
       <a
         href="/admin/loyalty"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/10 hover:text-white"
+        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
       >
         Ver tiers
       </a>
 
       <a
         href="/admin/pedidos"
-        class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
       >
         Ver pedidos
       </a>
     </div>
   </Fragment>
 
-  {successMessage ? (
-    <section class="mb-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
-      {successMessage}
-    </section>
-  ) : null}
+  {
+    successMessage ? (
+      <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+        {successMessage}
+      </section>
+    ) : null
+  }
 
-  {errorMessage ? (
-    <section class="mb-6 rounded-3xl border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {errorMessage}
-    </section>
-  ) : null}
+  {
+    errorMessage ? (
+      <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+        {errorMessage}
+      </section>
+    ) : null
+  }
 
   <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <article class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Usuarios</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalUsers}</div>
-      <p class="mt-2 text-sm text-slate-400">Todas las cuentas registradas</p>
-    </article>
-
-    <article class="rounded-[28px] border border-sky-400/15 bg-sky-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200/80">Clientes activos</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{activeCustomerCount}</div>
-      <p class="mt-2 text-sm text-sky-100/70">{customerCount} clientes en total</p>
-    </article>
-
-    <article class="rounded-[28px] border border-violet-400/15 bg-violet-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-200/80">Con loyalty</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{loyaltyUsers}</div>
-      <p class="mt-2 text-sm text-violet-100/70">Perfiles con puntos</p>
-    </article>
-
-    <article class="rounded-[28px] border border-amber-400/15 bg-amber-400/6 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]">
-      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/80">Puntos totales</div>
-      <div class="mt-3 text-2xl font-semibold tracking-tight text-white">{totalPoints}</div>
-      <p class="mt-2 text-sm text-amber-100/75">Saldo agregado actual</p>
-    </article>
+    {
+      summaryCards.map((card) => (
+        <article
+          class:list={[
+            "rounded-[28px] border p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
+            card.tone,
+          ]}
+        >
+          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            {card.label}
+          </div>
+          <div class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
+            {card.value}
+          </div>
+          <p class="mt-2 text-sm leading-6 text-slate-400">{card.note}</p>
+        </article>
+      ))
+    }
   </section>
 
   <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_420px]">
-    <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+    <article
+      class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+    >
       <div class="border-b border-white/10 px-6 py-5">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80">
+            <div
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
+            >
               Base de usuarios
             </div>
             <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -598,7 +669,10 @@ const errorMessage =
           </a>
         </div>
 
-        <form method="get" class="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_160px_160px_180px_160px_auto]">
+        <form
+          method="get"
+          class="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_160px_160px_180px_160px_auto]"
+        >
           <input
             class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
             type="text"
@@ -612,9 +686,15 @@ const errorMessage =
             name="role"
           >
             <option value="">Todos los roles</option>
-            <option value="ADMIN" selected={roleFilter === "ADMIN"}>ADMIN</option>
-            <option value="STAFF" selected={roleFilter === "STAFF"}>STAFF</option>
-            <option value="CUSTOMER" selected={roleFilter === "CUSTOMER"}>CUSTOMER</option>
+            <option value="ADMIN" selected={roleFilter === "ADMIN"}
+              >ADMIN</option
+            >
+            <option value="STAFF" selected={roleFilter === "STAFF"}
+              >STAFF</option
+            >
+            <option value="CUSTOMER" selected={roleFilter === "CUSTOMER"}
+              >CUSTOMER</option
+            >
           </select>
 
           <select
@@ -622,8 +702,12 @@ const errorMessage =
             name="active"
           >
             <option value="">Todos</option>
-            <option value="active" selected={activeFilter === "active"}>Activos</option>
-            <option value="inactive" selected={activeFilter === "inactive"}>Inactivos</option>
+            <option value="active" selected={activeFilter === "active"}
+              >Activos</option
+            >
+            <option value="inactive" selected={activeFilter === "inactive"}
+              >Inactivos</option
+            >
           </select>
 
           <select
@@ -631,14 +715,24 @@ const errorMessage =
             name="tierId"
           >
             <option value="">Todos los tiers</option>
-            {tiers
-              .slice()
-              .sort((a, b) => a.sortOrder - b.sortOrder || a.minPoints - b.minPoints)
-              .map((tier) => (
-                <option value={tier.id} selected={Number.isFinite(tierFilter) && tierFilter === tier.id}>
-                  {tier.name}
-                </option>
-              ))}
+            {
+              tiers
+                .slice()
+                .sort(
+                  (a, b) =>
+                    a.sortOrder - b.sortOrder || a.minPoints - b.minPoints,
+                )
+                .map((tier) => (
+                  <option
+                    value={tier.id}
+                    selected={
+                      Number.isFinite(tierFilter) && tierFilter === tier.id
+                    }
+                  >
+                    {tier.name}
+                  </option>
+                ))
+            }
           </select>
 
           <select
@@ -646,9 +740,17 @@ const errorMessage =
             name="orders"
           >
             <option value="">Todos</option>
-            <option value="with-orders" selected={ordersFilter === "with-orders"}>Con pedidos</option>
-            <option value="without-orders" selected={ordersFilter === "without-orders"}>Sin pedidos</option>
-            <option value="paid-only" selected={ordersFilter === "paid-only"}>Con pedidos cobrados</option>
+            <option
+              value="with-orders"
+              selected={ordersFilter === "with-orders"}>Con pedidos</option
+            >
+            <option
+              value="without-orders"
+              selected={ordersFilter === "without-orders"}>Sin pedidos</option
+            >
+            <option value="paid-only" selected={ordersFilter === "paid-only"}
+              >Con pedidos cobrados</option
+            >
           </select>
 
           <button
@@ -660,109 +762,128 @@ const errorMessage =
         </form>
       </div>
 
-      {filteredSummaries.length === 0 ? (
-        <div class="px-6 py-12 text-center">
-          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
-            <div class="text-lg font-semibold text-white">No hay usuarios con ese filtro</div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              Ajusta el filtro o limpia la búsqueda para volver a ver toda la base.
-            </p>
+      {
+        filteredSummaries.length === 0 ? (
+          <div class="px-6 py-12 text-center">
+            <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+              <div class="text-lg font-semibold text-white">
+                No hay usuarios con ese filtro
+              </div>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                Ajusta el filtro o limpia la búsqueda para volver a ver toda la
+                base.
+              </p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div class="overflow-x-auto">
-          <table class="min-w-full border-collapse">
-            <thead>
-              <tr class="border-b border-white/10 text-left">
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Usuario</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Rol</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Loyalty</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos</th>
-                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Gasto cobrado</th>
-              </tr>
-            </thead>
+        ) : (
+          <div class="space-y-5 px-6 py-6">
+            {filteredSummaries.map((summary) => {
+              const selected = summary.user.id === selectedUserId;
+              const linkParams = new URLSearchParams(filterParams);
+              linkParams.set("user", String(summary.user.id));
 
-            <tbody>
-              {filteredSummaries.map((summary) => {
-                const selected = summary.user.id === selectedUserId;
-                const linkParams = new URLSearchParams(filterParams);
-                linkParams.set("user", String(summary.user.id));
-
-                return (
-                  <tr class:list={[
-                    "border-b border-white/5 transition",
-                    selected ? "bg-sky-400/6" : "hover:bg-white/3",
-                  ]}>
-                    <td class="px-6 py-4 align-top">
-                      <a
-                        href={`/admin/usuarios?${linkParams.toString()}`}
-                        class="block"
-                      >
-                        <div class="text-sm font-semibold text-white">
+              return (
+                <a
+                  href={`/admin/usuarios?${linkParams.toString()}`}
+                  class:list={[
+                    "block rounded-[28px] border p-5 shadow-[0_18px_60px_rgba(0,0,0,0.18)] transition",
+                    selected
+                      ? "border-sky-400/30 bg-sky-400/10"
+                      : "border-white/10 bg-[#0b1220]/90 hover:border-white/15 hover:bg-white/[0.04]",
+                  ]}
+                >
+                  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-2.5">
+                        <div class="truncate text-lg font-semibold text-white">
                           {summary.user.name ?? "Sin nombre"}
                         </div>
-                        <div class="mt-1 text-xs text-slate-500">{summary.user.email}</div>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                          <span class:list={[
-                            "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                            roleTone(summary.user.role),
+                          ]}
+                        >
+                          {summary.user.role}
+                        </span>
+
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
                             summary.user.active
                               ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                               : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                          ]}>
-                            {summary.user.active ? "Activa" : "Inactiva"}
+                          ]}
+                        >
+                          {summary.user.active ? "Activa" : "Inactiva"}
+                        </span>
+
+                        {summary.profile?.phone ? (
+                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold text-slate-300">
+                            {summary.profile.phone}
                           </span>
-
-                          {summary.profile?.phone ? (
-                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
-                              {summary.profile.phone}
-                            </span>
-                          ) : null}
-                        </div>
-                      </a>
-                    </td>
-
-                    <td class="px-6 py-4 align-top">
-                      <span class:list={[
-                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                        roleTone(summary.user.role),
-                      ]}>
-                        {summary.user.role}
-                      </span>
-                    </td>
-
-                    <td class="px-6 py-4 align-top">
-                      <div class="text-sm font-semibold text-white">
-                        {summary.profile?.pointsBalance ?? 0} pts
+                        ) : null}
                       </div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        {summary.tier?.name ?? "Sin tier"}
-                      </div>
-                    </td>
 
-                    <td class="px-6 py-4 align-top">
-                      <div class="text-sm text-slate-300">{summary.orderCount} total</div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        {summary.paidOrderCount} cobrados · {formatDateTime(summary.lastOrderAt)}
+                      <div class="mt-2 break-all text-sm text-slate-400">
+                        {summary.user.email}
                       </div>
-                    </td>
 
-                    <td class="px-6 py-4 align-top text-right">
-                      <div class="text-sm font-semibold text-white">
-                        {money(summary.totalSpentCents)}
+                      <div class="mt-4 grid gap-4 md:grid-cols-3">
+                        <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                          <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Loyalty
+                          </div>
+                          <div class="mt-2 text-sm font-semibold text-white">
+                            {summary.profile?.pointsBalance ?? 0} pts
+                          </div>
+                          <div class="mt-1 text-xs text-slate-500">
+                            {summary.tier?.name ?? "Sin tier"}
+                          </div>
+                        </section>
+
+                        <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                          <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Pedidos
+                          </div>
+                          <div class="mt-2 text-sm font-semibold text-white">
+                            {summary.orderCount} total
+                          </div>
+                          <div class="mt-1 text-xs text-slate-500">
+                            {summary.paidOrderCount} cobrados
+                          </div>
+                        </section>
+
+                        <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                          <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Gasto cobrado
+                          </div>
+                          <div class="mt-2 text-sm font-semibold text-white">
+                            {money(summary.totalSpentCents)}
+                          </div>
+                          <div class="mt-1 text-xs text-slate-500">
+                            {formatDateTime(summary.lastOrderAt)}
+                          </div>
+                        </section>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )
+      }
     </article>
 
     <aside class="space-y-6">
-      <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+      <section
+        class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
+      >
+        <div
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        >
           Ranking
         </div>
         <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
@@ -770,502 +891,645 @@ const errorMessage =
         </h2>
 
         <div class="mt-5 space-y-3">
-          {topCustomersByPoints.length === 0 ? (
-            <div class="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
-              Todavía no hay clientes suficientes para ranking.
-            </div>
-          ) : (
-            topCustomersByPoints.map((summary, index) => {
-              const linkParams = new URLSearchParams(filterParams);
-              linkParams.set("user", String(summary.user.id));
+          {
+            topCustomersByPoints.length === 0 ? (
+              <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
+                Todavía no hay clientes suficientes para ranking.
+              </div>
+            ) : (
+              topCustomersByPoints.map((summary, index) => {
+                const linkParams = new URLSearchParams(filterParams);
+                linkParams.set("user", String(summary.user.id));
 
-              return (
-                <a
-                  href={`/admin/usuarios?${linkParams.toString()}`}
-                  class="block rounded-3xl border border-white/10 bg-white/5 p-4 transition hover:border-sky-400/25 hover:bg-white/7"
-                >
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
-                      <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
-                        #{index + 1}
+                return (
+                  <a
+                    href={`/admin/usuarios?${linkParams.toString()}`}
+                    class="block rounded-3xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-sky-400/25 hover:bg-white/[0.05]"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
+                          #{index + 1}
+                        </div>
+                        <div class="mt-1 text-sm font-semibold text-white">
+                          {summary.user.name ?? summary.user.email}
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          {summary.tier?.name ?? "Sin tier"} ·{" "}
+                          {summary.paidOrderCount} cobrados
+                        </div>
                       </div>
-                      <div class="mt-1 text-sm font-semibold text-white">
-                        {summary.user.name ?? summary.user.email}
-                      </div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        {summary.tier?.name ?? "Sin tier"} · {summary.paidOrderCount} cobrados
+
+                      <div class="text-right">
+                        <div class="text-sm font-semibold text-white">
+                          {summary.profile?.pointsBalance ?? 0} pts
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">
+                          {money(summary.totalSpentCents)}
+                        </div>
                       </div>
                     </div>
-
-                    <div class="text-right">
-                      <div class="text-sm font-semibold text-white">
-                        {summary.profile?.pointsBalance ?? 0} pts
-                      </div>
-                      <div class="mt-1 text-xs text-slate-500">{money(summary.totalSpentCents)}</div>
-                    </div>
-                  </div>
-                </a>
-              );
-            })
-          )}
+                  </a>
+                );
+              })
+            )
+          }
         </div>
       </section>
 
-      {selectedSummary ? (
-        <>
-          <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                  Usuario seleccionado
+      {
+        selectedSummary ? (
+          <>
+            <section class="rounded-[30px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Usuario seleccionado
+                  </div>
+                  <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+                    {selectedSummary.user.name ?? "Sin nombre"}
+                  </h2>
+                  <div class="mt-1 text-sm text-slate-400">
+                    {selectedSummary.user.email}
+                  </div>
                 </div>
-                <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-                  {selectedSummary.user.name ?? "Sin nombre"}
-                </h2>
-                <div class="mt-1 text-sm text-slate-400">{selectedSummary.user.email}</div>
-              </div>
 
-              <div class="flex flex-wrap gap-2">
-                <span class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                  roleTone(selectedSummary.user.role),
-                ]}>
-                  {selectedSummary.user.role}
-                </span>
-
-                <span class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                  selectedSummary.user.active
-                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                    : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                ]}>
-                  {selectedSummary.user.active ? "Activa" : "Inactiva"}
-                </span>
-              </div>
-            </div>
-
-            <form method="post" action="/api/admin/users" class="mt-6 grid gap-4">
-              <input type="hidden" name="intent" value="update-user" />
-              <input type="hidden" name="userId" value={selectedSummary.user.id} />
-
-              <div class="grid gap-4 lg:grid-cols-2">
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nombre</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                    type="text"
-                    name="name"
-                    value={selectedSummary.user.name ?? ""}
-                  />
-                </label>
-
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Email</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                    type="email"
-                    name="email"
-                    value={selectedSummary.user.email}
-                    required
-                  />
-                </label>
-              </div>
-
-              <div class="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)]">
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Rol</span>
-                  <select
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                    name="role"
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    class:list={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      roleTone(selectedSummary.user.role),
+                    ]}
                   >
-                    <option value="ADMIN" selected={selectedSummary.user.role === "ADMIN"}>ADMIN</option>
-                    <option value="STAFF" selected={selectedSummary.user.role === "STAFF"}>STAFF</option>
-                    <option value="CUSTOMER" selected={selectedSummary.user.role === "CUSTOMER"}>CUSTOMER</option>
-                  </select>
-                </label>
+                    {selectedSummary.user.role}
+                  </span>
 
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Teléfono</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                    type="text"
-                    name="phone"
-                    value={selectedProfile?.phone ?? ""}
-                  />
-                </label>
-
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Cumpleaños</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                    type="text"
-                    name="birthday"
-                    value={selectedProfile?.birthday ?? ""}
-                    placeholder="YYYY-MM-DD"
-                  />
-                </label>
+                  <span
+                    class:list={[
+                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                      selectedSummary.user.active
+                        ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                        : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                    ]}
+                  >
+                    {selectedSummary.user.active ? "Activa" : "Inactiva"}
+                  </span>
+                </div>
               </div>
 
-              <label class="inline-flex items-center gap-3 text-sm text-slate-300">
+              <form
+                method="post"
+                action="/api/admin/users"
+                class="mt-6 grid gap-4"
+              >
+                <input type="hidden" name="intent" value="update-user" />
                 <input
-                  class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                  type="checkbox"
-                  name="active"
-                  checked={selectedSummary.user.active}
+                  type="hidden"
+                  name="userId"
+                  value={selectedSummary.user.id}
                 />
-                Cuenta activa
-              </label>
 
-              <div class="flex justify-end">
-                <button
-                  type="submit"
-                  class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                >
-                  Guardar usuario
-                </button>
+                <div class="grid gap-4 lg:grid-cols-2">
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Nombre
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="text"
+                      name="name"
+                      value={selectedSummary.user.name ?? ""}
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Email
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="email"
+                      name="email"
+                      value={selectedSummary.user.email}
+                      required
+                    />
+                  </label>
+                </div>
+
+                <div class="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_minmax(0,1fr)]">
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Rol
+                    </span>
+                    <select
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      name="role"
+                    >
+                      <option
+                        value="ADMIN"
+                        selected={selectedSummary.user.role === "ADMIN"}
+                      >
+                        ADMIN
+                      </option>
+                      <option
+                        value="STAFF"
+                        selected={selectedSummary.user.role === "STAFF"}
+                      >
+                        STAFF
+                      </option>
+                      <option
+                        value="CUSTOMER"
+                        selected={selectedSummary.user.role === "CUSTOMER"}
+                      >
+                        CUSTOMER
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Teléfono
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="text"
+                      name="phone"
+                      value={selectedProfile?.phone ?? ""}
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Cumpleaños
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="text"
+                      name="birthday"
+                      value={selectedProfile?.birthday ?? ""}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </label>
+                </div>
+
+                <label class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
+                  <div class="flex items-start gap-3">
+                    <input
+                      class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
+                      type="checkbox"
+                      name="active"
+                      checked={selectedSummary.user.active}
+                    />
+                    <div>
+                      <div class="text-sm font-semibold text-white">
+                        Cuenta activa
+                      </div>
+                      <p class="mt-1 text-sm leading-6 text-slate-400">
+                        Controla si la cuenta sigue operativa dentro del
+                        sistema.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+
+                <div class="flex justify-end">
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                  >
+                    Guardar usuario
+                  </button>
+                </div>
+              </form>
+            </section>
+
+            <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Loyalty
               </div>
-            </form>
-          </section>
 
-          <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Loyalty
-            </div>
+              <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                <div class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                  <div class="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Puntos
+                  </div>
+                  <div class="mt-2 text-2xl font-semibold text-white">
+                    {selectedPoints}
+                  </div>
+                </div>
 
-            <div class="mt-4 grid gap-4 sm:grid-cols-3">
-              <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
-                <div class="text-xs uppercase tracking-[0.16em] text-slate-500">Puntos</div>
-                <div class="mt-2 text-2xl font-semibold text-white">{selectedPoints}</div>
-              </div>
+                <div class="rounded-3xl border border-violet-400/20 bg-violet-400/10 p-4">
+                  <div class="text-xs uppercase tracking-[0.16em] text-violet-200/80">
+                    Tier actual
+                  </div>
+                  <div class="mt-2 text-lg font-semibold text-white">
+                    {selectedTier?.name ?? bestTierByPoints?.name ?? "Sin tier"}
+                  </div>
+                </div>
 
-              <div class="rounded-3xl border border-violet-400/20 bg-violet-400/10 p-4">
-                <div class="text-xs uppercase tracking-[0.16em] text-violet-200/80">Tier actual</div>
-                <div class="mt-2 text-lg font-semibold text-white">
-                  {selectedTier?.name ?? bestTierByPoints?.name ?? "Sin tier"}
+                <div class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+                  <div class="text-xs uppercase tracking-[0.16em] text-cyan-200/80">
+                    Siguiente tier
+                  </div>
+                  <div class="mt-2 text-lg font-semibold text-white">
+                    {nextTier
+                      ? `${nextTier.name} · ${nextTier.minPoints} pts`
+                      : "Máximo alcanzado"}
+                  </div>
                 </div>
               </div>
 
-              <div class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                <div class="text-xs uppercase tracking-[0.16em] text-cyan-200/80">Siguiente tier</div>
-                <div class="mt-2 text-lg font-semibold text-white">
-                  {nextTier ? `${nextTier.name} · ${nextTier.minPoints} pts` : "Máximo alcanzado"}
+              <div class="mt-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                <div class="flex items-center justify-between gap-3 text-sm">
+                  <span class="font-semibold text-white">
+                    Progreso al siguiente tier
+                  </span>
+                  <span class="text-slate-400">
+                    {nextTier
+                      ? `${selectedPoints}/${nextTier.minPoints}`
+                      : "100%"}
+                  </span>
+                </div>
+
+                <div class="mt-3 h-3 rounded-full bg-white/[0.05]">
+                  <div
+                    class="h-3 rounded-full bg-cyan-400/80"
+                    style={`width:${Math.max(0, Math.min(100, tierProgressPct))}%`}
+                  />
                 </div>
               </div>
-            </div>
 
-            <div class="mt-4 rounded-3xl border border-white/10 bg-white/5 p-4">
-              <div class="flex items-center justify-between gap-3 text-sm">
-                <span class="font-semibold text-white">Progreso al siguiente tier</span>
-                <span class="text-slate-400">
-                  {nextTier ? `${selectedPoints}/${nextTier.minPoints}` : "100%"}
-                </span>
-              </div>
-
-              <div class="mt-3 h-3 rounded-full bg-white/5">
-                <div
-                  class="h-3 rounded-full bg-cyan-400/80"
-                  style={`width:${Math.max(0, Math.min(100, tierProgressPct))}%`}
-                ></div>
-              </div>
-            </div>
-
-            <div class="mt-5 grid gap-4 xl:grid-cols-2">
-              <form method="post" action="/api/admin/users" class="grid gap-4 rounded-3xl border border-white/10 bg-white/4 p-4">
-                <input type="hidden" name="intent" value="adjust-points" />
-                <input type="hidden" name="userId" value={selectedSummary.user.id} />
-
-                <div class="text-sm font-semibold text-white">Ajuste manual</div>
-
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Delta</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                    type="number"
-                    name="pointsDelta"
-                    step="1"
-                    placeholder="+50 o -20"
-                    required
-                  />
-                </label>
-
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Nota interna</span>
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                    type="text"
-                    name="note"
-                    placeholder="Compensación, incidencia..."
-                  />
-                </label>
-
-                <button
-                  type="submit"
-                  class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              <div class="mt-5 grid gap-4 xl:grid-cols-2">
+                <form
+                  method="post"
+                  action="/api/admin/users"
+                  class="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4"
                 >
-                  Aplicar ajuste
-                </button>
-              </form>
-
-              <form method="post" action="/api/admin/users" class="grid gap-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/6 p-4">
-                <input type="hidden" name="intent" value="promo-bonus" />
-                <input type="hidden" name="userId" value={selectedSummary.user.id} />
-
-                <div class="text-sm font-semibold text-white">Bonus promocional</div>
-
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/80">Bonus</span>
+                  <input type="hidden" name="intent" value="adjust-points" />
                   <input
-                    class="w-full rounded-2xl border border-emerald-400/20 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-emerald-300/40 focus:outline-none"
-                    type="number"
-                    name="bonusPoints"
-                    min="1"
-                    step="1"
-                    placeholder="25"
-                    required
+                    type="hidden"
+                    name="userId"
+                    value={selectedSummary.user.id}
                   />
-                </label>
 
-                <label class="block">
-                  <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/80">Motivo promo</span>
-                  <input
-                    class="w-full rounded-2xl border border-emerald-400/20 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-emerald-300/40 focus:outline-none"
-                    type="text"
-                    name="note"
-                    placeholder="Campaña local, cortesía, aniversario..."
-                  />
-                </label>
+                  <div class="text-sm font-semibold text-white">
+                    Ajuste manual
+                  </div>
 
-                <button
-                  type="submit"
-                  class="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Delta
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="number"
+                      name="pointsDelta"
+                      step="1"
+                      placeholder="+50 o -20"
+                      required
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Nota interna
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                      type="text"
+                      name="note"
+                      placeholder="Compensación, incidencia..."
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                  >
+                    Aplicar ajuste
+                  </button>
+                </form>
+
+                <form
+                  method="post"
+                  action="/api/admin/users"
+                  class="grid gap-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/6 p-4"
                 >
-                  Aplicar bonus promo
-                </button>
-              </form>
+                  <input type="hidden" name="intent" value="promo-bonus" />
+                  <input
+                    type="hidden"
+                    name="userId"
+                    value={selectedSummary.user.id}
+                  />
+
+                  <div class="text-sm font-semibold text-white">
+                    Bonus promocional
+                  </div>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/80">
+                      Bonus
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-emerald-400/20 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-emerald-300/40 focus:outline-none"
+                      type="number"
+                      name="bonusPoints"
+                      min="1"
+                      step="1"
+                      placeholder="25"
+                      required
+                    />
+                  </label>
+
+                  <label class="block">
+                    <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200/80">
+                      Motivo promo
+                    </span>
+                    <input
+                      class="w-full rounded-2xl border border-emerald-400/20 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-emerald-300/40 focus:outline-none"
+                      type="text"
+                      name="note"
+                      placeholder="Campaña local, cortesía, aniversario..."
+                    />
+                  </label>
+
+                  <button
+                    type="submit"
+                    class="inline-flex items-center justify-center rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+                  >
+                    Aplicar bonus promo
+                  </button>
+                </form>
+              </div>
+            </section>
+          </>
+        ) : (
+          <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+            <div class="text-lg font-semibold text-white">
+              No hay usuario seleccionado
             </div>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Selecciona una cuenta de la lista izquierda para ver perfil,
+              loyalty, direcciones y pedidos.
+            </p>
           </section>
-        </>
-      ) : (
-        <section class="rounded-[30px] border border-white/10 bg-slate-950/70 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-          <div class="text-lg font-semibold text-white">No hay usuario seleccionado</div>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Selecciona una cuenta de la tabla izquierda para ver perfil, loyalty, direcciones y pedidos.
-          </p>
-        </section>
-      )}
+        )
+      }
     </aside>
   </section>
 
-  {selectedSummary ? (
-    <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
-        <div class="border-b border-white/10 px-6 py-5">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-300/80">
-                Direcciones
+  {
+    selectedSummary ? (
+      <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <div class="border-b border-white/10 px-6 py-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-300/80">
+                  Direcciones
+                </div>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+                  Direcciones guardadas
+                </h2>
               </div>
-              <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-                Direcciones guardadas
-              </h2>
-            </div>
 
-            <div class="text-sm text-slate-400">
-              {selectedAddresses.length} dirección{selectedAddresses.length === 1 ? "" : "es"}
+              <div class="text-sm text-slate-400">
+                {selectedAddresses.length} dirección
+                {selectedAddresses.length === 1 ? "" : "es"}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="space-y-4 px-6 py-6">
-          {selectedAddresses.length === 0 ? (
-            <div class="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 text-sm text-slate-400">
-              Este usuario no tiene direcciones guardadas.
-            </div>
-          ) : (
-            selectedAddresses
-              .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-              .map((address) => (
-                <article class="rounded-3xl border border-white/10 bg-white/4 p-4">
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div class="text-sm font-semibold text-white">
-                        {address.label ?? "Sin etiqueta"}
+          <div class="space-y-4 px-6 py-6">
+            {selectedAddresses.length === 0 ? (
+              <div class="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 text-sm text-slate-400">
+                Este usuario no tiene direcciones guardadas.
+              </div>
+            ) : (
+              selectedAddresses
+                .sort(
+                  (a, b) =>
+                    Number(b.isDefault) - Number(a.isDefault) ||
+                    new Date(b.createdAt).getTime() -
+                      new Date(a.createdAt).getTime(),
+                )
+                .map((address) => (
+                  <article class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div class="text-sm font-semibold text-white">
+                          {address.label ?? "Sin etiqueta"}
+                        </div>
+                        <div class="mt-1 text-sm text-slate-300">
+                          {address.contactName} · {address.phone}
+                        </div>
+                        <div class="mt-2 text-sm text-slate-400">
+                          {address.line1}
+                          {address.line2 ? `, ${address.line2}` : ""} ·{" "}
+                          {address.postalCode} {address.city}
+                        </div>
+                        {address.notes ? (
+                          <div class="mt-2 text-sm text-slate-500">
+                            {address.notes}
+                          </div>
+                        ) : null}
                       </div>
-                      <div class="mt-1 text-sm text-slate-300">
-                        {address.contactName} · {address.phone}
-                      </div>
-                      <div class="mt-2 text-sm text-slate-400">
-                        {address.line1}
-                        {address.line2 ? `, ${address.line2}` : ""} · {address.postalCode} {address.city}
-                      </div>
-                      {address.notes ? (
-                        <div class="mt-2 text-sm text-slate-500">{address.notes}</div>
+
+                      {address.isDefault ? (
+                        <span class="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
+                          Default
+                        </span>
                       ) : null}
                     </div>
+                  </article>
+                ))
+            )}
+          </div>
+        </article>
 
-                    {address.isDefault ? (
-                      <span class="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
-                        Default
-                      </span>
-                    ) : null}
+        <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+          <div class="border-b border-white/10 px-6 py-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/80">
+                  Loyalty ledger
+                </div>
+                <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
+                  Historial de puntos
+                </h2>
+              </div>
+
+              <div class="text-sm text-slate-400">
+                {selectedLedger.length} movimiento
+                {selectedLedger.length === 1 ? "" : "s"}
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-4 px-6 py-6">
+            {selectedLedger.length === 0 ? (
+              <div class="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 text-sm text-slate-400">
+                Este usuario todavía no tiene movimientos en loyalty.
+              </div>
+            ) : (
+              selectedLedger.map((entry) => (
+                <article class="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                            reasonTone(entry.reason),
+                          ]}
+                        >
+                          {entry.reason}
+                        </span>
+
+                        <span
+                          class:list={[
+                            "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                            entry.pointsDelta >= 0
+                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                              : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                          ]}
+                        >
+                          {entry.pointsDelta >= 0
+                            ? `+${entry.pointsDelta}`
+                            : entry.pointsDelta}{" "}
+                          pts
+                        </span>
+                      </div>
+
+                      <div class="mt-3 text-sm text-slate-300">
+                        {formatDateTime(entry.createdAt)}
+                      </div>
+
+                      {entry.orderId ? (
+                        <div class="mt-1 text-xs text-slate-500">
+                          orderId #{entry.orderId}
+                        </div>
+                      ) : null}
+
+                      {safeMetaNote(entry.meta) ? (
+                        <div class="mt-2 text-sm text-slate-400">
+                          {safeMetaNote(entry.meta)}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
               ))
-          )}
-        </div>
-      </article>
+            )}
+          </div>
+        </article>
+      </section>
+    ) : null
+  }
 
-      <article class="rounded-[30px] border border-white/10 bg-[#111827]/80 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
+  {
+    selectedSummary ? (
+      <section class="mt-6 rounded-[30px] border border-white/10 bg-white/[0.03] shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
         <div class="border-b border-white/10 px-6 py-5">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/80">
-                Loyalty ledger
+              <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Pedidos
               </div>
               <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-                Historial de puntos
+                Últimos pedidos del usuario
               </h2>
             </div>
 
             <div class="text-sm text-slate-400">
-              {selectedLedger.length} movimiento{selectedLedger.length === 1 ? "" : "s"}
+              {selectedOrders.length} registro
+              {selectedOrders.length === 1 ? "" : "s"}
             </div>
           </div>
         </div>
 
-        <div class="space-y-4 px-6 py-6">
-          {selectedLedger.length === 0 ? (
-            <div class="rounded-[28px] border border-white/10 bg-slate-950/40 p-6 text-sm text-slate-400">
-              Este usuario todavía no tiene movimientos en loyalty.
+        {selectedOrders.length === 0 ? (
+          <div class="px-6 py-12 text-center">
+            <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
+              <div class="text-lg font-semibold text-white">
+                Este usuario aún no tiene pedidos
+              </div>
+              <p class="mt-2 text-sm leading-6 text-slate-400">
+                Cuando haga pedidos, aquí aparecerán los últimos con su estado y
+                total.
+              </p>
             </div>
-          ) : (
-            selectedLedger.map((entry) => (
-              <article class="rounded-3xl border border-white/10 bg-white/4 p-4">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class:list={[
-                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                        reasonTone(entry.reason),
-                      ]}>
-                        {entry.reason}
+          </div>
+        ) : (
+          <div class="space-y-4 px-6 py-6">
+            {selectedOrders.map((order) => (
+              <article class="rounded-[28px] border border-white/10 bg-[#0b1220]/90 p-5">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2.5">
+                      <a
+                        href={`/admin/pedidos/${order.publicId}`}
+                        class="text-base font-semibold text-white transition hover:text-sky-300"
+                      >
+                        {order.publicId}
+                      </a>
+
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                          orderStatusTone(order.status),
+                        ]}
+                      >
+                        {order.status}
                       </span>
 
-                      <span class:list={[
-                        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                        entry.pointsDelta >= 0
-                          ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                          : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                      ]}>
-                        {entry.pointsDelta >= 0 ? `+${entry.pointsDelta}` : entry.pointsDelta} pts
+                      <span
+                        class:list={[
+                          "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                          paymentTone(order.paymentStatus),
+                        ]}
+                      >
+                        {order.paymentStatus}
+                      </span>
+
+                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                        {order.type}
                       </span>
                     </div>
 
-                    <div class="mt-3 text-sm text-slate-300">
-                      {formatDateTime(entry.createdAt)}
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                      <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Fecha
+                        </div>
+                        <div class="mt-2 text-sm font-semibold text-white">
+                          {formatDateTime(order.createdAt)}
+                        </div>
+                      </section>
+
+                      <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Total
+                        </div>
+                        <div class="mt-2 text-sm font-semibold text-white">
+                          {money(order.totalCents)}
+                        </div>
+                      </section>
                     </div>
-
-                    {entry.orderId ? (
-                      <div class="mt-1 text-xs text-slate-500">orderId #{entry.orderId}</div>
-                    ) : null}
-
-                    {safeMetaNote(entry.meta) ? (
-                      <div class="mt-2 text-sm text-slate-400">{safeMetaNote(entry.meta)}</div>
-                    ) : null}
                   </div>
+
+                  <a
+                    href={`/admin/pedidos/${order.publicId}`}
+                    class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+                  >
+                    Abrir pedido
+                  </a>
                 </div>
               </article>
-            ))
-          )}
-        </div>
-      </article>
-    </section>
-  ) : null}
-
-  {selectedSummary ? (
-    <section class="mt-6 rounded-[30px] border border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-      <div class="border-b border-white/10 px-6 py-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Pedidos
-            </div>
-            <h2 class="mt-2 text-xl font-semibold tracking-tight text-white">
-              Últimos pedidos del usuario
-            </h2>
+            ))}
           </div>
-
-          <div class="text-sm text-slate-400">
-            {selectedOrders.length} registro{selectedOrders.length === 1 ? "" : "s"}
-          </div>
-        </div>
-      </div>
-
-      {selectedOrders.length === 0 ? (
-        <div class="px-6 py-12 text-center">
-          <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-slate-950/40 p-8">
-            <div class="text-lg font-semibold text-white">Este usuario aún no tiene pedidos</div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              Cuando haga pedidos, aquí aparecerán los últimos con su estado y total.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div class="overflow-x-auto">
-          <table class="min-w-full border-collapse">
-            <thead>
-              <tr class="border-b border-white/10 text-left">
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pedido</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Estado</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pago</th>
-                <th class="px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Fecha</th>
-                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {selectedOrders.map((order) => (
-                <tr class="border-b border-white/5 transition hover:bg-white/3">
-                  <td class="px-6 py-4 align-top">
-                    <a
-                      href={`/admin/pedidos/${order.publicId}`}
-                      class="text-sm font-semibold text-white transition hover:text-sky-300"
-                    >
-                      {order.publicId}
-                    </a>
-                    <div class="mt-1 text-xs text-slate-500">{order.type}</div>
-                  </td>
-
-                  <td class="px-6 py-4 align-top">
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      orderStatusTone(order.status),
-                    ]}>
-                      {order.status}
-                    </span>
-                  </td>
-
-                  <td class="px-6 py-4 align-top">
-                    <span class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
-                      paymentTone(order.paymentStatus),
-                    ]}>
-                      {order.paymentStatus}
-                    </span>
-                  </td>
-
-                  <td class="px-6 py-4 align-top text-sm text-slate-300">
-                    {formatDateTime(order.createdAt)}
-                  </td>
-
-                  <td class="px-6 py-4 align-top text-right text-sm font-semibold text-white">
-                    {money(order.totalCents)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  ) : null}
+        )}
+      </section>
+    ) : null
+  }
 </AdminLayout>
