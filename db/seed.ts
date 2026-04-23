@@ -100,6 +100,125 @@ function safeImageUrl(filename: string) {
   return `/images/products/${encodeURIComponent(filename)}`;
 }
 
+function safeIngredientImageUrl(filename: string) {
+  return `/images/ingredients/${encodeURIComponent(filename)}`;
+}
+
+async function buildIngredientImageIndex() {
+  const dir = path.join(process.cwd(), "public", "images", "ingredients");
+
+  let files: string[] = [];
+  try {
+    files = await readdir(dir);
+  } catch {
+    console.warn(`⚠️ Seed: no se pudo leer ${dir}. ¿Existe public/images/ingredients?`);
+    return new Map<string, string>();
+  }
+
+  const map = new Map<string, string>();
+
+  for (const file of files) {
+    if (!/\.(svg|webp|png|jpg|jpeg)$/i.test(file)) continue;
+
+    const base = stripExtension(file);
+    const slug = slugify(base);
+    const norm = normalizeSlugForMatch(slug);
+
+    if (!map.has(slug)) map.set(slug, file);
+    if (!map.has(norm)) map.set(norm, file);
+  }
+
+  return map;
+}
+
+function resolveIngredientImageUrl(
+  name: string,
+  slug: string,
+  imageIndex: Map<string, string>,
+) {
+  // 1) Match directo
+  const direct = imageIndex.get(slug);
+  if (direct) return safeIngredientImageUrl(direct);
+
+  const norm = normalizeSlugForMatch(slug);
+  const viaNorm = imageIndex.get(norm);
+  if (viaNorm) return safeIngredientImageUrl(viaNorm);
+
+  const hay = `${name} ${slug}`.toLowerCase();
+
+  // 2) Familias útiles con tus SVG actuales
+  if (hay.includes("queso")) {
+    const file = imageIndex.get("queso");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("cebolla")) {
+    const file = imageIndex.get("cebolla");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("lechuga") || hay.includes("brotes-de-lechuga") || hay.includes("brotes-de-ensalada")) {
+    const file = imageIndex.get("lechuga");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("tomate")) {
+    const file = imageIndex.get("tomate");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("huevo")) {
+    const file = imageIndex.get("huevo-frito");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("pimiento-rojo") || hay.includes("piquillo")) {
+    const file = imageIndex.get("pimiento-rojo");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("pimiento-verde")) {
+    const file = imageIndex.get("pimiento-verde");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (
+    hay.includes("picante") ||
+    hay.includes("jalap") ||
+    hay.includes("guindilla") ||
+    hay.includes("chili")
+  ) {
+    const file = imageIndex.get("picante");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (
+    hay.includes("carne") ||
+    hay.includes("pollo") ||
+    hay.includes("hamburguesa") ||
+    hay.includes("pulled-pork") ||
+    hay.includes("pulled pork") ||
+    hay.includes("bacon") ||
+    hay.includes("lomo") ||
+    hay.includes("butifarra") ||
+    hay.includes("kebab") ||
+    hay.includes("pincho") ||
+    hay.includes("atun") ||
+    hay.includes("atun") ||
+    hay.includes("heura") ||
+    hay.includes("calamar")
+  ) {
+    const file = imageIndex.get("carne");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  // 3) Placeholder por defecto
+  const placeholder = imageIndex.get("placeholder");
+  if (placeholder) return safeIngredientImageUrl(placeholder);
+
+  return "/images/ingredients/placeholder.svg";
+}
+
 /**
  * Normalización “para matching” (imágenes vs slugs)
  * - quita stopwords como "con", "de", "la"...
@@ -439,6 +558,7 @@ export default async function seed() {
   const allergenIdBySlug = new Map<string, number>(allergenRows.map((r) => [r.slug, r.id]));
 
   const imageIndex = await buildProductImageIndex();
+  const ingredientImageIndex = await buildIngredientImageIndex();
 
   function inferAllergenSlugs(p: ProductSeed) {
     const set = new Set<string>();
@@ -571,7 +691,7 @@ export default async function seed() {
     id: nextIngredientId2++,
     name,
     slug,
-    imageUrl: null,
+    imageUrl: resolveIngredientImageUrl(name, slug, ingredientImageIndex),
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -1024,7 +1144,7 @@ export default async function seed() {
     id: nextIngredientId++,
     name,
     slug,
-    imageUrl: null,
+    imageUrl: resolveIngredientImageUrl(name, slug, ingredientImageIndex),
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -1344,7 +1464,7 @@ export default async function seed() {
     id: nextIngredientId4++,
     name,
     slug,
-    imageUrl: null,
+    imageUrl: resolveIngredientImageUrl(name, slug, ingredientImageIndex),
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -1828,7 +1948,7 @@ export default async function seed() {
     id: nextIngredientId5++,
     name,
     slug,
-    imageUrl: null,
+    imageUrl: resolveIngredientImageUrl(name, slug, ingredientImageIndex),
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -2110,7 +2230,7 @@ export default async function seed() {
     id: nextIngredientId6++,
     name,
     slug,
-    imageUrl: null,
+    imageUrl: resolveIngredientImageUrl(name, slug, ingredientImageIndex),
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,

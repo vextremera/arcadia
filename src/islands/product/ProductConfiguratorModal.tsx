@@ -132,19 +132,26 @@ function ProductImageOrPlaceholder(props: {
   rounded?: string;
   className?: string;
   labelSize?: string;
+  fit?: "cover" | "contain";
+  padded?: boolean;
 }) {
   const rounded = props.rounded ?? "rounded-2xl";
   const className = props.className ?? "h-24 w-full";
   const labelSize = props.labelSize ?? "text-lg";
+  const fit = props.fit ?? "cover";
+  const padded = props.padded ?? false;
 
   if (props.imageUrl) {
     return (
-      <img
-        src={props.imageUrl}
-        alt={props.name}
-        class={`${className} ${rounded} object-cover`}
-        loading="lazy"
-      />
+      <div class={`${className} ${rounded} overflow-hidden bg-zinc-50`}>
+        <img
+          src={props.imageUrl}
+          alt={props.name}
+          class={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"} ${padded ? "p-3" : ""
+            }`}
+          loading="lazy"
+        />
+      </div>
     );
   }
 
@@ -188,6 +195,8 @@ function IngredientCard(props: {
         className="h-28 w-full"
         rounded="rounded-[18px]"
         labelSize="text-base"
+        fit="contain"
+        padded
       />
 
       <div class="mt-3 flex items-start justify-between gap-3">
