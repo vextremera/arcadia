@@ -28,6 +28,7 @@ import {
   LoyaltyLedger,
   MenuDish,
   MenuDishAssignment,
+  LoyaltyTier,
   eq,
 } from "astro:db";
 
@@ -463,6 +464,37 @@ export default async function seed() {
   await db.delete(Ingredient);
 
   await db.delete(Category);
+
+  const existingTiers = await db.select({ id: LoyaltyTier.id }).from(LoyaltyTier);
+
+  if (existingTiers.length === 0) {
+    await db.insert(LoyaltyTier).values([
+      {
+        id: 1,
+        name: "Bronce",
+        minPoints: 0,
+        perks: { badge: "Bronce" },
+        active: true,
+        sortOrder: 10,
+      },
+      {
+        id: 2,
+        name: "Plata",
+        minPoints: 1000,
+        perks: { badge: "Plata" },
+        active: true,
+        sortOrder: 20,
+      },
+      {
+        id: 3,
+        name: "Oro",
+        minPoints: 3000,
+        perks: { badge: "Oro" },
+        active: true,
+        sortOrder: 30,
+      },
+    ]);
+  }
 
   // -----------------------
   // Admin default (solo si no existe)

@@ -12,6 +12,7 @@ import {
   UserProfile,
 } from "astro:db";
 import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
+import { reverseRemainingOrderPointsOnce } from "@/server/loyalty/engine";
 
 type OrderStatus =
   | "PENDING"
@@ -154,11 +155,6 @@ function appendAdminEvent(
   snapshot.adminEvents = list.slice(-60);
 }
 
-function calcPointsFromSubtotal(subtotalCents: number) {
-  const POINTS_PER_EURO = 10;
-  return Math.max(0, Math.floor((Number(subtotalCents) * POINTS_PER_EURO) / 100));
-}
-
 async function getNextLedgerId() {
   const rows = await db.select({ id: LoyaltyLedger.id }).from(LoyaltyLedger);
   return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
@@ -250,58 +246,6 @@ async function insertLedgerEntry(input: {
   });
 
   return nextLedgerId;
-}
-
-async function awardXpOnce(params: {
-  orderId: number;
-  userId: number;
-  subtotalCents: number;
-  paymentMethod: "CASH" | "CARD";
-}) {
-  const { orderId, userId, subtotalCents, paymentMethod } = params;
-
-  const [exists] = await db
-    .select({ id: LoyaltyLedger.id })
-    .from(LoyaltyLedger)
-    .where(
-      and(
-        eq(LoyaltyLedger.userId, userId),
-        eq(LoyaltyLedger.orderId, orderId),
-        eq(LoyaltyLedger.reason, "ORDER_PAID")
-      )
-    )
-    .limit(1);
-
-  if (exists) return null;
-
-  const points = calcPointsFromSubtotal(subtotalCents);
-  if (points <= 0) return null;
-
-  await insertLedgerEntry({
-    userId,
-    orderId,
-    pointsDelta: points,
-    reason: "ORDER_PAID",
-    meta: {
-      paymentMethod,
-      awardedAt: new Date().toISOString(),
-    },
-  });
-
-  const profile = await getOrCreateProfile(userId);
-  if (!profile) return null;
-
-  const current = Number(profile.pointsBalance ?? 0);
-  const next = current + points;
-
-  await db
-    .update(UserProfile)
-    .set({ pointsBalance: next, updatedAt: new Date() })
-    .where(eq(UserProfile.id, profile.id));
-
-  await recomputeTier(profile.id, next);
-
-  return { awardedPoints: points };
 }
 
 function mapOrderPaymentToPaymentStatus(status: OrderPaymentStatus) {
@@ -424,17 +368,17 @@ async function getOrderPaymentsAndRefunds(orderId: number) {
 
   const refunds = paymentIds.length
     ? await db
-        .select({
-          id: Refund.id,
-          paymentId: Refund.paymentId,
-          status: Refund.status,
-          amountCents: Refund.amountCents,
-          raw: Refund.raw,
-          createdAt: Refund.createdAt,
-        })
-        .from(Refund)
-        .where(inArray(Refund.paymentId, paymentIds))
-        .orderBy(Refund.createdAt)
+      .select({
+        id: Refund.id,
+        paymentId: Refund.paymentId,
+        status: Refund.status,
+        amountCents: Refund.amountCents,
+        raw: Refund.raw,
+        createdAt: Refund.createdAt,
+      })
+      .from(Refund)
+      .where(inArray(Refund.paymentId, paymentIds))
+      .orderBy(Refund.createdAt)
     : [];
 
   return { payments, refunds };
@@ -864,33 +808,40 @@ export const POST: APIRoute = async (context) => {
 
   let loyaltyRefundSync:
     | {
-        refundedCents: number;
-        appliedPoints: number;
-        targetRefundPoints: number;
-        alreadyRefundedPoints: number;
-      }
+      refundedCents: number;
+      appliedPoints: number;
+      targetRefundPoints: number;
+      alreadyRefundedPoints: number;
+    }
+    | null = null;
+
+  let loyaltyCancelSync:
+    | {
+      reversedPoints: number;
+      alreadyBalanced: boolean;
+      beforePoints: number;
+      afterPoints: number;
+      afterTierId: number | null;
+      afterTierName: string | null;
+    }
     | null = null;
 
   try {
     if (order.userId && method) {
       const userId = Number(order.userId);
 
-      const shouldAwardCard =
-        method === "CARD" &&
-        nextPayment === "PAID" &&
-        String(order.paymentStatus) !== "PAID";
+      const shouldReverseOnCancel =
+        nextStatus === "CANCELLED" && String(order.status) !== "CANCELLED";
 
-      const shouldAwardCash =
-        method === "CASH" &&
-        nextStatus === "DELIVERED" &&
-        String(order.status) !== "DELIVERED";
-
-      if (shouldAwardCard || shouldAwardCash) {
-        await awardXpOnce({
+      if (shouldReverseOnCancel) {
+        loyaltyCancelSync = await reverseRemainingOrderPointsOnce({
           orderId: order.id,
           userId,
-          subtotalCents: Number(order.subtotalCents ?? 0),
-          paymentMethod: method,
+          meta: {
+            actor,
+            source: "admin-status-cancelled",
+            cancelledAt: new Date().toISOString(),
+          },
         });
       }
 
@@ -909,6 +860,16 @@ export const POST: APIRoute = async (context) => {
     }
   } catch (error) {
     console.error("[loyalty] sync failed", error);
+  }
+
+  if (loyaltyCancelSync && loyaltyCancelSync.reversedPoints > 0) {
+    appendAdminEvent(snapshot, {
+      kind: "NOTE",
+      title: "Ajuste loyalty por cancelación",
+      detail: `-${loyaltyCancelSync.reversedPoints} pts por cancelación del pedido`,
+      by: actor,
+    });
+    snapshotChanged = true;
   }
 
   if (loyaltyRefundSync) {

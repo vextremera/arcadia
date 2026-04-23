@@ -20,6 +20,27 @@ type Availability = {
   };
 };
 
+type LoyaltySummaryResponse = {
+  ok: boolean;
+  current?: {
+    pointsBalance: number;
+    currentTier: { id: number; name: string; minPoints: number } | null;
+    nextTier: { id: number; name: string; minPoints: number } | null;
+    pointsToNext: number;
+    progressPercent: number;
+  };
+  projected?: {
+    gainPoints: number;
+    pointsBalance: number;
+    currentTier: { id: number; name: string; minPoints: number } | null;
+    nextTier: { id: number; name: string; minPoints: number } | null;
+    pointsToNext: number;
+    progressPercent: number;
+    levelUp: boolean;
+  };
+  error?: string;
+};
+
 type CartResponse = {
   currency: "EUR";
   items: Array<{
@@ -120,6 +141,8 @@ const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
 export default function CheckoutForm() {
   const [cart, setCart] = useState<CartResponse | null>(null);
   const [avail, setAvail] = useState<Availability | null>(null);
+
+  const [loyaltySummary, setLoyaltySummary] = useState<LoyaltySummaryResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -327,6 +350,26 @@ export default function CheckoutForm() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !cart) {
+      setLoyaltySummary(null);
+      return;
+    }
+
+    let alive = true;
+
+    safeJson<LoyaltySummaryResponse>(
+      `/api/account/loyalty-summary?subtotalCents=${cart.subtotalCents}`,
+    ).then((data) => {
+      if (!alive) return;
+      if (data?.ok) setLoyaltySummary(data);
+    });
+
+    return () => {
+      alive = false;
+    };
+  }, [isLoggedIn, cart?.subtotalCents]);
 
   useEffect(() => {
     if (type !== "DELIVERY") {
@@ -850,6 +893,59 @@ export default function CheckoutForm() {
               <span class="font-semibold text-emerald-700">
                 - {money(couponPreview.discountCents)}
               </span>
+            </div>
+          ) : null}
+
+          {loyaltySummary?.ok && loyaltySummary.current && loyaltySummary.projected ? (
+            <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                    Loyalty
+                  </div>
+                  <div class="mt-1 text-sm font-semibold text-zinc-900">
+                    {loyaltySummary.current.currentTier?.name ?? "Sin nivel"}
+                  </div>
+                </div>
+
+                <div class="text-right">
+                  <div class="text-xs text-zinc-600">Ganarás</div>
+                  <div class="text-lg font-black text-amber-700">
+                    +{loyaltySummary.projected.gainPoints} pts
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 h-3 overflow-hidden rounded-full bg-white/80">
+                <div
+                  class="h-full rounded-full bg-zinc-900 transition-all duration-500"
+                  style={{ width: `${loyaltySummary.projected.progressPercent}%` }}
+                />
+              </div>
+
+              <div class="mt-3 flex items-start justify-between gap-3 text-xs sm:text-sm">
+                <div class="text-zinc-700">
+                  Ahora: <b>{loyaltySummary.current.pointsBalance} pts</b>
+                </div>
+                <div class="text-right text-zinc-700">
+                  Después: <b>{loyaltySummary.projected.pointsBalance} pts</b>
+                </div>
+              </div>
+
+              <div class="mt-2 text-xs text-zinc-700 sm:text-sm">
+                {loyaltySummary.projected.levelUp ? (
+                  <span>
+                    Subes a <b>{loyaltySummary.projected.currentTier?.name}</b> con este pedido.
+                  </span>
+                ) : loyaltySummary.projected.nextTier ? (
+                  <span>
+                    Te faltarán <b>{loyaltySummary.projected.pointsToNext} pts</b> para{" "}
+                    <b>{loyaltySummary.projected.nextTier.name}</b>.
+                  </span>
+                ) : (
+                  <span>Ya estás en el nivel más alto.</span>
+                )}
+              </div>
             </div>
           ) : null}
 

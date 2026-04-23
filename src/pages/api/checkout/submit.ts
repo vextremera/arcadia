@@ -22,6 +22,7 @@ import { validateCheckoutCoupon } from "@/server/checkout/coupons";
 import { normalizePaymentMethod } from "@/server/payments/settings";
 import { randomUUID } from "node:crypto";
 import { validateDeliveryAddressByArea } from "@/server/delivery/area";
+import { awardOrderPointsOnce } from "@/server/loyalty/engine";
 
 type CartItemSession = {
   lineId: string;
@@ -556,6 +557,18 @@ export const POST: APIRoute = async ({ request, session }) => {
       .where(eq(Coupon.id, couponId));
   }
 
+  let loyaltyAward:
+    | {
+      awardedPoints: number;
+      alreadyAwarded: boolean;
+      beforePoints: number;
+      afterPoints: number;
+      beforeTierId: number | null;
+      afterTierId: number | null;
+      afterTierName: string | null;
+    }
+    | null = null;
+
   let savedAddressId: number | null = null;
 
   if (saveAddress && type === "DELIVERY" && authUser?.role === "CUSTOMER") {
@@ -671,6 +684,23 @@ export const POST: APIRoute = async ({ request, session }) => {
     }
   }
 
+  if (authUser?.role === "CUSTOMER") {
+    try {
+      loyaltyAward = await awardOrderPointsOnce({
+        orderId: created.id,
+        userId: authUser.id,
+        subtotalCents,
+        paymentMethod: pm,
+        meta: {
+          publicId,
+          orderType: type,
+        },
+      });
+    } catch (error) {
+      console.error("[loyalty] award on checkout failed", error);
+    }
+  }
+
   await session.delete("cart");
 
   return json({
@@ -683,5 +713,6 @@ export const POST: APIRoute = async ({ request, session }) => {
     couponCode: couponCode || null,
     discountCents,
     savedAddressId,
+    loyalty: loyaltyAward,
   });
 };

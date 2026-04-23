@@ -1,6 +1,11 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
-import { db, Order, OrderItem, eq } from "astro:db";
+import OrderLoyaltyCelebration from "@/islands/loyalty/OrderLoyaltyCelebration";
+import { db, Order, OrderItem, LoyaltyLedger, UserProfile, eq } from "astro:db";
+import {
+  buildLoyaltyProgress,
+  getActiveLoyaltyTiers,
+} from "@/server/loyalty/progress";
 
 const publicId = String(Astro.params.publicId ?? "").trim();
 if (!publicId) return new Response("Missing publicId", { status: 400 });
@@ -43,19 +48,141 @@ const forcedReason = meta?.forcedReason ?? null;
 const address = meta?.address ?? null;
 
 const isDelivery = order.type === "DELIVERY";
+
+let loyaltyView: {
+  awardedPoints: number;
+  beforePoints: number;
+  afterPoints: number;
+  beforeTierName: string | null;
+  afterTierName: string | null;
+  beforeProgressPercent: number;
+  afterProgressPercent: number;
+  pointsToNext: number;
+} | null = null;
+
+if (order.userId) {
+  const userId = Number(order.userId);
+
+  const allLedger = await db
+    .select({
+      id: LoyaltyLedger.id,
+      orderId: LoyaltyLedger.orderId,
+      reason: LoyaltyLedger.reason,
+      pointsDelta: LoyaltyLedger.pointsDelta,
+      createdAt: LoyaltyLedger.createdAt,
+    })
+    .from(LoyaltyLedger)
+    .where(eq(LoyaltyLedger.userId, userId));
+
+  const sortedLedger = [...allLedger].sort((a, b) => {
+    const da = new Date(a.createdAt as any).getTime();
+    const dbb = new Date(b.createdAt as any).getTime();
+    if (da !== dbb) return da - dbb;
+    return Number(a.id) - Number(b.id);
+  });
+
+  const orderAwardEntries = sortedLedger.filter(
+    (entry) =>
+      Number(entry.orderId ?? 0) === Number(order.id) &&
+      entry.reason === "ORDER_PAID",
+  );
+
+  const orderRefundEntries = sortedLedger.filter(
+    (entry) =>
+      Number(entry.orderId ?? 0) === Number(order.id) &&
+      entry.reason === "ORDER_REFUND",
+  );
+
+  const awardedPoints = orderAwardEntries.reduce(
+    (sum, entry) => sum + Math.max(0, Number(entry.pointsDelta ?? 0)),
+    0,
+  );
+
+  const refundedPoints = orderRefundEntries.reduce(
+    (sum, entry) => sum + Math.max(0, -Number(entry.pointsDelta ?? 0)),
+    0,
+  );
+
+  const netOrderPoints = Math.max(0, awardedPoints - refundedPoints);
+
+  if (awardedPoints > 0) {
+    const firstAwardId = Number(orderAwardEntries[0]?.id ?? 0);
+
+    let beforePoints = 0;
+    for (const entry of sortedLedger) {
+      if (Number(entry.id) === firstAwardId) break;
+      beforePoints += Number(entry.pointsDelta ?? 0);
+    }
+    beforePoints = Math.max(0, beforePoints);
+
+    const afterPoints = Math.max(0, beforePoints + netOrderPoints);
+    const tiers = await getActiveLoyaltyTiers();
+    const beforeProgress = buildLoyaltyProgress(beforePoints, tiers);
+    const afterProgress = buildLoyaltyProgress(afterPoints, tiers);
+
+    loyaltyView = {
+      awardedPoints: netOrderPoints,
+      beforePoints,
+      afterPoints,
+      beforeTierName: beforeProgress.currentTier?.name ?? null,
+      afterTierName: afterProgress.currentTier?.name ?? null,
+      beforeProgressPercent: beforeProgress.progressPercent,
+      afterProgressPercent: afterProgress.progressPercent,
+      pointsToNext: afterProgress.pointsToNext,
+    };
+  } else {
+    const [profile] = await db
+      .select({
+        id: UserProfile.id,
+        pointsBalance: UserProfile.pointsBalance,
+      })
+      .from(UserProfile)
+      .where(eq(UserProfile.userId, userId))
+      .limit(1);
+
+    if (profile) {
+      const tiers = await getActiveLoyaltyTiers();
+      const progress = buildLoyaltyProgress(
+        Number(profile.pointsBalance ?? 0),
+        tiers,
+      );
+
+      loyaltyView = {
+        awardedPoints: 0,
+        beforePoints: Number(profile.pointsBalance ?? 0),
+        afterPoints: Number(profile.pointsBalance ?? 0),
+        beforeTierName: progress.currentTier?.name ?? null,
+        afterTierName: progress.currentTier?.name ?? null,
+        beforeProgressPercent: progress.progressPercent,
+        afterProgressPercent: progress.progressPercent,
+        pointsToNext: progress.pointsToNext,
+      };
+    }
+  }
+}
 ---
 
 <SiteLayout title={`Pedido ${order.publicId} · Arcadia`}>
   <style>
     @media print {
-      header, nav, .no-print { display: none !important; }
-      main { max-width: 320px !important; }
-      body { background: white !important; }
+      header,
+      nav,
+      .no-print {
+        display: none !important;
+      }
+      main {
+        max-width: 320px !important;
+      }
+      body {
+        background: white !important;
+      }
     }
   </style>
 
   <div class="mx-auto w-full max-w-5xl 2xl:max-w-6xl">
-    <div class="flex flex-col items-stretch justify-between gap-3 no-print sm:flex-row sm:items-center">
+    <div
+      class="flex flex-col items-stretch justify-between gap-3 no-print sm:flex-row sm:items-center"
+    >
       <h1 class="text-2xl font-semibold tracking-tight">Pedido confirmado</h1>
 
       <button
@@ -67,107 +194,169 @@ const isDelivery = order.type === "DELIVERY";
       </button>
     </div>
 
-    <main class="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 2xl:p-6">
-      <div class="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-baseline sm:gap-3">
+    <main
+      class="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 2xl:p-6"
+    >
+      <div
+        class="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-baseline sm:gap-3"
+      >
         <div class="text-sm text-zinc-600">Número de pedido</div>
         <div class="font-mono text-lg font-black">{order.publicId}</div>
       </div>
 
-      <div class="mt-2 flex flex-col items-start gap-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div
+        class="mt-2 flex flex-col items-start gap-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+      >
         <div class="text-zinc-600">{fmtDate(order.createdAt)}</div>
-        <div class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700">
+        <div
+          class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700"
+        >
           {order.type}
         </div>
       </div>
 
-      <div class="mt-2 flex flex-col items-start justify-between gap-1 text-sm sm:flex-row sm:items-center sm:gap-3">
+      <div
+        class="mt-2 flex flex-col items-start justify-between gap-1 text-sm sm:flex-row sm:items-center sm:gap-3"
+      >
         <div class="text-zinc-600">Pago</div>
         <div class="font-semibold">{paymentMethod ?? "—"}</div>
       </div>
 
-      {forcedPickup ? (
-        <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          <b>Reparto no disponible:</b> pedido pasado a <b>RECOGIDA</b>.
-          {forcedReason ? <div class="mt-1 text-xs">{forcedReason}</div> : null}
-        </div>
-      ) : null}
-
-      {isDelivery && address ? (
-        <div class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
-          <div class="text-sm font-semibold">Dirección</div>
-          <div class="mt-1 text-sm text-zinc-700">
-            <div>{address.line1}{address.line2 ? `, ${address.line2}` : ""}</div>
-            <div>{address.postalCode} {address.city}</div>
-            {address.notes ? <div class="mt-1 text-xs">Notas: {address.notes}</div> : null}
+      {
+        forcedPickup ? (
+          <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <b>Reparto no disponible:</b> pedido pasado a <b>RECOGIDA</b>.
+            {forcedReason ? (
+              <div class="mt-1 text-xs">{forcedReason}</div>
+            ) : null}
           </div>
-        </div>
-      ) : null}
+        ) : null
+      }
+
+      {
+        loyaltyView && loyaltyView.awardedPoints > 0 ? (
+          <div class="mt-5">
+            <OrderLoyaltyCelebration
+              client:load
+              awardedPoints={loyaltyView.awardedPoints}
+              beforePoints={loyaltyView.beforePoints}
+              afterPoints={loyaltyView.afterPoints}
+              beforeTierName={loyaltyView.beforeTierName}
+              afterTierName={loyaltyView.afterTierName}
+              beforeProgressPercent={loyaltyView.beforeProgressPercent}
+              afterProgressPercent={loyaltyView.afterProgressPercent}
+              pointsToNext={loyaltyView.pointsToNext}
+            />
+          </div>
+        ) : null
+      }
+
+      {
+        isDelivery && address ? (
+          <div class="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+            <div class="text-sm font-semibold">Dirección</div>
+            <div class="mt-1 text-sm text-zinc-700">
+              <div>
+                {address.line1}
+                {address.line2 ? `, ${address.line2}` : ""}
+              </div>
+              <div>
+                {address.postalCode} {address.city}
+              </div>
+              {address.notes ? (
+                <div class="mt-1 text-xs">Notas: {address.notes}</div>
+              ) : null}
+            </div>
+          </div>
+        ) : null
+      }
 
       <div class="mt-5 border-t border-zinc-200 pt-4">
         <div class="text-sm font-semibold">Items</div>
 
         <div class="mt-3 space-y-3">
-          {items.map((item) => {
-            const modifiers: any = (item as any).modifiers ?? {};
-            const options = modifiers.modifierOptions ?? [];
-            const added = modifiers.ingredientsAdded ?? [];
-            const removed = modifiers.ingredientsRemoved ?? [];
+          {
+            items.map((item) => {
+              const modifiers: any = (item as any).modifiers ?? {};
+              const options = modifiers.modifierOptions ?? [];
+              const added = modifiers.ingredientsAdded ?? [];
+              const removed = modifiers.ingredientsRemoved ?? [];
 
-            return (
-              <div class="rounded-xl border border-zinc-200 p-3 sm:p-4">
-                <div class="flex items-start justify-between gap-3 sm:items-baseline">
-                  <div class="min-w-0">
-                    <div class="truncate font-semibold">
-                      {item.qty}× {item.nameSnapshot}
-                      {item.variantSnapshot ? (
-                        <span class="ml-1 text-xs font-normal text-zinc-600">
-                          ({item.variantSnapshot})
-                        </span>
+              return (
+                <div class="rounded-xl border border-zinc-200 p-3 sm:p-4">
+                  <div class="flex items-start justify-between gap-3 sm:items-baseline">
+                    <div class="min-w-0">
+                      <div class="truncate font-semibold">
+                        {item.qty}× {item.nameSnapshot}
+                        {item.variantSnapshot ? (
+                          <span class="ml-1 text-xs font-normal text-zinc-600">
+                            ({item.variantSnapshot})
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {options.length || added.length || removed.length ? (
+                        <div class="mt-2 space-y-1 text-xs text-zinc-700">
+                          {options.length ? (
+                            <div>
+                              <b>Extras:</b>{" "}
+                              {options.map((x: any) => x.name).join(", ")}
+                            </div>
+                          ) : null}
+                          {added.length ? (
+                            <div>
+                              <b>Añadir:</b>{" "}
+                              {added.map((x: any) => x.name).join(", ")}
+                            </div>
+                          ) : null}
+                          {removed.length ? (
+                            <div>
+                              <b>Quitar:</b>{" "}
+                              {removed.map((x: any) => x.name).join(", ")}
+                            </div>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
 
-                    {(options.length || added.length || removed.length) ? (
-                      <div class="mt-2 space-y-1 text-xs text-zinc-700">
-                        {options.length ? (
-                          <div><b>Extras:</b> {options.map((x: any) => x.name).join(", ")}</div>
-                        ) : null}
-                        {added.length ? (
-                          <div><b>Añadir:</b> {added.map((x: any) => x.name).join(", ")}</div>
-                        ) : null}
-                        {removed.length ? (
-                          <div><b>Quitar:</b> {removed.map((x: any) => x.name).join(", ")}</div>
-                        ) : null}
-                      </div>
-                    ) : null}
+                    <div class="shrink-0 font-black">
+                      {money(item.lineTotalCents)}
+                    </div>
                   </div>
-
-                  <div class="shrink-0 font-black">{money(item.lineTotalCents)}</div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          }
         </div>
       </div>
 
-      {(order as any).notes ? (
-        <div class="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
-          <div class="text-sm font-semibold">Notas</div>
-          <div class="mt-1 text-sm text-zinc-700">{(order as any).notes}</div>
-        </div>
-      ) : null}
+      {
+        (order as any).notes ? (
+          <div class="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 p-3 sm:p-4">
+            <div class="text-sm font-semibold">Notas</div>
+            <div class="mt-1 text-sm text-zinc-700">{(order as any).notes}</div>
+          </div>
+        ) : null
+      }
 
       <div class="mt-5 border-t border-zinc-200 pt-4">
         <div class="flex items-center justify-between gap-3 text-sm">
           <span class="text-zinc-600">Subtotal</span>
-          <span class="font-semibold">{money((order as any).subtotalCents)}</span>
+          <span class="font-semibold"
+            >{money((order as any).subtotalCents)}</span
+          >
         </div>
 
-        {isDelivery ? (
-          <div class="mt-1 flex items-center justify-between gap-3 text-sm">
-            <span class="text-zinc-600">Delivery</span>
-            <span class="font-semibold">{money(Number(order.deliveryFeeCents ?? 0))}</span>
-          </div>
-        ) : null}
+        {
+          isDelivery ? (
+            <div class="mt-1 flex items-center justify-between gap-3 text-sm">
+              <span class="text-zinc-600">Delivery</span>
+              <span class="font-semibold">
+                {money(Number(order.deliveryFeeCents ?? 0))}
+              </span>
+            </div>
+          ) : null
+        }
 
         <div class="mt-3 flex items-center justify-between gap-3 text-base">
           <span class="font-black">TOTAL</span>
