@@ -12,8 +12,11 @@
     "preview": "astro preview",
     "db:push": "astro db push",
     "db:seed": "astro db execute db/seed.ts",
+    "db:bootstrap": "astro db execute db/bootstrap.ts",
     "db:push:remote": "astro db push --remote",
-    "db:seed:remote": "astro db execute db/seed.ts --remote"
+    "db:seed:remote": "astro db execute db/seed.ts --remote",
+    "db:bootstrap:remote": "astro db execute db/bootstrap.ts --remote",
+    "build:vercel": "npm run db:push:remote && npm run db:bootstrap:remote && astro build --remote"
   },
   "dependencies": {
     "@astrojs/db": "^0.20.1",
