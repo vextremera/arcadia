@@ -1,65 +1,110 @@
 ---
+const DOMICILIO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="72px" viewBox="0 -960 960 960" width="72px" fill="#FFFFFF"><path d="m120-80 162-650-2-28q-1-17-12-29.5T240-800q-17 0-28.5 11.5T200-760v80h-80v-80q0-50 35-85t85-35h442q48 0 82.5 32.5T802-767l38 687H120Zm104-80h93l-19-304-74 304Zm174 0h358l-34-602q-1-16-12.5-27T682-800H353q4 10 5 19.5t2 20.5l38 600Zm122-80h60v-160q26-6 43-27.5t17-49.5v-163h-40v151h-30v-151h-40v151h-30v-151h-40v163q0 28 17 49.5t43 27.5v160Zm-122 80h358-358Z"/></svg>`;
 const BOOK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="72px" viewBox="0 -960 960 960" width="72px" fill="#FFFFFF"><path d="M560-564v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-600q-38 0-73 9.5T560-564Zm0 220v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-380q-38 0-73 9t-67 27Zm0-110v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-490q-38 0-73 9.5T560-454ZM260-320q47 0 91.5 10.5T440-278v-394q-41-24-87-36t-93-12q-36 0-71.5 7T120-692v396q35-12 69.5-18t70.5-6Zm260 42q44-21 88.5-31.5T700-320q36 0 70.5 6t69.5 18v-396q-33-14-68.5-21t-71.5-7q-47 0-93 12t-87 36v394Zm-40 118q-48-38-104-59t-116-21q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740q51-30 106.5-45T700-800q52 0 102 12t96 36q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-60 0-116 21t-104 59ZM280-494Z"/></svg>`;
 const MENU_SVG = `<svg xmlns="http://www.w3.org/2000/svg" height="72px" viewBox="0 -960 960 960" width="72px" fill="#FFFFFF"><path d="M240-80q-33 0-56.5-23.5T160-160v-80h-40v-80h40v-120h-40v-80h40v-120h-40v-80h40v-80q0-33 23.5-56.5T240-880h480q33 0 56.5 23.5T800-800v640q0 33-23.5 56.5T720-80H240Zm0-80h480v-640H240v80h40v80h-40v120h40v80h-40v120h40v80h-40v80Zm0 0v-640 640Zm140-120h60v-160q26-7 43-28.5t17-48.5v-163h-40v151h-30v-151h-40v151h-30v-151h-40v163q0 27 17 48.5t43 28.5v160Zm220 0h60v-400q-50 0-85 35t-35 85v120h60v160Z"/></svg>`;
 const cartaBg = "/images/general/menu-bg.webp";
 ---
 
-<section class="home-tiles w-full">
-  <div class="grid w-full grid-cols-1 md:grid-cols-2">
-    <a
-      href="/pedir"
-      class="home-tiles__tile home-tiles__tile--carta relative aspect-6/5 w-full overflow-hidden border-110 border-zinc-900 text-white rounded-t-[3rem] rounded-b-none md:aspect-square md:rounded-tl-[50px] md:rounded-bl-md md:rounded-tr-none md:rounded-br-none hover:border-0 hover:opacity-95 transition-border duration-600"
-      style={`background-image: url('${cartaBg}'); background-size: cover; background-position: center; background-repeat: no-repeat;`}
-    >
-      <div
-        class="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.60),rgba(0,0,0,0.25))]"
+<section class="w-full">
+  <div class="mx-auto w-full max-w-340 px-4 sm:px-6">
+    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <a
+        href="/pedir"
+        class="group relative isolate overflow-hidden rounded-[28px] border border-[#8f1d1d]/20 bg-[#8f1d1d] text-white shadow-[0_16px_40px_rgba(0,0,0,0.1)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(0,0,0,0.16)] aspect-[6/5] sm:aspect-[5/4] xl:aspect-[11/9]"
       >
-      </div>
-      <div
-        class="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.18),transparent_55%)]"
-      >
-      </div>
+        <div
+          class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.14),transparent_40%)]"
+        >
+        </div>
+        <div
+          class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.14))]"
+        >
+        </div>
 
-      <div class="relative grid h-full w-full place-items-center px-4">
-        <div class="text-center">
+        <div
+          class="relative flex h-full w-full flex-col items-center justify-center px-6 py-8 text-center sm:px-8"
+        >
           <div
-            class="mx-auto grid h-16 w-16 place-items-center rounded-3xl sm:h-20 sm:w-20"
+            class="grid h-16 w-16 place-items-center rounded-[22px] border border-white/15 bg-black/10 backdrop-blur-sm sm:h-20 sm:w-20"
+          >
+            <div set:html={DOMICILIO_SVG} />
+          </div>
+          <div
+            class="mt-4 text-3xl tracking-[0.14em] text-white sigmar-regular sm:text-4xl"
+          >
+            DOMICILIO
+          </div>
+          <p
+            class="mt-3 max-w-[24rem] text-sm leading-6 text-white/85 sm:text-base"
+          >
+            Haz tu pedido para recibirlo cómodamente donde quieras.
+          </p>
+        </div>
+      </a>
+      <a
+        href="/pedir"
+        class="group relative isolate overflow-hidden rounded-[28px] border border-zinc-900/10 text-white shadow-[0_16px_40px_rgba(0,0,0,0.08)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)] aspect-[6/5] sm:aspect-[5/4] xl:aspect-[11/9]"
+        style={`background-image: url('${cartaBg}'); background-size: cover; background-position: center; background-repeat: no-repeat;`}
+      >
+        <div class="absolute inset-0 bg-black/45"></div>
+        <div
+          class="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.16),transparent_38%)]"
+        >
+        </div>
+
+        <div
+          class="relative flex h-full w-full flex-col items-center justify-center px-6 py-8 text-center sm:px-8"
+        >
+          <div
+            class="grid h-16 w-16 place-items-center rounded-[22px] border border-white/15 bg-white/10 backdrop-blur-sm sm:h-20 sm:w-20"
             set:html={BOOK_SVG}
           />
-          <div class="mt-3 text-xl font-normal sigmar-regular tracking-widest sm:mt-4 sm:text-2xl">
+          <div
+            class="mt-4 text-3xl tracking-[0.14em] text-white sigmar-regular sm:text-4xl"
+          >
             CARTA
           </div>
+          <p
+            class="mt-3 max-w-[24rem] text-sm leading-6 text-white/85 sm:text-base"
+          >
+            Toda la carta disponible para pedir online de forma rápida y clara.
+          </p>
         </div>
-      </div>
-    </a>
+      </a>
 
-    <a
-      href="/pedir"
-      class="home-tiles__tile home-tiles__tile--menu relative aspect-6/5 w-full border-110 border-accent rounded-b-[3rem] rounded-t-none md:aspect-square md:rounded-br-[50px] md:rounded-tr-md md:rounded-tl-none md:rounded-bl-none bg-bg text-white hover:border-220 transition-border duration-600"
-    >
-      <div class="relative grid h-full w-full place-items-center">
-        <div class="home-tiles__panel grid w-full place-items-center bg-zinc-800 aspect-6/5 md:aspect-square">
-          <div class="text-center px-4">
-            <div
-              class="mx-auto grid h-16 w-16 place-items-center rounded-3xl sm:h-20 sm:w-20"
-              set:html={MENU_SVG}
-            />
-            <div
-              class="mt-3 text-xl font-normal sigmar-regular tracking-widest text-white sm:mt-4 sm:text-2xl"
-            >
-              MENÚ
-            </div>
-          </div>
+      <a
+        href="/pedir"
+        class="group relative isolate overflow-hidden rounded-[28px] border border-white/10 bg-[#111214] text-white shadow-[0_16px_40px_rgba(0,0,0,0.12)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_rgba(0,0,0,0.18)] aspect-[6/5] sm:aspect-[5/4] xl:aspect-[11/9]"
+      >
+        <div
+          class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.06),transparent_38%)]"
+        >
         </div>
-      </div>
-    </a>
+        <div
+          class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.18))]"
+        >
+        </div>
+
+        <div
+          class="relative flex h-full w-full flex-col items-center justify-center px-6 py-8 text-center sm:px-8"
+        >
+          <div
+            class="grid h-16 w-16 place-items-center rounded-[22px] border border-white/10 bg-white/5 backdrop-blur-sm sm:h-20 sm:w-20"
+          >
+            <div set:html={MENU_SVG} />
+          </div>
+          <div
+            class="mt-4 text-3xl tracking-[0.14em] text-white sigmar-regular sm:text-4xl"
+          >
+            MENÚ
+          </div>
+          <p
+            class="mt-3 max-w-[24rem] text-sm leading-6 text-white/80 sm:text-base"
+          >
+            Accede al menú destacado del día con una presentación más directa.
+          </p>
+        </div>
+      </a>
+    </div>
   </div>
 </section>
-
-<style>
-  @media (max-width: 549px) {
-    .home-tiles__tile {
-      border-width: 5rem !important;
-    }
-  }
-</style>
