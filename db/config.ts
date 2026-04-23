@@ -12,13 +12,14 @@ const User = defineTable({
     id: column.number({ primaryKey: true }),
     email: column.text({ unique: true }),
     name: column.text({ optional: true }),
+    googleSub: column.text({ optional: true }),
     passwordHash: column.text(),
     role: column.text({ enum: ["ADMIN", "STAFF", "CUSTOMER"], default: "CUSTOMER" }),
     active: column.boolean({ default: true }),
     createdAt: column.date({ default: NOW }),
     updatedAt: column.date({ default: NOW })
   },
-  indexes: [{ on: "role" }, { on: "active" }]
+  indexes: [{ on: "role" }, { on: "active" }, { on: "googleSub", unique: true }]
 });
 
 const UserProfile = defineTable({

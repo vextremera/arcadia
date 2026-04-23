@@ -26,6 +26,12 @@ function errorMessage(code: string) {
     if (!code) return "";
     if (code === "invalid") return "Usuario o contraseña incorrectos.";
     if (code === "captcha") return "Verifica el captcha para continuar.";
+    if (code === "google_missing") return "Google OAuth no está configurado todavía.";
+    if (code === "google_denied") return "Has cancelado el acceso con Google.";
+    if (code === "google_state") return "La sesión de Google no es válida. Inténtalo de nuevo.";
+    if (code === "google_token") return "No se pudo validar el acceso con Google.";
+    if (code === "google_email") return "Google no devolvió un correo verificado.";
+    if (code === "google_account") return "No se pudo iniciar sesión con esa cuenta de Google.";
     return code;
 }
 
@@ -146,7 +152,11 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                     <button
                         type="button"
                         class="h-10 w-full rounded-xl border border-zinc-300 bg-white text-sm font-semibold text-zinc-800 hover:bg-zinc-50 sm:h-11"
-                        onClick={() => alert("Google OAuth se integrará más adelante.")}
+                        onClick={() => {
+                            const url = new URL("/api/auth/google/start", window.location.origin);
+                            if (next) url.searchParams.set("next", next);
+                            window.location.href = url.toString();
+                        }}
                     >
                         <span class="inline-flex items-center justify-center gap-2 sm:gap-3">
                             <span class="grid h-6 w-6 place-items-center rounded-full bg-white">
@@ -161,15 +171,15 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                                     />
                                     <path
                                         fill="#4CAF50"
-                                        d="M24 44c5.186 0 10.129-1.986 13.78-5.205l-6.36-5.385C29.355 35.091 26.816 36 24 36c-5.284 0-9.77-3.319-11.287-7.946l-6.49 5.002C9.537 39.556 16.227 44 24 44Z"
+                                        d="M24 44c5.186 0 10.129-1.986 13.78-5.205l-6.36-5.385C29.355 35.091 26.816 36 24 36c-5.282 0-9.772-3.328-11.526-8.009l-6.52 5.025C5.273 38.556 14.015 44 24 44Z"
                                     />
                                     <path
                                         fill="#1976D2"
-                                        d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.223 5.41l.003-.002 6.36 5.385C36.992 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917Z"
+                                        d="M43.611 20.083H42V20H24v8h11.303a12.05 12.05 0 0 1-3.883 5.41l.003-.002 6.36 5.385C37.362 38.48 44 33 44 24c0-1.341-.138-2.65-.389-3.917Z"
                                     />
                                 </svg>
                             </span>
-                            Inicia sesión con Google
+                            Iniciar sesión con Google
                         </span>
                     </button>
 
