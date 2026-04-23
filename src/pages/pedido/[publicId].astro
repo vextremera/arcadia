@@ -1,7 +1,7 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
-import OrderLoyaltyCelebration from "@/islands/loyalty/OrderLoyaltyCelebration";
-import { db, Order, OrderItem, LoyaltyLedger, UserProfile, eq } from "astro:db";
+import OrderLoyaltyModal from "@/islands/loyalty/OrderLoyaltyModal";
+import { db, Order, OrderItem, LoyaltyLedger, eq } from "astro:db";
 import {
   buildLoyaltyProgress,
   getActiveLoyaltyTiers,
@@ -46,7 +46,6 @@ const paymentMethod = meta?.paymentMethod ?? null;
 const forcedPickup = !!meta?.forcedPickup;
 const forcedReason = meta?.forcedReason ?? null;
 const address = meta?.address ?? null;
-
 const isDelivery = order.type === "DELIVERY";
 
 let loyaltyView: {
@@ -105,7 +104,7 @@ if (order.userId) {
 
   const netOrderPoints = Math.max(0, awardedPoints - refundedPoints);
 
-  if (awardedPoints > 0) {
+  if (netOrderPoints > 0) {
     const firstAwardId = Number(orderAwardEntries[0]?.id ?? 0);
 
     let beforePoints = 0;
@@ -130,34 +129,6 @@ if (order.userId) {
       afterProgressPercent: afterProgress.progressPercent,
       pointsToNext: afterProgress.pointsToNext,
     };
-  } else {
-    const [profile] = await db
-      .select({
-        id: UserProfile.id,
-        pointsBalance: UserProfile.pointsBalance,
-      })
-      .from(UserProfile)
-      .where(eq(UserProfile.userId, userId))
-      .limit(1);
-
-    if (profile) {
-      const tiers = await getActiveLoyaltyTiers();
-      const progress = buildLoyaltyProgress(
-        Number(profile.pointsBalance ?? 0),
-        tiers,
-      );
-
-      loyaltyView = {
-        awardedPoints: 0,
-        beforePoints: Number(profile.pointsBalance ?? 0),
-        afterPoints: Number(profile.pointsBalance ?? 0),
-        beforeTierName: progress.currentTier?.name ?? null,
-        afterTierName: progress.currentTier?.name ?? null,
-        beforeProgressPercent: progress.progressPercent,
-        afterProgressPercent: progress.progressPercent,
-        pointsToNext: progress.pointsToNext,
-      };
-    }
   }
 }
 ---
@@ -178,6 +149,23 @@ if (order.userId) {
       }
     }
   </style>
+
+  {
+    loyaltyView ? (
+      <OrderLoyaltyModal
+        client:load
+        publicId={order.publicId}
+        awardedPoints={loyaltyView.awardedPoints}
+        beforePoints={loyaltyView.beforePoints}
+        afterPoints={loyaltyView.afterPoints}
+        beforeTierName={loyaltyView.beforeTierName}
+        afterTierName={loyaltyView.afterTierName}
+        beforeProgressPercent={loyaltyView.beforeProgressPercent}
+        afterProgressPercent={loyaltyView.afterProgressPercent}
+        pointsToNext={loyaltyView.pointsToNext}
+      />
+    ) : null
+  }
 
   <div class="mx-auto w-full max-w-5xl 2xl:max-w-6xl">
     <div
@@ -229,24 +217,6 @@ if (order.userId) {
             {forcedReason ? (
               <div class="mt-1 text-xs">{forcedReason}</div>
             ) : null}
-          </div>
-        ) : null
-      }
-
-      {
-        loyaltyView && loyaltyView.awardedPoints > 0 ? (
-          <div class="mt-5">
-            <OrderLoyaltyCelebration
-              client:load
-              awardedPoints={loyaltyView.awardedPoints}
-              beforePoints={loyaltyView.beforePoints}
-              afterPoints={loyaltyView.afterPoints}
-              beforeTierName={loyaltyView.beforeTierName}
-              afterTierName={loyaltyView.afterTierName}
-              beforeProgressPercent={loyaltyView.beforeProgressPercent}
-              afterProgressPercent={loyaltyView.afterProgressPercent}
-              pointsToNext={loyaltyView.pointsToNext}
-            />
           </div>
         ) : null
       }

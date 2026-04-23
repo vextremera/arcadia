@@ -12,6 +12,14 @@ export function calcPointsFromSubtotal(subtotalCents: number) {
     return Math.max(0, Math.floor((Number(subtotalCents) * POINTS_PER_EURO) / 100));
 }
 
+function getRandomLoyaltyMultiplier() {
+    return 1.05 + Math.random() * 0.10;
+}
+
+function applyLoyaltyVariation(basePoints: number, multiplier: number) {
+    return Math.max(0, Math.round(basePoints * multiplier));
+}
+
 async function getNextLedgerId() {
     const rows = await db.select({ id: LoyaltyLedger.id }).from(LoyaltyLedger);
     return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
@@ -149,7 +157,10 @@ export async function awardOrderPointsOnce(params: {
         };
     }
 
-    const points = calcPointsFromSubtotal(subtotalCents);
+    const basePoints = calcPointsFromSubtotal(subtotalCents);
+    const multiplier = getRandomLoyaltyMultiplier();
+    const points = applyLoyaltyVariation(basePoints, multiplier);
+
     const profile = await getOrCreateProfile(userId);
 
     if (!profile || points <= 0) {
@@ -177,6 +188,9 @@ export async function awardOrderPointsOnce(params: {
             source: "checkout-submit",
             paymentMethod: paymentMethod ?? null,
             awardedAt: new Date().toISOString(),
+            basePoints,
+            multiplier: Number(multiplier.toFixed(4)),
+            finalPoints: points,
             ...(params.meta ?? {}),
         },
     });
