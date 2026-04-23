@@ -137,7 +137,6 @@ function resolveIngredientImageUrl(
   slug: string,
   imageIndex: Map<string, string>,
 ) {
-  // 1) Match directo
   const direct = imageIndex.get(slug);
   if (direct) return safeIngredientImageUrl(direct);
 
@@ -147,7 +146,12 @@ function resolveIngredientImageUrl(
 
   const hay = `${name} ${slug}`.toLowerCase();
 
-  // 2) Familias útiles con tus SVG actuales
+  // Salsas genéricas para ingredientes de producto
+  if (isSauceIngredient({ name, slug })) {
+    const file = imageIndex.get("salsas");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
   if (hay.includes("queso")) {
     const file = imageIndex.get("queso");
     if (file) return safeIngredientImageUrl(file);
@@ -158,13 +162,22 @@ function resolveIngredientImageUrl(
     if (file) return safeIngredientImageUrl(file);
   }
 
-  if (hay.includes("lechuga") || hay.includes("brotes-de-lechuga") || hay.includes("brotes-de-ensalada")) {
+  if (
+    hay.includes("lechuga") ||
+    hay.includes("brotes-de-lechuga") ||
+    hay.includes("brotes-de-ensalada")
+  ) {
     const file = imageIndex.get("lechuga");
     if (file) return safeIngredientImageUrl(file);
   }
 
   if (hay.includes("tomate")) {
     const file = imageIndex.get("tomate");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("huevo-duro")) {
+    const file = imageIndex.get("huevo-duro");
     if (file) return safeIngredientImageUrl(file);
   }
 
@@ -193,19 +206,47 @@ function resolveIngredientImageUrl(
     if (file) return safeIngredientImageUrl(file);
   }
 
+  if (hay.includes("pollo")) {
+    const file = imageIndex.get("pollo");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("beicon") || hay.includes("bacon")) {
+    const file = imageIndex.get("beicon");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("frankfurt")) {
+    const file = imageIndex.get("frankfurt");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("jamon") || hay.includes("jamón")) {
+    const file = imageIndex.get("jamon-salado");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("pan-de-molde") || hay.includes("pan-molde")) {
+    const file = imageIndex.get("pan-molde");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
+  if (hay.includes("patatas") || hay.includes("patata")) {
+    const file = imageIndex.get("patatas-fritas");
+    if (file) return safeIngredientImageUrl(file);
+  }
+
   if (
     hay.includes("carne") ||
-    hay.includes("pollo") ||
     hay.includes("hamburguesa") ||
     hay.includes("pulled-pork") ||
     hay.includes("pulled pork") ||
-    hay.includes("bacon") ||
     hay.includes("lomo") ||
     hay.includes("butifarra") ||
     hay.includes("kebab") ||
     hay.includes("pincho") ||
     hay.includes("atun") ||
-    hay.includes("atun") ||
+    hay.includes("atún") ||
     hay.includes("heura") ||
     hay.includes("calamar")
   ) {
@@ -213,7 +254,6 @@ function resolveIngredientImageUrl(
     if (file) return safeIngredientImageUrl(file);
   }
 
-  // 3) Placeholder por defecto
   const placeholder = imageIndex.get("placeholder");
   if (placeholder) return safeIngredientImageUrl(placeholder);
 

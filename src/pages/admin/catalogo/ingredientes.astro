@@ -27,6 +27,7 @@ const ingredients = await db
     id: Ingredient.id,
     name: Ingredient.name,
     slug: Ingredient.slug,
+    imageUrl: Ingredient.imageUrl,
     addPriceDeltaCents: Ingredient.addPriceDeltaCents,
     isCommon: Ingredient.isCommon,
     active: Ingredient.active,
@@ -426,6 +427,24 @@ const summaryCards = [
             />
           </label>
 
+          <label class="block">
+            <span
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+            >
+              Imagen
+            </span>
+            <input
+              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+              type="text"
+              name="imageUrl"
+              placeholder="/images/ingredients/placeholder.svg"
+            />
+            <p class="mt-2 text-xs leading-5 text-slate-500">
+              Ruta pública opcional. Si la dejas vacía, el seed puede volver a
+              autogenerarla.
+            </p>
+          </label>
+
           <div class="grid gap-4 md:grid-cols-2">
             <label class="block">
               <span
@@ -696,66 +715,85 @@ const summaryCards = [
               <section class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.22)] lg:p-6">
                 <div class="flex flex-col gap-5 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-start lg:justify-between">
                   <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-2.5">
-                      <h3 class="text-xl font-semibold tracking-[-0.03em] text-white">
-                        {ingredient.name}
-                      </h3>
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
+                      <div class="h-20 w-20 shrink-0 overflow-hidden rounded-[20px] border border-white/10 bg-white/5">
+                        {ingredient.imageUrl ? (
+                          <img
+                            src={ingredient.imageUrl}
+                            alt={ingredient.name}
+                            class="h-full w-full object-contain p-2"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div class="grid h-full w-full place-items-center text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Sin img
+                          </div>
+                        )}
+                      </div>
 
-                      <code class="rounded-xl border border-white/10 bg-[#07101f] px-3 py-1.5 text-xs text-slate-300">
-                        {ingredient.slug}
-                      </code>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2.5">
+                          <h3 class="text-xl font-semibold tracking-[-0.03em] text-white">
+                            {ingredient.name}
+                          </h3>
 
-                      {ingredient.hasPriceDelta ? (
-                        <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-300">
-                          +{money(ingredient.addPriceDeltaCents)}
-                        </span>
-                      ) : (
-                        <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                          Sin coste extra
-                        </span>
-                      )}
-                    </div>
+                          <code class="rounded-xl border border-white/10 bg-[#07101f] px-3 py-1.5 text-xs text-slate-300">
+                            {ingredient.slug}
+                          </code>
 
-                    <div class="mt-3 flex flex-wrap gap-2.5">
-                      <span
-                        class:list={[
-                          "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                          ingredient.active
-                            ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                            : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                        ]}
-                      >
-                        {ingredient.active ? "Activo" : "Inactivo"}
-                      </span>
+                          {ingredient.hasPriceDelta ? (
+                            <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-300">
+                              +{money(ingredient.addPriceDeltaCents)}
+                            </span>
+                          ) : (
+                            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                              Sin coste extra
+                            </span>
+                          )}
+                        </div>
 
-                      {ingredient.isCommon ? (
-                        <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                          Común
-                        </span>
-                      ) : null}
+                        <div class="mt-3 flex flex-wrap gap-2.5">
+                          <span
+                            class:list={[
+                              "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                              ingredient.active
+                                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+                                : "border-rose-400/20 bg-rose-400/10 text-rose-300",
+                            ]}
+                          >
+                            {ingredient.active ? "Activo" : "Inactivo"}
+                          </span>
 
-                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                        {ingredient.linkedProducts} producto
-                        {ingredient.linkedProducts === 1 ? "" : "s"}
-                      </span>
+                          {ingredient.isCommon ? (
+                            <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
+                              Común
+                            </span>
+                          ) : null}
 
-                      <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                        {ingredient.linkedCategories} categor
-                        {ingredient.linkedCategories === 1 ? "ía" : "ías"}
-                      </span>
+                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                            {ingredient.linkedProducts} producto
+                            {ingredient.linkedProducts === 1 ? "" : "s"}
+                          </span>
 
-                      {ingredient.defaultIncludedIn > 0 ? (
-                        <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-300">
-                          {ingredient.defaultIncludedIn} por defecto
-                        </span>
-                      ) : null}
+                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                            {ingredient.linkedCategories} categor
+                            {ingredient.linkedCategories === 1 ? "ía" : "ías"}
+                          </span>
 
-                      {ingredient.removableIn > 0 ? (
-                        <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
-                          {ingredient.removableIn} removible
-                          {ingredient.removableIn === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
+                          {ingredient.defaultIncludedIn > 0 ? (
+                            <span class="inline-flex items-center rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-300">
+                              {ingredient.defaultIncludedIn} por defecto
+                            </span>
+                          ) : null}
+
+                          {ingredient.removableIn > 0 ? (
+                            <span class="inline-flex items-center rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">
+                              {ingredient.removableIn} removible
+                              {ingredient.removableIn === 1 ? "" : "s"}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -845,7 +883,7 @@ const summaryCards = [
                     value={ingredient.id}
                   />
 
-                  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px_180px_140px]">
+                  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)_180px_140px]">
                     <label class="block">
                       <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                         Nombre
@@ -869,6 +907,19 @@ const summaryCards = [
                         name="slug"
                         value={ingredient.slug}
                         required
+                      />
+                    </label>
+
+                    <label class="block">
+                      <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Imagen
+                      </span>
+                      <input
+                        class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
+                        type="text"
+                        name="imageUrl"
+                        value={ingredient.imageUrl ?? ""}
+                        placeholder="/images/ingredients/placeholder.svg"
                       />
                     </label>
 

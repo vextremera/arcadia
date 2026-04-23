@@ -11,6 +11,11 @@ function safeText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
 }
 
+function safeImageUrl(value: FormDataEntryValue | null) {
+  const raw = safeText(value);
+  return raw || null;
+}
+
 function parseId(value: FormDataEntryValue | null) {
   const n = Number(safeText(value));
   return Number.isFinite(n) ? Math.trunc(n) : null;
@@ -66,6 +71,7 @@ export const POST: APIRoute = async (context) => {
     const name = safeText(form.get("name"));
     const slugInput = safeText(form.get("slug"));
     const slug = slugify(slugInput || name);
+    const imageUrl = safeImageUrl(form.get("imageUrl"));
     const addPriceDeltaCents = parseEuroToCents(form.get("addPriceDeltaEur"));
     const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const isCommon = form.get("isCommon") === "on";
@@ -104,6 +110,7 @@ export const POST: APIRoute = async (context) => {
       id: nextId,
       name,
       slug,
+      imageUrl,
       addPriceDeltaCents,
       isCommon,
       active,
@@ -132,6 +139,7 @@ export const POST: APIRoute = async (context) => {
     const name = safeText(form.get("name"));
     const slugInput = safeText(form.get("slug"));
     const slug = slugify(slugInput || name);
+    const imageUrl = safeImageUrl(form.get("imageUrl"));
     const addPriceDeltaCents = parseEuroToCents(form.get("addPriceDeltaEur"));
     const sortOrder = parseNonNegativeInt(form.get("sortOrder"), 0);
     const isCommon = form.get("isCommon") === "on";
@@ -168,6 +176,7 @@ export const POST: APIRoute = async (context) => {
       .set({
         name,
         slug,
+        imageUrl,
         addPriceDeltaCents,
         isCommon,
         active,
