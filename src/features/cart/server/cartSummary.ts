@@ -23,6 +23,8 @@ type CartItemSession = {
 type ModifierDetail = { id: number; name: string; deltaCents: number; groupName?: string };
 type IngredientDetail = { id: number; name: string; deltaCents: number };
 
+const ADDED_COMMON_INGREDIENT_CENTS = 100;
+
 function money(cents: number) {
     return `${(cents / 100).toFixed(2)} €`;
 }
@@ -143,7 +145,7 @@ export async function getCartSummaryFromSession(session: any) {
             const ing = ingById.get(ingId);
             if (!ing) continue;
 
-            const d = ing.addPriceDeltaCents ?? 0;
+            const d = ADDED_COMMON_INGREDIENT_CENTS;
             addedDelta += d;
 
             addedIngredientDetails.push({

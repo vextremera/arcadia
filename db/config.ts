@@ -130,6 +130,7 @@ const Ingredient = defineTable({
     id: column.number({ primaryKey: true }),
     name: column.text(),
     slug: column.text({ unique: true }),
+    imageUrl: column.text({ optional: true }),
     addPriceDeltaCents: column.number({ default: 0 }),
     isCommon: column.boolean({ default: false }),
     active: column.boolean({ default: true }),

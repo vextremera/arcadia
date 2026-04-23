@@ -35,7 +35,44 @@ import { hashPassword } from "@/server/auth/password";
 
 import { readdir } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+
+const NON_CUSTOMIZABLE_CATEGORY_SLUGS = new Set([
+  "platos-infantiles",
+  "platos-combinados",
+  "tapas",
+  "croquetas",
+  "montaditos",
+]);
+
+function isSauceIngredient(value: { slug?: string | null; name?: string | null }) {
+  const hay = `${value.slug ?? ""} ${value.name ?? ""}`.toLowerCase();
+
+  return [
+    "ketchup",
+    "mayonesa",
+    "mahonesa",
+    "alioli",
+    "barbacoa",
+    "salsa-amarilla",
+    "amarilla",
+    "salsa-cheddar",
+    "cheddar",
+    "salsa-cesar",
+    "cesar",
+    "salsa-griega",
+    "griega",
+    "salsa-sioux",
+    "sioux",
+    "salsa-zen",
+    "zen",
+    "salsa-bhuda",
+    "bhuda",
+    "salsa-cajun",
+    "cajun",
+    "mayo-vegana",
+    "mayo-veggie",
+  ].some((part) => hay.includes(part));
+}
 
 /** Helpers */
 function slugify(input: string) {
@@ -76,8 +113,7 @@ function normalizeSlugForMatch(slug: string) {
 
 /** Construye un índice slug-imagen desde /public/images/products */
 async function buildProductImageIndex() {
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const dir = path.join(__dirname, "..", "public", "images", "products");
+  const dir = path.join(process.cwd(), "public", "images", "products");
 
   let files: string[] = [];
   try {
@@ -89,7 +125,6 @@ async function buildProductImageIndex() {
 
   const map = new Map<string, string>();
 
-  // aliases por typos detectados en tus archivos
   const alias: Record<string, string> = {
     "wrap-flashdance": "wrap-flasdance",
     "wrap-forrest-gump": "wrap-forres-gump",
@@ -97,24 +132,16 @@ async function buildProductImageIndex() {
 
   for (const file of files) {
     if (!/\.(webp|png|jpg|jpeg)$/i.test(file)) continue;
+
     const base = stripExtension(file);
     const imgSlug = slugify(base);
-
-    // guardamos:
-    // - slug normal
-    // - slug normalizado (sin stopwords)
-    // - alias extra para typos
     const norm = normalizeSlugForMatch(imgSlug);
 
     if (!map.has(imgSlug)) map.set(imgSlug, file);
     if (!map.has(norm)) map.set(norm, file);
 
-    // reverse aliases (si el archivo tiene el typo, mapeamos también al correcto)
-    for (const [good, bad] of Object.entries(alias)) {
-      if (imgSlug === bad || norm === bad) {
-        if (!map.has(good)) map.set(good, file);
-      }
-    }
+    const aliased = alias[imgSlug];
+    if (aliased && !map.has(aliased)) map.set(aliased, file);
   }
 
   return map;
@@ -200,6 +227,10 @@ function resolveProductImageUrl(productSlug: string, imageIndex: Map<string, str
 
   if (count === 1 && found) return safeImageUrl(found);
   return null;
+}
+
+function isIngredientCommonForCategory(count: number) {
+  return count >= 2;
 }
 
 /** Seed types */
@@ -540,6 +571,7 @@ export default async function seed() {
     id: nextIngredientId2++,
     name,
     slug,
+    imageUrl: null,
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -992,6 +1024,7 @@ export default async function seed() {
     id: nextIngredientId++,
     name,
     slug,
+    imageUrl: null,
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -1311,6 +1344,7 @@ export default async function seed() {
     id: nextIngredientId4++,
     name,
     slug,
+    imageUrl: null,
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -1794,6 +1828,7 @@ export default async function seed() {
     id: nextIngredientId5++,
     name,
     slug,
+    imageUrl: null,
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -2075,6 +2110,7 @@ export default async function seed() {
     id: nextIngredientId6++,
     name,
     slug,
+    imageUrl: null,
     addPriceDeltaCents: 0,
     isCommon: false,
     active: true,
@@ -2345,5 +2381,175 @@ export default async function seed() {
 
   console.log(
     `✅ Seed completo: productos=${totalProducts.length}, ingredientes=${totalIngredients.length}, producto-alérgeno=${totalLinks.length}`
+  );
+
+  // ----------------------------------------------------------
+  // CategoryIngredient automático
+  // Ingredientes comunes por categoría = ingredientes repetidos
+  // en al menos 2 productos de esa misma categoría
+  // ----------------------------------------------------------
+  const categoryRowsForCommon = await db
+    .select({
+      id: Category.id,
+      slug: Category.slug,
+    })
+    .from(Category);
+
+  const categoryIdToSlug = new Map(
+    categoryRowsForCommon.map((row) => [row.id, row.slug]),
+  );
+
+  const productCategoryRows = await db
+    .select({
+      productId: Product.id,
+      categoryId: Product.categoryId,
+    })
+    .from(Product);
+
+  const productToCategoryId = new Map(
+    productCategoryRows.map((row) => [row.productId, row.categoryId]),
+  );
+
+  const ingredientRowsForCommon = await db
+    .select({
+      id: Ingredient.id,
+      slug: Ingredient.slug,
+      name: Ingredient.name,
+    })
+    .from(Ingredient);
+
+  const ingredientById = new Map(
+    ingredientRowsForCommon.map((row) => [row.id, row]),
+  );
+
+  const productIngredientRows = await db
+    .select({
+      productId: ProductIngredient.productId,
+      ingredientId: ProductIngredient.ingredientId,
+    })
+    .from(ProductIngredient);
+
+  const categoryIngredientCounts = new Map<string, number>();
+
+  for (const row of productIngredientRows) {
+    const categoryId = productToCategoryId.get(row.productId);
+    if (!categoryId) continue;
+
+    const categorySlug = categoryIdToSlug.get(categoryId);
+    if (!categorySlug) continue;
+    if (NON_CUSTOMIZABLE_CATEGORY_SLUGS.has(categorySlug)) continue;
+
+    const ingredient = ingredientById.get(row.ingredientId);
+    if (!ingredient) continue;
+    if (isSauceIngredient(ingredient)) continue;
+
+    const key = `${categoryId}:${row.ingredientId}`;
+    categoryIngredientCounts.set(key, (categoryIngredientCounts.get(key) ?? 0) + 1);
+  }
+
+  const categoryIngredientRows: Array<{ categoryId: number; ingredientId: number }> = [];
+
+  for (const [key, count] of categoryIngredientCounts.entries()) {
+    if (!isIngredientCommonForCategory(count)) continue;
+
+    const [categoryIdRaw, ingredientIdRaw] = key.split(":");
+    const categoryId = Number(categoryIdRaw);
+    const ingredientId = Number(ingredientIdRaw);
+
+    if (!Number.isFinite(categoryId) || !Number.isFinite(ingredientId)) continue;
+
+    categoryIngredientRows.push({ categoryId, ingredientId });
+  }
+
+  if (categoryIngredientRows.length) {
+    await db.insert(CategoryIngredient).values(categoryIngredientRows);
+  }
+
+  const existingGroups = await db
+    .select({ id: ModifierGroup.id, name: ModifierGroup.name })
+    .from(ModifierGroup);
+
+  let nextGroupId = existingGroups.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+
+  const existingOptions = await db
+    .select({ id: ModifierOption.id })
+    .from(ModifierOption);
+
+  let nextOptionId = existingOptions.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+
+  const existingProductModifierGroups = await db
+    .select({ id: ProductModifierGroup.id })
+    .from(ProductModifierGroup);
+
+  let nextProductModifierGroupId =
+    existingProductModifierGroups.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+
+  // Crear grupo Salsas
+  const sauceGroupId = nextGroupId++;
+
+  await db.insert(ModifierGroup).values({
+    id: sauceGroupId,
+    name: "Salsas",
+    minSelect: 0,
+    maxSelect: 20,
+    required: false,
+    sortOrder: 10,
+    active: true,
+  });
+
+  // Crear opciones
+  const sauceOptionsSeed = [
+    "Ketchup",
+    "Mayonesa",
+    "Salsa Amarilla",
+    "Alioli",
+    "Barbacoa",
+    "Salsa Cheddar",
+    "Salsa César",
+    "Salsa Griega",
+    "Salsa Sioux",
+    "Salsa Zen",
+    "Salsa Bhuda",
+    "Salsa Cajún",
+    "Mayo Vegana",
+  ];
+
+  await db.insert(ModifierOption).values(
+    sauceOptionsSeed.map((name, index) => ({
+      id: nextOptionId++,
+      groupId: sauceGroupId,
+      name,
+      priceDeltaCents: 50,
+      sortOrder: index + 1,
+      active: true,
+    })),
+  );
+
+  // Enlazar a todos los productos excepto bebidas
+  const allProducts = await db
+    .select({
+      id: Product.id,
+      categoryId: Product.categoryId,
+    })
+    .from(Product);
+
+  const sauceGroupLinks = allProducts
+    .filter((product) => {
+      const categorySlug = categoryIdToSlug.get(product.categoryId) ?? "";
+      return categorySlug !== "bebidas";
+    })
+    .map((product) => ({
+      id: nextProductModifierGroupId++,
+      productId: product.id,
+      groupId: sauceGroupId,
+      sortOrder: 10,
+    }));
+
+  if (sauceGroupLinks.length > 0) {
+    await db.insert(ProductModifierGroup).values(sauceGroupLinks);
+  }
+
+  console.log(
+    `✅ Seed salsas: grupo=${sauceGroupId}, opciones=${sauceOptionsSeed.length}, enlaces=${sauceGroupLinks.length}`
   );
 }

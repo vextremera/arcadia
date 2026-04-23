@@ -10,10 +10,50 @@ import {
   Ingredient,
   ProductAllergen,
   Allergen,
+  Category,
+  CategoryIngredient,
   eq,
   inArray,
   and,
 } from "astro:db";
+
+const NON_CUSTOMIZABLE_CATEGORY_SLUGS = new Set([
+  "platos-infantiles",
+  "platos-combinados",
+  "tapas",
+  "croquetas",
+  "montaditos",
+]);
+
+function isSauceIngredient(value: { slug?: string | null; name?: string | null }) {
+  const hay = `${value.slug ?? ""} ${value.name ?? ""}`.toLowerCase();
+
+  return [
+    "ketchup",
+    "mayonesa",
+    "mahonesa",
+    "alioli",
+    "barbacoa",
+    "salsa-amarilla",
+    "amarilla",
+    "salsa-cheddar",
+    "cheddar",
+    "salsa-cesar",
+    "cesar",
+    "salsa-griega",
+    "griega",
+    "salsa-sioux",
+    "sioux",
+    "salsa-zen",
+    "zen",
+    "salsa-bhuda",
+    "bhuda",
+    "salsa-cajun",
+    "cajun",
+    "mayo-vegana",
+    "mayo-veggie",
+  ].some((part) => hay.includes(part));
+}
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -39,12 +79,18 @@ export const GET: APIRoute = async ({ params }) => {
       priceCents: Product.priceCents,
       active: Product.active,
       categoryId: Product.categoryId,
+      categorySlug: Category.slug,
     })
     .from(Product)
+    .innerJoin(Category, eq(Product.categoryId, Category.id))
     .where(eq(Product.id, id))
     .limit(1);
 
   if (!product || !product.active) return json({ error: "NOT_FOUND" }, 404);
+
+  const ingredientsCustomizationEnabled = !NON_CUSTOMIZABLE_CATEGORY_SLUGS.has(
+    product.categorySlug,
+  );
 
   const variants = await db
     .select({
@@ -96,46 +142,46 @@ export const GET: APIRoute = async ({ params }) => {
         .where(inArray(ModifierOption.groupId, groupIds))
     : [];
 
-  const productIngredients = await db
-    .select({
-      id: ProductIngredient.id,
-      ingredientId: ProductIngredient.ingredientId,
-      defaultIncluded: ProductIngredient.defaultIncluded,
-      removable: ProductIngredient.removable,
-      sortOrder: ProductIngredient.sortOrder,
-      name: Ingredient.name,
-      slug: Ingredient.slug,
-    })
-    .from(ProductIngredient)
-    .innerJoin(Ingredient, eq(ProductIngredient.ingredientId, Ingredient.id))
-    .where(and(eq(ProductIngredient.productId, id), eq(Ingredient.active, true)))
-    .orderBy(ProductIngredient.sortOrder);
+  const productIngredients = ingredientsCustomizationEnabled
+    ? await db
+      .select({
+        id: ProductIngredient.id,
+        ingredientId: ProductIngredient.ingredientId,
+        defaultIncluded: ProductIngredient.defaultIncluded,
+        removable: ProductIngredient.removable,
+        sortOrder: ProductIngredient.sortOrder,
+        name: Ingredient.name,
+        slug: Ingredient.slug,
+        imageUrl: Ingredient.imageUrl,
+        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+      })
+      .from(ProductIngredient)
+      .innerJoin(Ingredient, eq(ProductIngredient.ingredientId, Ingredient.id))
+      .where(and(eq(ProductIngredient.productId, id), eq(Ingredient.active, true)))
+      .orderBy(ProductIngredient.sortOrder)
+    : [];
 
-  const commonIngredients = await db
-    .select({
-      id: Ingredient.id,
-      name: Ingredient.name,
-      slug: Ingredient.slug,
-      addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-      isCommon: Ingredient.isCommon,
-      active: Ingredient.active,
-    })
-    .from(Ingredient)
-    .where(and(eq(Ingredient.active, true), eq(Ingredient.isCommon, true)))
-    .orderBy(Ingredient.name);
-
-  const allIngredients = await db
-    .select({
-      id: Ingredient.id,
-      name: Ingredient.name,
-      slug: Ingredient.slug,
-      addPriceDeltaCents: Ingredient.addPriceDeltaCents,
-      isCommon: Ingredient.isCommon,
-      active: Ingredient.active,
-    })
-    .from(Ingredient)
-    .where(eq(Ingredient.active, true))
-    .orderBy(Ingredient.name);
+  const commonIngredients = ingredientsCustomizationEnabled
+    ? await db
+      .select({
+        id: Ingredient.id,
+        name: Ingredient.name,
+        slug: Ingredient.slug,
+        imageUrl: Ingredient.imageUrl,
+        addPriceDeltaCents: Ingredient.addPriceDeltaCents,
+        isCommon: Ingredient.isCommon,
+        active: Ingredient.active,
+      })
+      .from(CategoryIngredient)
+      .innerJoin(Ingredient, eq(CategoryIngredient.ingredientId, Ingredient.id))
+      .where(
+        and(
+          eq(CategoryIngredient.categoryId, product.categoryId),
+          eq(Ingredient.active, true),
+        ),
+      )
+      .orderBy(Ingredient.name)
+    : [];
 
   const allergens = await db
     .select({
@@ -181,17 +227,20 @@ export const GET: APIRoute = async ({ params }) => {
       ingredientId: productIngredient.ingredientId,
       name: productIngredient.name,
       slug: productIngredient.slug,
+      imageUrl: productIngredient.imageUrl ?? null,
+      addPriceDeltaCents: productIngredient.addPriceDeltaCents,
       defaultIncluded: productIngredient.defaultIncluded,
       removable: productIngredient.removable,
       sortOrder: productIngredient.sortOrder,
     })),
 
-    commonIngredients,
-    allIngredients,
+    commonIngredients: commonIngredients.filter((ingredient) => !isSauceIngredient(ingredient)),
     allergens: allergens.map((allergen) => ({
       slug: allergen.slug,
       name: allergen.name,
       iconUrl: allergenIconPath(allergen.slug, allergen.iconUrl),
     })),
+
+    ingredientsCustomizationEnabled,
   });
 };
