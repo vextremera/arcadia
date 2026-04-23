@@ -13,6 +13,18 @@ function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
 
+async function shouldOpenUpsell() {
+  const res = await fetch("/api/upsell/open", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+
+  if (!res.ok) return false;
+
+  const data = (await res.json()) as { shouldOpen?: boolean };
+  return Boolean(data.shouldOpen);
+}
+
 export default function CartDrawer() {
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartResponse | null>(getCartSnapshot());
@@ -70,10 +82,19 @@ export default function CartDrawer() {
     await clearCartServer();
   }
 
-  function openUpsell() {
+  async function openUpsell() {
     if (items.length === 0) return;
+
+    const allowUpsell = await shouldOpenUpsell();
+
     setOpen(false);
-    window.dispatchEvent(new Event("arcadia:upsell:open"));
+
+    if (allowUpsell) {
+      window.dispatchEvent(new Event("arcadia:upsell:open"));
+      return;
+    }
+
+    window.location.href = "/checkout";
   }
 
   if (!open) return null;

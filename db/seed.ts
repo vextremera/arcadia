@@ -2672,4 +2672,42 @@ export default async function seed() {
   console.log(
     `✅ Seed salsas: grupo=${sauceGroupId}, opciones=${sauceOptionsSeed.length}, enlaces=${sauceGroupLinks.length}`
   );
+
+  const upsellDefaultProductNames = [
+    "Agua",
+    "Coca-Cola",
+    "Coca-Cola Zero",
+    "Fanta Naranja",
+    "Nestea Limón",
+    "Patatas Bravas",
+    "Patatas Loki",
+    "Patatas Teja",
+    "Patatas Ninja",
+  ];
+
+  const upsellCandidateRows = await db
+    .select({
+      id: Product.id,
+      name: Product.name,
+      active: Product.active,
+    })
+    .from(Product);
+
+  const upsellDefaultProducts = upsellCandidateRows
+    .filter((product) => product.active)
+    .filter((product) => upsellDefaultProductNames.includes(product.name));
+
+  if (upsellDefaultProducts.length > 0) {
+    await db.insert(UpsellItem).values(
+      upsellDefaultProducts.map((product, index) => ({
+        productId: product.id,
+        sortOrder: index + 1,
+        active: true,
+      })),
+    );
+  }
+
+  console.log(
+    `✅ Seed upsell: ${upsellDefaultProducts.length} productos por defecto`
+  );
 }
