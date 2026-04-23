@@ -440,6 +440,11 @@ export default function CheckoutForm() {
       alert(`Reparto no disponible ahora. Pedido cambiado a RECOGIDA. ${data.forcedReason ?? ""}`);
     }
 
+    if (data?.redirectUrl) {
+      window.location.href = data.redirectUrl;
+      return;
+    }
+
     window.location.href = `/pedido/${data.publicId}`;
   }
 

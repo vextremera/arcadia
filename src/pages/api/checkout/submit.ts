@@ -149,11 +149,11 @@ async function buildCardPaymentInsert(params: {
 
   const raw = {
     source: "checkout-submit",
-    mode: "manual-card-tracking",
+    mode: "test-gateway",
     channel: params.channel,
     forcedPickup: params.forcedPickup,
     createdAt: new Date().toISOString(),
-    note: "Registro interno de tarjeta pendiente de pasarela real.",
+    note: "Pago con pasarela de prueba sin cobro real.",
   } satisfies Record<string, unknown>;
 
   return {
@@ -701,7 +701,9 @@ export const POST: APIRoute = async ({ request, session }) => {
     }
   }
 
-  await session.delete("cart");
+  if (pm !== "CARD") {
+    await session.delete("cart");
+  }
 
   return json({
     ok: true,
@@ -714,5 +716,6 @@ export const POST: APIRoute = async ({ request, session }) => {
     discountCents,
     savedAddressId,
     loyalty: loyaltyAward,
+    redirectUrl: pm === "CARD" ? `/pasarela/prueba/${publicId}` : null,
   });
 };
