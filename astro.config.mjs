@@ -26,20 +26,24 @@ if (isVercelBuild && !hasUpstash) {
   );
 }
 
-const sessionConfig = hasUpstash
+const sessionDriver = hasUpstash
   ? {
-    driver: "upstash",
-    options: {
+    entrypoint: "unstorage/drivers/upstash",
+    config: {
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
       base: "arcadia:session",
     },
-    ttl: 60 * 60 * 24 * 30,
   }
   : {
-    driver: "memory",
-    ttl: 60 * 60 * 24 * 7,
+    entrypoint: "unstorage/drivers/memory",
+    config: {},
   };
+
+const sessionConfig = {
+  driver: sessionDriver,
+  ttl: hasUpstash ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7,
+};
 
 export default defineConfig({
   output: "server",

@@ -40,16 +40,64 @@ async function safeFetchReviews(url: string): Promise<Review[] | null> {
   }
 }
 
-export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4500 }: Props) {
+function ReviewCard({ r }: { r: Review }) {
+  return (
+    <article class="flex h-full w-[20rem] shrink-0 flex-col rounded-[28px] border border-zinc-300 bg-white p-5 shadow-sm sm:w-[23rem] sm:p-6 lg:w-[25rem]">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 overflow-hidden rounded-full bg-zinc-100 sm:h-11 sm:w-11">
+          {r.avatarUrl ? (
+            <img
+              src={r.avatarUrl}
+              alt={r.name}
+              class="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div class="grid h-full w-full place-items-center text-zinc-500">👤</div>
+          )}
+        </div>
+
+        <div class="min-w-0">
+          <div class="truncate text-sm font-semibold text-zinc-900">{r.name}</div>
+          <div class="text-xs text-zinc-600">
+            {r.totalReviews ? `${r.totalReviews} valoraciones · ` : ""}
+            {r.source}
+          </div>
+        </div>
+      </div>
+
+      <p class="mt-4 line-clamp-6 text-sm leading-7 text-zinc-800 sm:text-[15px]">
+        {r.text}
+      </p>
+
+      <div class="mt-auto pt-5">
+        <div class="flex items-center justify-between gap-3">
+          <Stars rating={r.rating} />
+          <span class="shrink-0 text-xs font-semibold text-zinc-700">
+            {r.rating.toFixed(1)}/5
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function ReviewsCarousel({
+  reviews = [],
+  fetchUrl,
+  intervalMs = 4500,
+}: Props) {
   const [remote, setRemote] = useState<Review[] | null>(null);
 
   useEffect(() => {
     if (!fetchUrl) return;
     let alive = true;
+
     safeFetchReviews(fetchUrl).then((r) => {
       if (!alive) return;
       if (r && r.length) setRemote(r);
     });
+
     return () => {
       alive = false;
     };
@@ -60,61 +108,93 @@ export default function ReviewsCarousel({ reviews = [], fetchUrl, intervalMs = 4
     return Array.isArray(base) ? base.filter(Boolean) : [];
   }, [remote, reviews]);
 
-  const [idx, setIdx] = useState(0);
-  const [fade, setFade] = useState(false);
+  const marqueeItems = useMemo(() => {
+    if (safe.length === 0) return [];
+    return [...safe, ...safe];
+  }, [safe]);
 
-  useEffect(() => {
-    setIdx(0);
+  const durationSeconds = useMemo(() => {
+    const base = safe.length || 1;
+    return Math.max(18, base * 6);
   }, [safe.length]);
 
-  useEffect(() => {
-    if (safe.length <= 1) return;
-
-    const t = window.setInterval(() => {
-      setFade(true);
-      window.setTimeout(() => {
-        setIdx((v) => (v + 1) % safe.length);
-        setFade(false);
-      }, 220);
-    }, intervalMs);
-
-    return () => window.clearInterval(t);
-  }, [safe.length, intervalMs]);
-
   if (safe.length === 0) return null;
-  const r = safe[idx];
+
+  if (safe.length === 1) {
+    return (
+      <div class="mx-auto max-w-[25rem]">
+        <ReviewCard r={safe[0]} />
+      </div>
+    );
+  }
 
   return (
-    <div class="grid items-stretch gap-4 sm:gap-6 md:grid-cols-3">
-      <article
-        class={`rounded-2xl border min-h-88 min-w-0 border-zinc-300 bg-white p-4 shadow-sm transition-opacity duration-200 sm:min-h-120 sm:min-w-140 sm:p-6 ${fade ? "opacity-0" : "opacity-100"
-          }`}
+    <div class="reviews-marquee relative overflow-hidden">
+      <div
+        class="reviews-marquee__track flex w-max gap-4 sm:gap-6"
+        style={{ animationDuration: `${durationSeconds}s` }}
       >
-        <div class="flex items-center gap-3">
-          <div class="h-10 w-10 overflow-hidden rounded-full bg-zinc-100 sm:h-11 sm:w-11">
-            {r.avatarUrl ? (
-              <img src={r.avatarUrl} alt={r.name} class="h-full w-full object-cover" loading="lazy" />
-            ) : (
-              <div class="grid h-full w-full place-items-center text-zinc-500">👤</div>
-            )}
-          </div>
+        {marqueeItems.map((r, i) => (
+          <ReviewCard r={r} key={`${r.name}-${i}`} />
+        ))}
+      </div>
 
-          <div class="min-w-0">
-            <div class="truncate text-sm font-semibold">{r.name}</div>
-            <div class="text-xs text-zinc-600">
-              {r.totalReviews ? `${r.totalReviews} valoraciones · ` : ""}
-              {r.source}
-            </div>
-          </div>
-        </div>
+      <style>{`
+        .reviews-marquee {
+          mask-image: linear-gradient(
+            to right,
+            transparent 0,
+            black 4rem,
+            black calc(100% - 4rem),
+            transparent 100%
+          );
+          -webkit-mask-image: linear-gradient(
+            to right,
+            transparent 0,
+            black 4rem,
+            black calc(100% - 4rem),
+            transparent 100%
+          );
+        }
 
-        <p class="mt-4 text-sm leading-relaxed text-zinc-800">{r.text}</p>
+        .reviews-marquee__track {
+          animation-name: reviews-marquee-scroll;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+          animation-play-state: running;
+          will-change: transform;
+        }
 
-        <div class="mt-4 flex items-center justify-between gap-3">
-          <Stars rating={r.rating} />
-          <span class="shrink-0 text-xs font-semibold text-zinc-700">{r.rating.toFixed(1)}/5</span>
-        </div>
-      </article>
+        .reviews-marquee:hover .reviews-marquee__track {
+          animation-play-state: paused;
+        }
+
+        @keyframes reviews-marquee-scroll {
+          from {
+            transform: translateX(0);
+          }
+          to {
+            transform: translateX(calc(-50% - 0.75rem));
+          }
+        }
+
+        @media (min-width: 640px) {
+          @keyframes reviews-marquee-scroll {
+            from {
+              transform: translateX(0);
+            }
+            to {
+              transform: translateX(calc(-50% - 1rem));
+            }
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .reviews-marquee__track {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
