@@ -6,10 +6,12 @@ type Cached = {
   fetchedAt?: string;
   placeId?: string;
   reviews?: Review[];
+  totalReviews?: number | null;
+  rating?: number | null;
 };
 
 const hasPlacesConfig = Boolean(
-  process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACE_ID
+  process.env.GOOGLE_PLACES_API_KEY && process.env.GOOGLE_PLACE_ID,
 );
 
 const [cacheRow] = await db
@@ -23,23 +25,65 @@ const cachedReviews = Array.isArray(cached?.reviews)
   ? cached.reviews.filter(Boolean)
   : [];
 
-const shouldRenderSection = hasPlacesConfig || cachedReviews.length > 0;
+let apiReviews: Review[] = [];
+let apiTotalReviews: number | null = null;
+let apiRating: number | null = null;
+
+try {
+  const res = await fetch(new URL("/api/home/reviews", Astro.url));
+  if (res.ok) {
+    const data = await res.json();
+    apiReviews = Array.isArray(data?.reviews)
+      ? data.reviews.filter(Boolean)
+      : [];
+    apiTotalReviews =
+      typeof data?.totalReviews === "number" ? data.totalReviews : null;
+    apiRating = typeof data?.rating === "number" ? data.rating : null;
+  }
+} catch {
+  // fallback a cache
+}
+
+const reviews = apiReviews.length > 0 ? apiReviews : cachedReviews;
+const totalReviews =
+  apiTotalReviews ??
+  (typeof cached?.totalReviews === "number" ? cached.totalReviews : null) ??
+  (typeof reviews[0]?.totalReviews === "number"
+    ? reviews[0].totalReviews
+    : null);
+
+const rating =
+  apiRating ?? (typeof cached?.rating === "number" ? cached.rating : null);
+
+const shouldRenderSection = hasPlacesConfig || reviews.length > 0;
 ---
 
-{shouldRenderSection ? (
-  <section id="resenas" class="scroll-mt-24">
-    <div class="mx-auto w-full max-w-340 px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
-      <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl text-center">
-        RESEÑAS
-      </h2>
+{
+  shouldRenderSection ? (
+    <section id="resenas" class="scroll-mt-24">
+      <div class="mx-auto w-full max-w-340 px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
+        <div class="text-center">
+          <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl">
+            RESEÑAS
+          </h2>
 
-      <div class="mt-8 sm:mt-10">
-        <ReviewsCarousel
-          client:load
-          fetchUrl="/api/home/reviews"
-          reviews={cachedReviews}
-        />
+          {(rating || totalReviews) && (
+            <div class="mt-2 text-sm text-zinc-600 sm:text-base">
+              Google
+              {rating ? ` · ${rating.toFixed(1)} ★` : ""}
+              {totalReviews ? ` · ${totalReviews} valoraciones` : ""}
+            </div>
+          )}
+        </div>
+
+        <div class="mt-8 sm:mt-10">
+          <ReviewsCarousel
+            client:load
+            fetchUrl="/api/home/reviews"
+            reviews={reviews}
+          />
+        </div>
       </div>
-    </div>
-  </section>
-) : null}
+    </section>
+  ) : null
+}

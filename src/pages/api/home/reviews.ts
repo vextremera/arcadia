@@ -135,7 +135,7 @@ export const GET: APIRoute = async ({ url }) => {
 
     const raw = Array.isArray(result?.reviews) ? result.reviews : [];
 
-    const mapped: ReviewItem[] = raw
+    const filtered: ReviewItem[] = raw
       .filter(Boolean)
       .map((r: any): ReviewItem => ({
         name: String(r?.author_name ?? "Cliente"),
@@ -147,11 +147,10 @@ export const GET: APIRoute = async ({ url }) => {
           typeof r?.profile_photo_url === "string" && r.profile_photo_url.length > 0
             ? r.profile_photo_url
             : null,
-      }));
-
-    const filtered = mapped
-      .filter((r) => r.text.length > 0)
-      .filter((r) => r.rating >= 4)
+      }))
+      .filter((r: ReviewItem) => r.text.length > 0)
+      .filter((r: ReviewItem) => r.rating >= 4)
+      .filter((r: ReviewItem) => Boolean(r.avatarUrl))
       .slice(0, 5);
 
     const payload: Cached = {
