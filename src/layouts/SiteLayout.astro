@@ -1,5 +1,6 @@
 ---
 import "@/styles/global.css";
+import { Font } from "astro:assets";
 import Header from "@/components/layout/Header.astro";
 import Footer from "@/components/layout/Footer.astro";
 import ProductConfiguratorModal from "@/islands/product/ProductConfiguratorModal";
@@ -40,9 +41,9 @@ const mainClass =
 
     <title>{title}</title>
 
-    <style is:global>
-      @import url("https://fonts.googleapis.com/css2?family=Sigmar&display=swap");
+    <Font cssVariable="--font-sigmar" preload />
 
+    <style is:global>
       body {
         margin: auto 20px;
         background-color: var(--color-bg);
@@ -61,7 +62,7 @@ const mainClass =
       }
 
       .sigmar-regular {
-        font-family: "Sigmar", sans-serif;
+        font-family: var(--font-sigmar);
         font-style: normal;
       }
     </style>

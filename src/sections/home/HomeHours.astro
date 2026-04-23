@@ -67,87 +67,82 @@ const operationalTone = availability.pauseOrders
         </div>
       </div>
 
-      <div class="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3">
-        {liveCards.map((card) => (
-          <article class:list={[
-            "rounded-[22px] border px-4 py-4 text-left shadow-[0_8px_20px_rgba(0,0,0,0.04)]",
-            card.tone,
-          ]}>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em]">
-              {card.label}
-            </div>
-            <div class="mt-2 text-lg font-black tracking-wide">
-              {card.value}
-            </div>
-            <div class="mt-1 text-sm opacity-80">
-              {card.detail}
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {operationalMessage ? (
-        <div class:list={[
-          "mt-5 rounded-[22px] border px-5 py-4 text-sm leading-6",
-          operationalTone,
-        ]}>
-          {operationalMessage}
-        </div>
-      ) : null}
+      {
+        operationalMessage ? (
+          <div
+            class:list={[
+              "mt-5 rounded-[22px] border px-5 py-4 text-sm leading-6",
+              operationalTone,
+            ]}
+          >
+            {operationalMessage}
+          </div>
+        ) : null
+      }
 
       <div class="mt-8 grid gap-8 sm:mt-12 sm:gap-12 lg:grid-cols-2">
         <div class="px-0 sm:px-12">
-          <div class="text-center text-lg font-normal sigmar-regular tracking-widest">
+          <div
+            class="text-center text-lg font-normal sigmar-regular tracking-widest"
+          >
             {localLabel}
           </div>
           <div
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
-            {weeklyHours.map((row) => (
-              <>
-                <div class="text-zinc-700">{row.dayLabel}</div>
-                <div
-                  class:list={[
-                    "text-right font-semibold",
-                    row.local === "Descanso" || row.local === "—"
-                      ? "text-zinc-500"
-                      : "text-zinc-900",
-                  ]}
-                >
-                  {row.local}
-                </div>
-              </>
-            ))}
+            {
+              weeklyHours.map((row) => (
+                <>
+                  <div class="text-zinc-700">{row.dayLabel}</div>
+                  <div
+                    class:list={[
+                      "text-right font-semibold",
+                      row.local === "Descanso" || row.local === "—"
+                        ? "text-zinc-500"
+                        : "text-zinc-900",
+                    ]}
+                  >
+                    {row.local}
+                  </div>
+                </>
+              ))
+            }
           </div>
         </div>
 
         <div class="px-0 sm:px-12">
-          <div class="text-center text-lg font-normal sigmar-regular tracking-widest">
+          <div
+            class="text-center text-lg font-normal sigmar-regular tracking-widest"
+          >
             {deliveryLabel}
           </div>
           <div
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
-            {weeklyHours.map((row) => (
-              <>
-                <div class="text-zinc-700">{row.dayLabel}</div>
-                <div
-                  class:list={[
-                    "text-right font-semibold",
-                    row.delivery === "Descanso" || row.delivery === "—"
-                      ? "text-zinc-500"
-                      : "text-zinc-900",
-                  ]}
-                >
-                  {row.delivery}
-                </div>
-              </>
-            ))}
+            {
+              weeklyHours.map((row) => (
+                <>
+                  <div class="text-zinc-700">{row.dayLabel}</div>
+                  <div
+                    class:list={[
+                      "text-right font-semibold",
+                      row.delivery === "Descanso" || row.delivery === "—"
+                        ? "text-zinc-500"
+                        : "text-zinc-900",
+                    ]}
+                  >
+                    {row.delivery}
+                  </div>
+                </>
+              ))
+            }
           </div>
         </div>
       </div>
 
-      <div class="mt-10 flex flex-col items-stretch justify-center gap-3 sm:mt-12 sm:flex-row sm:flex-wrap sm:items-center">
+      <div
+        class="mt-10 flex flex-col items-stretch justify-center gap-3 sm:mt-12 sm:flex-row sm:flex-wrap sm:items-center"
+      >
         <a
           href="/#reservas"
           class="w-full rounded-full border border-zinc-300 bg-white px-7 py-3 text-center text-sm font-semibold hover:bg-zinc-50 sm:w-auto"

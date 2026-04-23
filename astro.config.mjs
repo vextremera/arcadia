@@ -1,4 +1,4 @@
-import { defineConfig } from "astro/config";
+import { defineConfig, fontProviders } from "astro/config";
 import db from "@astrojs/db";
 import vercel from "@astrojs/vercel";
 import preact from "@astrojs/preact";
@@ -28,24 +28,37 @@ if (isVercelBuild && !hasUpstash) {
 
 const sessionConfig = hasUpstash
   ? {
-      driver: "upstash",
-      options: {
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-        base: "arcadia:session",
-      },
-      ttl: 60 * 60 * 24 * 30,
-    }
+    driver: "upstash",
+    options: {
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      base: "arcadia:session",
+    },
+    ttl: 60 * 60 * 24 * 30,
+  }
   : {
-      driver: "memory",
-      ttl: 60 * 60 * 24 * 7,
-    };
+    driver: "memory",
+    ttl: 60 * 60 * 24 * 7,
+  };
 
 export default defineConfig({
   output: "server",
   adapter: vercel(),
 
   integrations: [db(), preact()],
+
+  fonts: [
+    {
+      provider: fontProviders.google(),
+      name: "Sigmar",
+      cssVariable: "--font-sigmar",
+      weights: [400],
+      styles: ["normal"],
+      subsets: ["latin"],
+      fallbacks: ["sans-serif"],
+      display: "swap",
+    },
+  ],
 
   vite: {
     plugins: [
