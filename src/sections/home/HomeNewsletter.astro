@@ -1,5 +1,10 @@
 ---
 import NewsletterForm from "@/islands/home/NewsletterForm";
+import { DEFAULT_LANG } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getPublicCopy(lang).home.newsletter;
 ---
 
 <section id="newsletter" class="scroll-mt-24">
@@ -7,11 +12,13 @@ import NewsletterForm from "@/islands/home/NewsletterForm";
     <div
       class="rounded-[28px] bg-accent px-5 py-8 text-white shadow-[0_20px_50px_rgba(0,0,0,0.25)] sm:px-12 sm:py-12"
     >
-      <h2 class="text-3xl font-black leading-none tracking-tight sm:text-4xl md:text-5xl">
-        ¿TE APETECE ARCADIA HOY?
+      <h2
+        class="text-3xl font-black leading-none tracking-tight sm:text-4xl md:text-5xl"
+      >
+        {t.title}
       </h2>
       <p class="mt-4 text-base text-white/80 sm:text-lg md:text-xl">
-        Regístrate a nuestras ofertas y novedades
+        {t.subtitle}
       </p>
 
       <div class="mt-7">

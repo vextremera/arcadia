@@ -1,48 +1,24 @@
 ---
 import { getWeeklyHours } from "@/features/hours/server/weeklyHours";
 import { getArcadiaAvailability } from "@/server/time/madrid";
-import { buildOperationalMessage } from "@/server/time/publicMessages";
+import { DEFAULT_LANG } from "@/lib/i18n";
+import {
+  buildPublicOperationalMessage,
+  getPublicCopy,
+  translateDayLabel,
+  translateWeeklyValue,
+} from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const copy = getPublicCopy(lang);
 
 const weeklyHours = await getWeeklyHours();
 const availability = await getArcadiaAvailability();
 
-const localLabel = "LOCAL";
-const deliveryLabel = "A DOMICILIO";
+const localLabel = copy.home.hours.localLabel;
+const deliveryLabel = copy.home.hours.deliveryLabel;
 
-const liveCards = [
-  {
-    label: "Local",
-    value: availability.localOpen ? "Abierto" : "Cerrado",
-    detail: `${availability.windows.open.start} - ${availability.windows.open.end}`,
-    tone: availability.localOpen
-      ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-      : "border-zinc-300 bg-zinc-50 text-zinc-700",
-  },
-  {
-    label: "Recogida",
-    value: availability.pickupAvailable ? "Disponible" : "No disponible",
-    detail: `${availability.windows.pickup.start} - ${availability.windows.pickup.end}`,
-    tone: availability.pickupAvailable
-      ? "border-sky-300 bg-sky-50 text-sky-900"
-      : "border-zinc-300 bg-zinc-50 text-zinc-700",
-  },
-  {
-    label: "Delivery",
-    value: availability.forcePickup
-      ? "Solo recogida"
-      : availability.deliveryAvailable
-        ? "Disponible"
-        : "No disponible",
-    detail: `${availability.windows.delivery.start} - ${availability.windows.delivery.end}`,
-    tone: availability.forcePickup
-      ? "border-amber-300 bg-amber-50 text-amber-900"
-      : availability.deliveryAvailable
-        ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900"
-        : "border-zinc-300 bg-zinc-50 text-zinc-700",
-  },
-];
-
-const operationalMessage = buildOperationalMessage(availability);
+const operationalMessage = buildPublicOperationalMessage(availability, lang);
 
 const operationalTone = availability.pauseOrders
   ? "border-rose-200 bg-rose-50 text-rose-900"
@@ -60,10 +36,10 @@ const operationalTone = availability.pauseOrders
         <h2
           class="text-3xl font-black sm:text-4xl sigmar-regular tracking-widest"
         >
-          HORARIOS
+          {copy.home.hours.title}
         </h2>
         <div class="mt-2 text-base italic text-zinc-500 sm:text-lg">
-          - Organízate sin dudas -
+          {copy.home.hours.subtitle}
         </div>
       </div>
 
@@ -91,21 +67,27 @@ const operationalTone = availability.pauseOrders
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
             {
-              weeklyHours.map((row) => (
-                <>
-                  <div class="text-zinc-700">{row.dayLabel}</div>
-                  <div
-                    class:list={[
-                      "text-right font-semibold",
-                      row.local === "Descanso" || row.local === "—"
-                        ? "text-zinc-500"
-                        : "text-zinc-900",
-                    ]}
-                  >
-                    {row.local}
-                  </div>
-                </>
-              ))
+              weeklyHours.map((row) => {
+                const localValue = translateWeeklyValue(row.local, lang);
+
+                return (
+                  <>
+                    <div class="text-zinc-700">
+                      {translateDayLabel(row.dayLabel, lang)}
+                    </div>
+                    <div
+                      class:list={[
+                        "text-right font-semibold",
+                        row.local === "Descanso" || row.local === "—"
+                          ? "text-zinc-500"
+                          : "text-zinc-900",
+                      ]}
+                    >
+                      {localValue}
+                    </div>
+                  </>
+                );
+              })
             }
           </div>
         </div>
@@ -120,21 +102,27 @@ const operationalTone = availability.pauseOrders
             class="mt-6 grid grid-cols-[1fr_auto] gap-x-4 gap-y-4 text-sm sm:mt-7 sm:gap-x-10 sm:text-lg"
           >
             {
-              weeklyHours.map((row) => (
-                <>
-                  <div class="text-zinc-700">{row.dayLabel}</div>
-                  <div
-                    class:list={[
-                      "text-right font-semibold",
-                      row.delivery === "Descanso" || row.delivery === "—"
-                        ? "text-zinc-500"
-                        : "text-zinc-900",
-                    ]}
-                  >
-                    {row.delivery}
-                  </div>
-                </>
-              ))
+              weeklyHours.map((row) => {
+                const deliveryValue = translateWeeklyValue(row.delivery, lang);
+
+                return (
+                  <>
+                    <div class="text-zinc-700">
+                      {translateDayLabel(row.dayLabel, lang)}
+                    </div>
+                    <div
+                      class:list={[
+                        "text-right font-semibold",
+                        row.delivery === "Descanso" || row.delivery === "—"
+                          ? "text-zinc-500"
+                          : "text-zinc-900",
+                      ]}
+                    >
+                      {deliveryValue}
+                    </div>
+                  </>
+                );
+              })
             }
           </div>
         </div>
@@ -147,14 +135,14 @@ const operationalTone = availability.pauseOrders
           href="/#reservas"
           class="w-full rounded-full border border-zinc-300 bg-white px-7 py-3 text-center text-sm font-semibold hover:bg-zinc-50 sm:w-auto"
         >
-          Reservar mesa
+          {copy.home.hours.reserve}
         </a>
 
         <a
           href="/pedir"
           class="w-full rounded-full bg-accent px-7 py-3 text-center text-sm font-semibold text-white hover:bg-accent-hover sm:w-auto"
         >
-          Pedir ahora
+          {copy.home.hours.orderNow}
         </a>
       </div>
     </div>

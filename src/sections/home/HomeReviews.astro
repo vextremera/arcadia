@@ -1,6 +1,11 @@
 ---
 import { db, AppSetting, eq } from "astro:db";
 import ReviewsCarousel, { type Review } from "@/islands/home/ReviewsCarousel";
+import { DEFAULT_LANG } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getPublicCopy(lang).home.reviews;
 
 type Cached = {
   fetchedAt?: string;
@@ -64,14 +69,14 @@ const shouldRenderSection = hasPlacesConfig || reviews.length > 0;
       <div class="mx-auto w-full max-w-340 px-4 py-10 sm:px-6 sm:py-12 lg:py-16">
         <div class="text-center">
           <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl">
-            RESEÑAS
+            {t.title}
           </h2>
 
           {(rating || totalReviews) && (
             <div class="mt-2 text-sm text-zinc-600 sm:text-base">
               Google
               {rating ? ` · ${rating.toFixed(1)} ★` : ""}
-              {totalReviews ? ` · ${totalReviews} valoraciones` : ""}
+              {totalReviews ? ` · ${totalReviews} ${t.reviewsLabel}` : ""}
             </div>
           )}
         </div>

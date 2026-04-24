@@ -1,27 +1,33 @@
+---
+import { DEFAULT_LANG } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getPublicCopy(lang).home.about;
+---
+
 <section id="sobre" class="relative rounded-t-[50px] z-20 home-about">
-  <div class="mx-auto w-full max-w-6xl px-6 py-12 lg:pt-16 lg:pb-22 home-about__inner">
+  <div
+    class="mx-auto w-full max-w-6xl px-6 py-12 lg:pt-16 lg:pb-22 home-about__inner"
+  >
     <div class="text-center">
       <h2
         class="text-3xl font-black sm:text-4xl sigmar-regular tracking-widest"
       >
-        SOBRE NOSOTROS
+        {t.title}
       </h2>
       <div class="mt-2 text-base italic text-zinc-500 sm:text-lg">
-        “La comida casera como en casa”
+        {t.quote}
       </div>
     </div>
 
     <div
       class="mx-auto mt-10 w-full max-w-5xl text-[20px] leading-relaxed text-center text-stone-900 home-about__copy"
     >
-      En el Bar Restaurante Arcadia encontrarás comida casera y auténtica, como
-      la de antes, elaborada con tiempo, maestría y cariño. Productos de calidad
-      y buen servicio. <br />
-      <br /> Una cocina nacida de la tradición popular y la vida cotidiana, la que
-      se cocinaba en casa y que hoy sigue viva en las cocinas de Arcadia, adaptada
-      a los gustos actuales pero sin perder su esencia. Platos familiares y generosos,
-      pensados tanto para comer en el local como para disfrutar en casa, gracias a
-      nuestro servicio de entrega a domicilio.
+      {t.body[0]}
+      <br />
+      <br />
+      {t.body[1]}
     </div>
   </div>
 </section>

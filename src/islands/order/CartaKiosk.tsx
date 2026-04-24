@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
+import { getClientLang, type ClientSiteLang } from "@/islands/_shared/lang";
 
 type ProductAllergen = {
   slug: string;
@@ -34,6 +35,14 @@ function money(cents: number) {
   return `${(cents / 100).toFixed(2)} €`;
 }
 
+const kioskCopy = {
+  es: { heroTitle: "PEDIR", heroSubtitle: "Elige tus productos y personalízalos al momento.", loadingCategories: "Cargando categorías…", noCategories: "No hay categorías disponibles.", categories: "Categorías", view: "Ver", closeCategories: "Cerrar categorías", loadingProducts: "Cargando productos…", noProducts: "No hay productos disponibles.", backToTop: "↑ arriba", noProductsInCategory: "No hay productos en esta categoría.", noDescription: "(Sin descripción)", openConfigurator: "Abrir configurador", addToCart: "Añadir al carrito", customize: "Personalizar", add: "Añadir", addFail: "No se pudo añadir al carrito" },
+  ca: { heroTitle: "DEMANAR", heroSubtitle: "Tria els teus productes i personalitza'ls al moment.", loadingCategories: "Carregant categories…", noCategories: "No hi ha categories disponibles.", categories: "Categories", view: "Veure", closeCategories: "Tancar categories", loadingProducts: "Carregant productes…", noProducts: "No hi ha productes disponibles.", backToTop: "↑ amunt", noProductsInCategory: "No hi ha productes en aquesta categoria.", noDescription: "(Sense descripció)", openConfigurator: "Obrir configurador", addToCart: "Afegir al carret", customize: "Personalitzar", add: "Afegir", addFail: "No s'ha pogut afegir al carret" },
+  en: { heroTitle: "ORDER", heroSubtitle: "Choose your products and customise them on the spot.", loadingCategories: "Loading categories…", noCategories: "No categories available.", categories: "Categories", view: "View", closeCategories: "Close categories", loadingProducts: "Loading products…", noProducts: "No products available.", backToTop: "↑ top", noProductsInCategory: "No products in this category.", noDescription: "(No description)", openConfigurator: "Open configurator", addToCart: "Add to cart", customize: "Customise", add: "Add", addFail: "Could not add to cart" },
+  fr: { heroTitle: "COMMANDER", heroSubtitle: "Choisissez vos produits et personnalisez-les sur le moment.", loadingCategories: "Chargement des catégories…", noCategories: "Aucune catégorie disponible.", categories: "Catégories", view: "Voir", closeCategories: "Fermer les catégories", loadingProducts: "Chargement des produits…", noProducts: "Aucun produit disponible.", backToTop: "↑ haut", noProductsInCategory: "Aucun produit dans cette catégorie.", noDescription: "(Sans description)", openConfigurator: "Ouvrir le configurateur", addToCart: "Ajouter au panier", customize: "Personnaliser", add: "Ajouter", addFail: "Impossible d'ajouter au panier" },
+} satisfies Record<ClientSiteLang, Record<string, string>>;
+
+
 function openProduct(productId: number) {
   window.dispatchEvent(new CustomEvent("arcadia:product:open", { detail: { productId } }));
 }
@@ -54,6 +63,9 @@ export default function CartaKiosk() {
   const catBarRef = useRef<HTMLDivElement>(null);
 
   const [catMenuOpen, setCatMenuOpen] = useState(false);
+
+  const lang = useMemo(() => getClientLang(), []);
+  const t = useMemo(() => kioskCopy[lang], [lang]);
 
   function scrollToCategory(slug: string) {
     const id = `cat-${slug}`;
@@ -118,7 +130,7 @@ export default function CartaKiosk() {
       setFlashAddedId(product.id);
       window.setTimeout(() => setFlashAddedId(null), 900);
     } catch (error) {
-      alert((error as any)?.message || "No se pudo añadir al carrito");
+      alert((error as any)?.message || t.addFail);
     } finally {
       setAddingId(null);
     }
@@ -145,9 +157,9 @@ export default function CartaKiosk() {
           <div class="absolute inset-x-0 bottom-0 h-6 bg-bg z-20 rounded-t-3xl sm:h-8 sm:rounded-t-[40px]" />
           <div class="flex h-full w-full items-center justify-center px-4 pb-12 pt-8 text-center sm:px-10 sm:pb-18 sm:pt-0 sm:mt-10">
             <div class="text-white">
-              <div class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular">PEDIR</div>
+              <div class="text-3xl sm:text-5xl font-black tracking-widest sigmar-regular">{t.heroTitle}</div>
               <div class="mt-1 text-sm sm:text-[20px] text-white/80">
-                Elige tus productos y personalízalos al momento.
+                {t.heroSubtitle}
               </div>
             </div>
           </div>
@@ -161,13 +173,13 @@ export default function CartaKiosk() {
       >
         <div class="mx-auto w-full max-w-448 px-4 py-3 sm:px-10">
           {loading && menu.length === 0 ? (
-            <div class="text-sm text-zinc-600">Cargando categorías…</div>
+            <div class="text-sm text-zinc-600">{t.loadingCategories}</div>
           ) : navCategories.length === 0 ? (
-            <div class="text-sm text-zinc-600">No hay categorías disponibles.</div>
+            <div class="text-sm text-zinc-600">{t.noCategories}</div>
           ) : (
             <>
               <div class="flex items-center justify-between sm:hidden">
-                <div class="text-sm font-semibold text-zinc-700">Categorías</div>
+                <div class="text-sm font-semibold text-zinc-700">{t.categories}</div>
                 <button
                   type="button"
                   class="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
@@ -175,12 +187,12 @@ export default function CartaKiosk() {
                   aria-expanded={catMenuOpen}
                   onClick={() => setCatMenuOpen(true)}
                 >
-                  <span>Ver</span>
+                  <span>{t.view}</span>
                   <span aria-hidden="true">☰</span>
                 </button>
               </div>
 
-              <nav class="hidden flex-wrap items-center gap-2 sm:flex" aria-label="Categorías">
+              <nav class="hidden flex-wrap items-center gap-2 sm:flex" aria-label={t.categories}>
                 {navCategories.map((category) => (
                   <a
                     key={category.id}
@@ -200,12 +212,12 @@ export default function CartaKiosk() {
                   <button
                     type="button"
                     class="absolute inset-0 h-full w-full bg-black/35"
-                    aria-label="Cerrar categorías"
+                    aria-label={t.closeCategories}
                     onClick={() => setCatMenuOpen(false)}
                   />
 
                   <div class="absolute inset-x-3 top-0 max-h-[calc(100dvh-2rem)] overflow-auto rounded-4xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)]">
-                    <nav class="grid gap-1" aria-label="Categorías">
+                    <nav class="grid gap-1" aria-label={t.categories}>
                       {navCategories.map((category) => (
                         <button
                           key={category.id}
@@ -228,9 +240,9 @@ export default function CartaKiosk() {
       <div class="w-full px-4 py-6 sm:px-10 sm:py-8">
         <div class="mx-auto w-full max-w-448">
           {loading && menu.length === 0 ? (
-            <div class="text-sm text-zinc-600">Cargando productos…</div>
+            <div class="text-sm text-zinc-600">{t.loadingProducts}</div>
           ) : menu.length === 0 ? (
-            <div class="text-sm text-zinc-600">No hay productos disponibles.</div>
+            <div class="text-sm text-zinc-600">{t.noProducts}</div>
           ) : (
             <div class="space-y-8 sm:space-y-10">
               {menu.map((category) => (
@@ -244,12 +256,12 @@ export default function CartaKiosk() {
                       {category.name}
                     </h2>
                     <a class="text-xs font-semibold text-zinc-500 hover:underline" href="#top">
-                      ↑ arriba
+                      {t.backToTop}
                     </a>
                   </div>
 
                   {category.products.length === 0 ? (
-                    <div class="mt-3 text-sm text-zinc-600">No hay productos en esta categoría.</div>
+                    <div class="mt-3 text-sm text-zinc-600">{t.noProductsInCategory}</div>
                   ) : (
                     <div class="mt-4 grid gap-3 sm:gap-4 md:grid-cols-2">
                       {category.products.map((product) => {
@@ -287,7 +299,7 @@ export default function CartaKiosk() {
                                   {ingredientsText ? (
                                     <p class="mt-2 line-clamp-3 text-sm text-zinc-600">{ingredientsText}</p>
                                   ) : (
-                                    <p class="mt-2 text-sm text-zinc-500">(Sin descripción)</p>
+                                    <p class="mt-2 text-sm text-zinc-500">{t.noDescription}</p>
                                   )}
                                 </div>
 
@@ -327,8 +339,8 @@ export default function CartaKiosk() {
 
                                 <button
                                   type="button"
-                                  aria-label={product.isConfigurable ? "Abrir configurador" : "Añadir al carrito"}
-                                  title={product.isConfigurable ? "Personalizar" : "Añadir"}
+                                  aria-label={product.isConfigurable ? t.openConfigurator : t.addToCart}
+                                  title={product.isConfigurable ? t.customize : t.add}
                                   onClick={(event) => onPlusClick(event, product)}
                                   class={[
                                     "absolute -top-2 -right-2 grid h-10 w-10 place-items-center rounded-full border border-zinc-200 bg-white shadow-sm transition sm:h-11 sm:w-11",

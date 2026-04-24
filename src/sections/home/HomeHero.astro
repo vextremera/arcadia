@@ -1,5 +1,12 @@
+---
+import { DEFAULT_LANG } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getPublicCopy(lang).home.hero;
+---
+
 <section class="home-hero relative overflow-hidden rounded-t-[40px]">
-  <!-- Fondo -->
   <div
     class="absolute inset-0 z-0 bg-cover bg-center"
     style={`background-image: url('/images/general/bg.webp');`}
@@ -8,8 +15,10 @@
     <div class="absolute inset-0 z-10 bg-black/60"></div>
   </div>
 
-  <!-- Transición inferior -->
-  <div class="home-hero__cap pointer-events-none absolute inset-x-0 -bottom-px z-20 h-10 rounded-t-[40px] bg-bg"></div>
+  <div
+    class="home-hero__cap pointer-events-none absolute inset-x-0 -bottom-px z-20 h-10 rounded-t-[40px] bg-bg"
+  >
+  </div>
 
   <div
     class="home-hero__inner relative z-10 mx-auto flex w-full max-w-440 items-center justify-center px-4 py-24 text-center sm:px-6 sm:py-32 lg:px-10 lg:py-40"
@@ -23,7 +32,7 @@
       <h1
         class="mx-auto w-full max-w-88 text-[clamp(1.1rem,4vw,2.25rem)] font-medium leading-tight text-white sigmar-regular min-[380px]:max-w-none sm:text-4xl"
       >
-        BAR RESTAURANTE<br /><span
+        {t.subtitle}<br /><span
           class="home-hero__brand mx-auto mt-1 block max-w-full text-center text-[clamp(3.2rem,16vw,8rem)] font-extrabold leading-[0.9] tracking-[0.02em] text-white sigmar-regular sm:-mt-2 sm:text-8xl sm:tracking-[0.06em] md:text-10xl md:tracking-widest"
           >ARCADIA</span
         >

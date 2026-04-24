@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+import { DEFAULT_LANG, resolveSiteLang } from "@/lib/i18n";
 
 type RouteAccess = "public" | "account" | "admin";
 
@@ -34,6 +35,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const url = new URL(context.request.url);
   const pathname = normalizePathname(url.pathname);
 
+  const cookieLang = context.cookies.get("arcadia_lang")?.value;
+  context.locals.lang = resolveSiteLang(cookieLang ?? DEFAULT_LANG);
+
   const sessionUser = await context.session?.get("user");
   if (sessionUser) {
     context.locals.user = sessionUser;
@@ -42,17 +46,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const user = context.locals.user;
   const access = resolveRouteAccess(pathname);
 
-  // Cuenta: solo usuarios autenticados
   if (access === "account" && !user) {
     return context.redirect(buildLoginRedirect(pathname, url.search), 302);
   }
 
-  // Admin: solo ADMIN / STAFF
   if (access === "admin" && !isAdminRole(user)) {
     return context.redirect("/admin/login", 302);
   }
 
-  // Si ya hay sesión, evitamos mostrar pantallas de login/registro sin sentido
   if (user) {
     if (pathname === "/admin/login" && isAdminRole(user)) {
       return context.redirect("/admin", 302);

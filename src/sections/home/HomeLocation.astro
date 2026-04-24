@@ -2,6 +2,11 @@
 import LazyMap from "@/islands/home/LazyMap";
 import TripadvisorLogo from "public/assets/logos/tripadvisor_logo.svg";
 import GoogleLogo from "public/assets/logos/google_logo.svg";
+import { DEFAULT_LANG } from "@/lib/i18n";
+import { getPublicCopy } from "@/lib/publicCopy";
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getPublicCopy(lang).home.location;
 
 const addressLines = [
   "C/ Maria Aurèlia Campmany i Farnés, nº 2",
@@ -12,10 +17,9 @@ const phone = "+34 656 56 25 10";
 const email = "info@bararcadia.com";
 const instagram = "@victor_arcadia";
 
-// Placeholder hasta conectar APIs
 const ratings = {
   tripadvisor: { label: "Tripadvisor", rating: 5, count: 0 },
-  google: { label: "Google", rating: 5, count: 0}
+  google: { label: "Google", rating: 5, count: 0 },
 };
 
 const mapQuery =
@@ -30,8 +34,10 @@ const mapQuery =
       <div
         class="rounded-[28px] min-h-144 border border-zinc-300 bg-white p-5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] sm:min-h-120 sm:p-8"
       >
-        <h2 class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl">
-          UBICACIÓN
+        <h2
+          class="text-3xl font-black sigmar-regular tracking-widest sm:text-4xl"
+        >
+          {t.title}
         </h2>
 
         <div class="mt-4 text-md text-zinc-700">
@@ -42,10 +48,13 @@ const mapQuery =
           <div
             class="flex items-center gap-2 rounded-full border-2 border-emerald-600 px-4 py-2 text-md"
           >
-            <span class="font-semibold text-emerald-900"
-              > <TripadvisorLogo class="inline-block size-8 mr-2" /> {ratings.tripadvisor.label}</span
+            <span class="font-semibold text-emerald-900">
+              <TripadvisorLogo class="inline-block size-8 mr-2" />
+              {ratings.tripadvisor.label}
+            </span>
+            <span class="text-emerald-900 text-[18px] tracking-widest ml-3"
+              >{"★".repeat(5)}</span
             >
-            <span class="text-emerald-900 text-[18px] tracking-widest ml-3">{"★".repeat(5)}</span>
           </div>
         </div>
 
@@ -53,24 +62,37 @@ const mapQuery =
           <div
             class="flex items-center gap-2 rounded-full border-2 border-yellow-400 px-4 py-2 text-md"
           >
-            <span class="font-semibold text-black"
-              > <GoogleLogo class="inline-block size-8 mr-2" /> {ratings.google.label}</span
+            <span class="font-semibold text-black">
+              <GoogleLogo class="inline-block size-8 mr-2" />
+              {ratings.google.label}
+            </span>
+            <span class="text-yellow-500 text-[18px] tracking-widest ml-3"
+              >{"★".repeat(5)}</span
             >
-            <span class="text-yellow-500 text-[18px] tracking-widest ml-3">{"★".repeat(5)}</span>
           </div>
         </div>
 
-        <div class="mt-10 space-y-3 text-md text-zinc-800 sm:mt-20 sm:space-y-2">
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <span class="text-zinc-600">Teléfono:</span>
+        <div
+          class="mt-10 space-y-3 text-md text-zinc-800 sm:mt-20 sm:space-y-2"
+        >
+          <div
+            class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <span class="text-zinc-600">{t.phone}</span>
             <span class="font-semibold wrap-break-words">{phone}</span>
           </div>
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <span class="text-zinc-600">Correo:</span>
-            <span class="font-semibold break-all sm:wrap-break-words">{email}</span>
+          <div
+            class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <span class="text-zinc-600">{t.email}</span>
+            <span class="font-semibold break-all sm:wrap-break-words"
+              >{email}</span
+            >
           </div>
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <span class="text-zinc-600">Instagram:</span>
+          <div
+            class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+          >
+            <span class="text-zinc-600">{t.instagram}</span>
             <span class="font-semibold wrap-break-words">{instagram}</span>
           </div>
         </div>

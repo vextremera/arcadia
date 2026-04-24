@@ -1,18 +1,22 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
 import NegativeLogo from "public/ARCADIA_LOGO.svg";
+import { DEFAULT_LANG, getSiteCopy } from "@/lib/i18n";
 
 const user = Astro.locals.user;
 const pathname = Astro.url.pathname;
-const next = encodeURIComponent(pathname);
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const t = getSiteCopy(lang).header;
+
+const next = encodeURIComponent(pathname === "/" ? "/cuenta" : pathname);
 
 const navLinks = [
-  { href: "/#sobre", label: "Sobre Nosotros" },
-  { href: "/#horarios", label: "Horario" },
-  { href: "/#ubicacion", label: "Ubicación" },
-  { href: "/carta", label: "Carta" },
-  { href: "/menu", label: "Menú" },
-  { href: "/pedir", label: "Domicilio" },
+  { href: "/#sobre", label: t.nav.about },
+  { href: "/#horarios", label: t.nav.hours },
+  { href: "/#ubicacion", label: t.nav.location },
+  { href: "/carta", label: t.nav.menuLetter },
+  { href: "/menu", label: t.nav.menuDay },
+  { href: "/pedir", label: t.nav.delivery },
 ];
 ---
 
@@ -29,11 +33,13 @@ const navLinks = [
 
     <nav
       class="hidden items-center gap-8 text-sm font-semibold text-stone-700 xl:flex 2xl:gap-10"
-      aria-label="Navegación principal"
+      aria-label={t.aria.mainNav}
     >
       {
         navLinks.map((link) => (
-          <a class="hover:text-stone-900" href={link.href}>{link.label}</a>
+          <a class="hover:text-stone-900" href={link.href}>
+            {link.label}
+          </a>
         ))
       }
     </nav>
@@ -42,8 +48,8 @@ const navLinks = [
       <details class="xl:hidden" data-mobile-nav>
         <summary
           class="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full transition-transform hover:-translate-y-0.5 active:translate-y-0 [&::-webkit-details-marker]:hidden"
-          aria-label="Abrir menú"
-          title="Menú"
+          aria-label={t.aria.openMenu}
+          title={t.aria.openMenu}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -53,22 +59,22 @@ const navLinks = [
             fill="#1f1f1f"
             aria-hidden="true"
           >
-            <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z" />
+            <path
+              d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"
+            ></path>
           </svg>
         </summary>
 
-        <!-- overlay solo por debajo del header -->
         <div class="fixed inset-x-0 bottom-0 top-19 z-50 sm:top-21">
           <button
             type="button"
             class="absolute inset-0 h-full w-full bg-black/35"
-            aria-label="Cerrar menú"
-          ></button>
+            aria-label="Cerrar menú"></button>
 
           <div
             class="fixed left-3 right-3 top-19 max-h-[calc(100dvh-5.5rem)] overflow-auto rounded-4xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)] sm:left-5 sm:right-5 sm:top-21"
           >
-            <nav class="grid gap-1" aria-label="Navegación móvil">
+            <nav class="grid gap-1" aria-label={t.aria.mobileNav}>
               {
                 navLinks.map((link) => (
                   <a
@@ -91,8 +97,8 @@ const navLinks = [
           <a
             class="grid h-10 w-10 place-items-center rounded-full cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0"
             href="/cuenta"
-            aria-label="Cuenta"
-            title="Cuenta"
+            aria-label={t.aria.account}
+            title={t.aria.account}
           >
             <span class="text-sm">
               <svg
@@ -155,7 +161,9 @@ const navLinks = [
       if (window.innerWidth >= 1280) closeMenu();
     });
 
-    const overlayButton = header.querySelector("details[data-mobile-nav] > div > button");
+    const overlayButton = header.querySelector(
+      "details[data-mobile-nav] > div > button",
+    );
     if (overlayButton instanceof HTMLButtonElement) {
       overlayButton.addEventListener("click", closeMenu);
     }

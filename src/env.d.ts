@@ -20,6 +20,7 @@ type CartItemSession = {
 declare namespace App {
   interface Locals {
     user?: AppUser;
+    lang?: import("@/lib/i18n").SiteLang;
   }
 
   interface SessionData {
