@@ -40,6 +40,7 @@ export default function NewsletterForm() {
         <input
           class="h-14 min-w-0 flex-1 rounded-2xl border border-white/20 bg-white px-5 text-base text-zinc-900 outline-none placeholder:text-zinc-500 sm:w-240"
           placeholder="example@correo.com"
+          aria-label="Correo"
           value={email}
           onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
           onKeyDown={(e) => {
