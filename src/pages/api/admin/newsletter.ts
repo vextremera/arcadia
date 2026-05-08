@@ -20,6 +20,69 @@ function parseId(value: FormDataEntryValue | null) {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function cleanEnv(value: unknown) {
+  const text = String(value ?? "").trim();
+
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1).trim();
+  }
+
+  return text;
+}
+
+function parseBooleanEnv(value: unknown) {
+  const text = cleanEnv(value).toLowerCase();
+  return text === "1" || text === "true" || text === "yes";
+}
+
+function maskEmail(email: string) {
+  const [local, domain] = email.split("@");
+
+  if (!local || !domain) {
+    return email;
+  }
+
+  const visible = local.slice(0, 2);
+  return `${visible}***@${domain}`;
+}
+
+function normalizeAddress(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "address" in value &&
+    typeof value.address === "string"
+  ) {
+    return value.address;
+  }
+
+  return String(value ?? "");
+}
+
+function formatMailError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      code: (error as { code?: unknown }).code,
+      command: (error as { command?: unknown }).command,
+      response: (error as { response?: unknown }).response,
+      responseCode: (error as { responseCode?: unknown }).responseCode,
+    };
+  }
+
+  return {
+    message: String(error),
+  };
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -41,26 +104,52 @@ async function sendNewsletterEmails(params: {
   subject: string;
   body: string;
 }) {
-  const host = import.meta.env.SMTP_HOST;
-  const port = Number(import.meta.env.SMTP_PORT || 0);
-  const secure =
-    import.meta.env.SMTP_SECURE === "1" ||
-    import.meta.env.SMTP_SECURE === "true";
-  const from = import.meta.env.SMTP_FROM;
-  const replyTo = import.meta.env.SMTP_REPLY_TO || undefined;
+  const host = cleanEnv(import.meta.env.SMTP_HOST);
+  const port = Number(cleanEnv(import.meta.env.SMTP_PORT));
+  const secure = parseBooleanEnv(import.meta.env.SMTP_SECURE);
+  const from = cleanEnv(import.meta.env.SMTP_FROM);
+  const replyTo = cleanEnv(import.meta.env.SMTP_REPLY_TO) || undefined;
+  const authUser = cleanEnv(import.meta.env.SMTP_USER);
+  const authPass = cleanEnv(import.meta.env.SMTP_PASS);
 
-  if (!host || !port || !from) {
+  if (!host || !port || !from || !authUser || !authPass) {
     throw new Error("SMTP_NOT_CONFIGURED");
   }
 
-  const authUser = import.meta.env.SMTP_USER || undefined;
-  const authPass = import.meta.env.SMTP_PASS || undefined;
+  if (![465, 587, 578].includes(port)) {
+    throw new Error("SMTP_INVALID_PORT");
+  }
+
+  if (port === 465 && !secure) {
+    throw new Error("SMTP_INVALID_SECURITY");
+  }
+
+  if ((port === 587 || port === 578) && secure) {
+    throw new Error("SMTP_INVALID_SECURITY");
+  }
 
   const transporter = nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: authUser && authPass ? { user: authUser, pass: authPass } : undefined,
+    auth: {
+      user: authUser,
+      pass: authPass,
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+  });
+
+  await transporter.verify();
+
+  console.log("[newsletter] smtp verified", {
+    host,
+    port,
+    secure,
+    user: maskEmail(authUser),
+    from,
+    replyTo,
   });
 
   const footerText =
@@ -75,7 +164,7 @@ async function sendNewsletterEmails(params: {
 
   for (const email of params.to) {
     try {
-      await transporter.sendMail({
+      const info = await transporter.sendMail({
         from,
         to: email,
         replyTo,
@@ -83,10 +172,34 @@ async function sendNewsletterEmails(params: {
         text: `${params.body}\n\n---\n${footerText}`,
         html,
       });
-      sent += 1;
+
+      const accepted = Array.isArray(info.accepted)
+        ? info.accepted.map(normalizeAddress)
+        : [];
+
+      const rejected = Array.isArray(info.rejected)
+        ? info.rejected.map(normalizeAddress)
+        : [];
+
+      console.log("[newsletter] mail result", {
+        to: maskEmail(email),
+        messageId: info.messageId,
+        accepted: accepted.map(maskEmail),
+        rejected: rejected.map(maskEmail),
+        response: info.response,
+      });
+
+      if (accepted.length > 0 && rejected.length === 0) {
+        sent += 1;
+      } else {
+        failed += 1;
+      }
     } catch (error) {
       failed += 1;
-      console.error("[newsletter] send failed", email, error);
+      console.error("[newsletter] send failed", {
+        to: maskEmail(email),
+        error: formatMailError(error),
+      });
     }
   }
 
@@ -96,6 +209,7 @@ async function sendNewsletterEmails(params: {
 export const POST: APIRoute = async (context) => {
   const user = context.locals.user;
   const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
+
   if (!allowed) {
     return context.redirect("/admin/login");
   }
@@ -141,7 +255,9 @@ export const POST: APIRoute = async (context) => {
     try {
       await writeAuditLog({
         actorUserId,
-        action: active ? "NEWSLETTER_SUBSCRIBER_ENABLED" : "NEWSLETTER_SUBSCRIBER_DISABLED",
+        action: active
+          ? "NEWSLETTER_SUBSCRIBER_ENABLED"
+          : "NEWSLETTER_SUBSCRIBER_DISABLED",
         entityType: "newsletter_subscriber",
         entityId: String(subscriberId),
         diff: {
@@ -233,9 +349,16 @@ export const POST: APIRoute = async (context) => {
         }),
       );
     } catch (error) {
-      console.error("[newsletter] send failed", error);
+      console.error("[newsletter] send failed", formatMailError(error));
 
-      if (error instanceof Error && error.message === "SMTP_NOT_CONFIGURED") {
+      if (
+        error instanceof Error &&
+        [
+          "SMTP_NOT_CONFIGURED",
+          "SMTP_INVALID_PORT",
+          "SMTP_INVALID_SECURITY",
+        ].includes(error.message)
+      ) {
         return context.redirect(
           withQuery(redirectPath, { error: "smtp-not-configured" }),
         );
