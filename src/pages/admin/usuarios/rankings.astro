@@ -1,0 +1,234 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import { userRoleTone } from "@/lib/admin/tones";
+import { getTodayDateISO } from "@/server/analytics/queries";
+import { getMadridDayBoundsUTC } from "@/server/time/madrid";
+import {
+  db,
+  User,
+  UserProfile,
+  LoyaltyTier,
+  LoyaltyLedger,
+  Order,
+  and,
+  gte,
+  lt,
+  inArray,
+  eq,
+} from "astro:db";
+
+type Period = "total" | "month";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function firstOfMonth(dateISO: string) {
+  const [year, month] = dateISO.split("-");
+  return `${year}-${month}-01`;
+}
+
+const url = new URL(Astro.request.url);
+const periodParam = url.searchParams.get("period");
+const period: Period = periodParam === "month" ? "month" : "total";
+
+const todayISO = getTodayDateISO();
+const monthFromISO = firstOfMonth(todayISO);
+const monthStartUTC = getMadridDayBoundsUTC(monthFromISO).startUTC;
+const monthEndUTC = getMadridDayBoundsUTC(todayISO).endUTC;
+
+const users = await db
+  .select({ id: User.id, name: User.name, email: User.email, role: User.role })
+  .from(User)
+  .where(eq(User.role, "CUSTOMER"));
+
+const userById = new Map(users.map((u) => [u.id, u]));
+const userIds = users.map((u) => u.id);
+
+const tiers = await db
+  .select({ id: LoyaltyTier.id, name: LoyaltyTier.name, minPoints: LoyaltyTier.minPoints, active: LoyaltyTier.active })
+  .from(LoyaltyTier);
+const tierById = new Map(tiers.map((t) => [t.id, t]));
+
+const profiles = userIds.length
+  ? await db
+      .select({ userId: UserProfile.userId, pointsBalance: UserProfile.pointsBalance, tierId: UserProfile.tierId })
+      .from(UserProfile)
+      .where(inArray(UserProfile.userId, userIds))
+  : [];
+
+const profileTierByUserId = new Map<number, number | null>();
+for (const p of profiles) profileTierByUserId.set(p.userId, p.tierId ?? null);
+
+let pointsRanking: Array<{ userId: number; points: number }> = [];
+
+if (period === "total") {
+  pointsRanking = profiles
+    .map((p) => ({ userId: p.userId, points: Number(p.pointsBalance ?? 0) }))
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 10);
+} else {
+  const ledgerRows = userIds.length
+    ? await db
+        .select({ userId: LoyaltyLedger.userId, pointsDelta: LoyaltyLedger.pointsDelta })
+        .from(LoyaltyLedger)
+        .where(and(inArray(LoyaltyLedger.userId, userIds), gte(LoyaltyLedger.createdAt, monthStartUTC), lt(LoyaltyLedger.createdAt, monthEndUTC)))
+    : [];
+  const byUser = new Map<number, number>();
+  for (const row of ledgerRows) {
+    byUser.set(row.userId, (byUser.get(row.userId) ?? 0) + Number(row.pointsDelta ?? 0));
+  }
+  pointsRanking = [...byUser.entries()]
+    .map(([userId, points]) => ({ userId, points }))
+    .filter((row) => row.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 10);
+}
+
+const orderRows = userIds.length
+  ? await db
+      .select({ userId: Order.userId, totalCents: Order.totalCents, paymentStatus: Order.paymentStatus, createdAt: Order.createdAt })
+      .from(Order)
+      .where(inArray(Order.userId, userIds))
+  : [];
+
+function isPaid(status: string) {
+  return status === "PAID" || status === "PARTIALLY_REFUNDED";
+}
+
+const spendByUser = new Map<number, number>();
+for (const order of orderRows) {
+  if (typeof order.userId !== "number" || !isPaid(order.paymentStatus)) continue;
+  if (period === "month") {
+    const createdAt = new Date(order.createdAt).getTime();
+    if (createdAt < monthStartUTC.getTime() || createdAt >= monthEndUTC.getTime()) continue;
+  }
+  spendByUser.set(order.userId, (spendByUser.get(order.userId) ?? 0) + Number(order.totalCents ?? 0));
+}
+
+const spendRanking = [...spendByUser.entries()]
+  .map(([userId, totalCents]) => ({ userId, totalCents }))
+  .sort((a, b) => b.totalCents - a.totalCents)
+  .slice(0, 10);
+
+function hrefFor(nextPeriod: Period) {
+  return `/admin/usuarios/rankings?period=${nextPeriod}`;
+}
+---
+
+<AdminLayout title="Rankings · Admin · Arcadia" heading="Rankings" description="Leaderboards de clientes por puntos y por gasto.">
+  <div class="space-y-6">
+    <section class="flex flex-wrap items-center justify-between gap-4">
+      <div class="inline-flex rounded-admin-lg border border-admin-border bg-white/[0.02] p-1">
+        {
+          (["total", "month"] as Period[]).map((option) => (
+            <a
+              href={hrefFor(option)}
+              class:list={[
+                "rounded-admin px-4 py-2 text-sm font-semibold transition",
+                option === period ? "bg-sky-400/15 text-sky-200" : "text-admin-muted hover:text-white",
+              ]}
+            >
+              {option === "total" ? "Total" : "Este mes"}
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <Card padded={false}>
+        <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+          <h2 class="text-base font-semibold text-white">Top por puntos</h2>
+          <p class="mt-1 text-xs text-admin-muted">{period === "total" ? "Saldo actual de puntos" : "Puntos ganados este mes"}</p>
+        </div>
+        {
+          pointsRanking.length === 0 ? (
+            <div class="px-6 py-14">
+              <EmptyState title="Sin datos para este periodo" />
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Cliente</th>
+                    <th>Tier</th>
+                    <th class="text-right">Puntos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pointsRanking.map((row, index) => {
+                    const user = userById.get(row.userId);
+                    const tierId = profileTierByUserId.get(row.userId) ?? null;
+                    const tier = tierId ? tierById.get(tierId) : null;
+                    return (
+                      <tr>
+                        <td class="text-admin-muted">{index + 1}</td>
+                        <td>
+                          <a href={`/admin/usuarios/${row.userId}`} class="font-semibold text-white transition hover:text-sky-300">
+                            {user?.name ?? user?.email ?? `#${row.userId}`}
+                          </a>
+                        </td>
+                        <td>{tier ? <Badge tone="cyan">{tier.name}</Badge> : <span class="text-admin-muted">—</span>}</td>
+                        <td class="text-right font-semibold text-white">{row.points}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Card>
+
+      <Card padded={false}>
+        <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+          <h2 class="text-base font-semibold text-white">Top por gasto</h2>
+          <p class="mt-1 text-xs text-admin-muted">{period === "total" ? "Gasto acumulado en pedidos pagados" : "Gasto de este mes en pedidos pagados"}</p>
+        </div>
+        {
+          spendRanking.length === 0 ? (
+            <div class="px-6 py-14">
+              <EmptyState title="Sin datos para este periodo" />
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Cliente</th>
+                    <th>Rol</th>
+                    <th class="text-right">Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {spendRanking.map((row, index) => {
+                    const user = userById.get(row.userId);
+                    return (
+                      <tr>
+                        <td class="text-admin-muted">{index + 1}</td>
+                        <td>
+                          <a href={`/admin/usuarios/${row.userId}`} class="font-semibold text-white transition hover:text-sky-300">
+                            {user?.name ?? user?.email ?? `#${row.userId}`}
+                          </a>
+                        </td>
+                        <td>{user ? <Badge tone={userRoleTone(user.role)}>Cliente</Badge> : <span class="text-admin-muted">—</span>}</td>
+                        <td class="text-right font-semibold text-white">{money(row.totalCents)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Card>
+    </div>
+  </div>
+</AdminLayout>

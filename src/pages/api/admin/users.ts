@@ -41,7 +41,7 @@ function withQuery(path: string, params: Record<string, string | number>) {
 }
 
 function redirectToUser(userId: number, params: Record<string, string>) {
-  return withQuery("/admin/usuarios", { user: userId, ...params });
+  return withQuery(`/admin/usuarios/${userId}`, params);
 }
 
 async function getOrCreateProfile(userId: number) {
