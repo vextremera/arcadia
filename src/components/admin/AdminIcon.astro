@@ -1,0 +1,153 @@
+---
+/**
+ * Iconografía centralizada del admin.
+ *
+ * Antes había ~19 SVG inline dentro de un switch gigante en AdminSidebar.
+ * Ahora se referencian por nombre: <AdminIcon name="dashboard" />
+ */
+
+import type { AdminIconName } from "@/lib/admin/icons";
+export type { AdminIconName };
+
+interface Props {
+  name: AdminIconName;
+  class?: string;
+}
+
+const { name, class: className = "h-[18px] w-[18px]" } = Astro.props as Props;
+---
+
+<svg
+  viewBox="0 0 24 24"
+  class={className}
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.8"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  {name === "dashboard" && (
+    <>
+      <path d="M4 13h7V4H4z" />
+      <path d="M13 20h7v-9h-7z" />
+      <path d="M13 11h7V4h-7z" />
+      <path d="M4 20h7v-5H4z" />
+    </>
+  )}
+  {name === "cart" && (
+    <>
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="18" cy="20" r="1" />
+      <path d="M3 4h2l2.4 12.2a1 1 0 0 0 1 .8h8.8a1 1 0 0 0 1-.8L21 8H6" />
+    </>
+  )}
+  {name === "products" && (
+    <>
+      {/* "Stacks" de Material Symbols: hojas apiladas sobre el cuerpo principal. */}
+      <path d="M8.5 3h7" />
+      <path d="M6 6.5h12" />
+      <rect x="3" y="10" width="18" height="11" rx="2" />
+    </>
+  )}
+  {name === "users" && (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+      <circle cx="9.5" cy="7" r="3" />
+      <path d="M20 8v6" />
+      <path d="M23 11h-6" />
+    </>
+  )}
+  {name === "live" && (
+    <>
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6.3 6.3a8 8 0 0 0 0 11.4" />
+      <path d="M17.7 6.3a8 8 0 0 1 0 11.4" />
+      <path d="M3.5 3.5a12 12 0 0 0 0 17" />
+      <path d="M20.5 3.5a12 12 0 0 1 0 17" />
+    </>
+  )}
+  {name === "sliders" && (
+    <>
+      <path d="M4 6h10" />
+      <path d="M18 6h2" />
+      <circle cx="16" cy="6" r="2" />
+      <path d="M4 12h4" />
+      <path d="M12 12h8" />
+      <circle cx="10" cy="12" r="2" />
+      <path d="M4 18h10" />
+      <path d="M18 18h2" />
+      <circle cx="16" cy="18" r="2" />
+    </>
+  )}
+  {name === "menu" && (
+    <>
+      {/* Carta del menú: tarjeta con líneas, no la lista de navegación. */}
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+      <path d="M9 16h3" />
+    </>
+  )}
+  {name === "printer" && (
+    <>
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H5a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1" />
+      <rect x="7" y="14" width="10" height="7" rx="1" />
+    </>
+  )}
+  {name === "ticket" && (
+    <>
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
+      <path d="M13 6v12" />
+    </>
+  )}
+  {name === "bell" && (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M10.3 21a1.9 1.9 0 0 0 3.4 0" />
+    </>
+  )}
+  {name === "search" && (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </>
+  )}
+  {name === "chevron" && <path d="m6 9 6 6 6-6" />}
+  {name === "power" && (
+    <>
+      <path d="M12 3v9" />
+      <path d="M6.3 7.3a8 8 0 1 0 11.4 0" />
+    </>
+  )}
+  {name === "logout" && (
+    <>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  )}
+  {name === "plus" && (
+    <>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </>
+  )}
+  {name === "dot" && <circle cx="12" cy="12" r="3" />}
+  {name === "coin" && (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 15.5c.5.7 1.4 1 2.5 1s2-.4 2-1.4c0-2-4.5-.9-4.5-2.9 0-1 .9-1.4 2-1.4s2 .3 2.5 1" />
+      <path d="M12 7v1.2" />
+      <path d="M12 15.8V17" />
+    </>
+  )}
+  {name === "receipt" && (
+    <>
+      <path d="M6 3h12v18l-2.5-1.5L13 21l-2.5-1.5L8 21l-2-1.5V3Z" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+    </>
+  )}
+</svg>

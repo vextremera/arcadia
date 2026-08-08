@@ -1,0 +1,31 @@
+---
+/**
+ * Estado vacío estandarizado para listas/tablas sin datos.
+ */
+interface Props {
+  title: string;
+  description?: string;
+  class?: string;
+}
+
+const { title, description, class: className = "" } = Astro.props as Props;
+---
+
+<div
+  class:list={[
+    "flex flex-col items-center justify-center rounded-admin-lg border border-dashed border-admin-border px-6 py-14 text-center",
+    className,
+  ]}
+>
+  <div class="text-base font-semibold text-white">{title}</div>
+  {
+    description ? (
+      <p class="mt-2 max-w-md text-sm leading-6 text-admin-muted">
+        {description}
+      </p>
+    ) : null
+  }
+  <div class="mt-5 empty:hidden">
+    <slot />
+  </div>
+</div>

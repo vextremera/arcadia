@@ -1,0 +1,20 @@
+---
+/**
+ * Contenedor base de superficie del admin.
+ * Reemplaza los `rounded-[32px] border ... bg-[#111827]/82 shadow-...` sueltos
+ * repartidos por las páginas, usando la clase `.admin-card` (global.css).
+ */
+interface Props {
+  padded?: boolean;
+  class?: string;
+}
+
+const {
+  padded = true,
+  class: className = "",
+} = Astro.props as Props;
+---
+
+<section class:list={["admin-card", padded && "p-6 lg:p-7", className]}>
+  <slot />
+</section>

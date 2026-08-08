@@ -1,0 +1,24 @@
+---
+/**
+ * Pill de estado / etiqueta. Usa el mapa único de tonos (lib/admin/tones.ts).
+ * Se puede pasar `tone` directo o dejar que un helper lo resuelva antes.
+ */
+import { toneClasses, type ToneName } from "@/lib/admin/tones";
+
+interface Props {
+  tone?: ToneName;
+  class?: string;
+}
+
+const { tone = "neutral", class: className = "" } = Astro.props as Props;
+---
+
+<span
+  class:list={[
+    "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
+    toneClasses(tone),
+    className,
+  ]}
+>
+  <slot />
+</span>
