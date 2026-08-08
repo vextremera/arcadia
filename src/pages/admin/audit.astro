@@ -203,20 +203,8 @@ const summaryCards = [
 <AdminLayout
   title="Audit · Admin · Arcadia"
   heading="Audit log"
-  description="Trazabilidad de cambios administrativos relevantes. He rehecho la vista para que cada evento se lea mejor como rastro operativo real y no como una lista técnica comprimida."
-  actions={true}
+  description="Rastro de cambios administrativos: quién tocó qué, cuándo y con qué payload."
 >
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Volver al dashboard
-      </a>
-    </div>
-  </Fragment>
-
   <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
     {
       summaryCards.map((card) => (

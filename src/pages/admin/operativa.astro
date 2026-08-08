@@ -1,10 +1,13 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
+import type { ToneName } from "@/lib/admin/tones";
 import { db, AppSetting, OpeningHour, SpecialDate, eq } from "astro:db";
-import {
-  getArcadiaAvailability,
-  type ArcadiaChannel,
-} from "@/server/time/madrid";
+import { getArcadiaAvailability, type ArcadiaChannel } from "@/server/time/madrid";
 
 type OperatingHoursSetting = {
   open: { start: string; end: string };
@@ -12,30 +15,17 @@ type OperatingHoursSetting = {
   delivery: { start: string; end: string };
 };
 
-type DeliveryFeeSetting = {
-  cents: number;
-};
-
-type OpsFlagsSetting = {
-  pauseOrders: boolean;
-  forcePickup: boolean;
-};
-
-type DeliveryAreaRuleSetting = {
-  enabled: boolean;
-};
+type DeliveryFeeSetting = { cents: number };
+type OpsFlagsSetting = { pauseOrders: boolean; forcePickup: boolean };
+type DeliveryAreaRuleSetting = { enabled: boolean };
 
 type ChannelEditor = {
   key: ArcadiaChannel;
   label: string;
-  badgeClass: string;
-  panelClass: string;
   isClosed: boolean;
   open: string;
   close: string;
   resolutionSource: "OPENING_HOUR" | "APP_SETTING";
-  resolutionLabel: string;
-  resolutionTone: string;
 };
 
 type WeeklyRow = {
@@ -64,30 +54,10 @@ const DAYS = [
   { key: 7, label: "Domingo" },
 ];
 
-const CHANNELS: Array<{
-  key: ArcadiaChannel;
-  label: string;
-  badgeClass: string;
-  panelClass: string;
-}> = [
-  {
-    key: "DINE_IN",
-    label: "Local",
-    badgeClass: "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-    panelClass: "border-emerald-400/15 bg-emerald-400/6",
-  },
-  {
-    key: "PICKUP",
-    label: "Pickup",
-    badgeClass: "border-indigo-400/20 bg-indigo-400/10 text-indigo-300",
-    panelClass: "border-indigo-400/15 bg-indigo-400/6",
-  },
-  {
-    key: "DELIVERY",
-    label: "Delivery",
-    badgeClass: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
-    panelClass: "border-cyan-400/15 bg-cyan-400/6",
-  },
+const CHANNELS: Array<{ key: ArcadiaChannel; label: string; tone: ToneName }> = [
+  { key: "DINE_IN", label: "Local", tone: "success" },
+  { key: "PICKUP", label: "Pickup", tone: "indigo" },
+  { key: "DELIVERY", label: "Delivery", tone: "cyan" },
 ];
 
 const DEFAULTS = {
@@ -97,20 +67,12 @@ const DEFAULTS = {
     delivery: { start: "20:00", end: "22:50" },
   } satisfies OperatingHoursSetting,
   deliveryFee: { cents: 0 } satisfies DeliveryFeeSetting,
-  opsFlags: {
-    pauseOrders: false,
-    forcePickup: false,
-  } satisfies OpsFlagsSetting,
+  opsFlags: { pauseOrders: false, forcePickup: false } satisfies OpsFlagsSetting,
   deliveryAreaRule: { enabled: false } satisfies DeliveryAreaRuleSetting,
 };
 
 async function getSetting<T>(key: string, fallback: T): Promise<T> {
-  const [row] = await db
-    .select({ value: AppSetting.value })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, key))
-    .limit(1);
-
+  const [row] = await db.select({ value: AppSetting.value }).from(AppSetting).where(eq(AppSetting.key, key)).limit(1);
   return (row?.value ?? fallback) as T;
 }
 
@@ -134,19 +96,13 @@ function normalizeDow(v: number) {
   return 1;
 }
 
-function fallbackWindowForChannel(
-  channel: ArcadiaChannel,
-  operatingHours: OperatingHoursSetting,
-) {
+function fallbackWindowForChannel(channel: ArcadiaChannel, operatingHours: OperatingHoursSetting) {
   if (channel === "DELIVERY") {
     return {
-      start:
-        operatingHours.delivery?.start ??
-        DEFAULTS.operatingHours.delivery.start,
+      start: operatingHours.delivery?.start ?? DEFAULTS.operatingHours.delivery.start,
       end: operatingHours.delivery?.end ?? DEFAULTS.operatingHours.delivery.end,
     };
   }
-
   return {
     start: operatingHours.open?.start ?? DEFAULTS.operatingHours.open.start,
     end: operatingHours.open?.end ?? DEFAULTS.operatingHours.open.end,
@@ -163,6 +119,10 @@ function channelLabel(channel: ArcadiaChannel) {
   return CHANNELS.find((item) => item.key === channel)?.label ?? channel;
 }
 
+function channelTone(channel: ArcadiaChannel): ToneName {
+  return CHANNELS.find((item) => item.key === channel)?.tone ?? "neutral";
+}
+
 function sourceLabel(source: string) {
   if (source === "SPECIAL_DATE") return "Excepción activa";
   if (source === "SPECIAL_DATE_CLOSED") return "Excepción de cierre";
@@ -171,50 +131,19 @@ function sourceLabel(source: string) {
   return "Fallback AppSetting";
 }
 
-function weeklySourceMeta(source: "OPENING_HOUR" | "APP_SETTING") {
-  if (source === "OPENING_HOUR") {
-    return {
-      label: "OpeningHour",
-      tone: "border-sky-400/20 bg-sky-400/10 text-sky-200",
-    };
-  }
-
-  return {
-    label: "Fallback AppSetting",
-    tone: "border-amber-400/20 bg-amber-400/10 text-amber-200",
-  };
-}
-
 const availability = await getArcadiaAvailability(new Date());
 
-const operatingHours = await getSetting<OperatingHoursSetting>(
-  "operatingHours",
-  DEFAULTS.operatingHours,
-);
-const deliveryFee = await getSetting<DeliveryFeeSetting>(
-  "deliveryFee",
-  DEFAULTS.deliveryFee,
-);
-const opsFlags = await getSetting<OpsFlagsSetting>(
-  "opsFlags",
-  DEFAULTS.opsFlags,
-);
-const deliveryAreaRule = await getSetting<DeliveryAreaRuleSetting>(
-  "deliveryAreaRule",
-  DEFAULTS.deliveryAreaRule,
-);
+const operatingHours = await getSetting<OperatingHoursSetting>("operatingHours", DEFAULTS.operatingHours);
+const deliveryFee = await getSetting<DeliveryFeeSetting>("deliveryFee", DEFAULTS.deliveryFee);
+const opsFlags = await getSetting<OpsFlagsSetting>("opsFlags", DEFAULTS.opsFlags);
+const deliveryAreaRule = await getSetting<DeliveryAreaRuleSetting>("deliveryAreaRule", DEFAULTS.deliveryAreaRule);
 
-const openStart =
-  operatingHours.open?.start ?? DEFAULTS.operatingHours.open.start;
+const openStart = operatingHours.open?.start ?? DEFAULTS.operatingHours.open.start;
 const openEnd = operatingHours.open?.end ?? DEFAULTS.operatingHours.open.end;
-const kitchenStart =
-  operatingHours.kitchen?.start ?? DEFAULTS.operatingHours.kitchen.start;
-const kitchenEnd =
-  operatingHours.kitchen?.end ?? DEFAULTS.operatingHours.kitchen.end;
-const deliveryStart =
-  operatingHours.delivery?.start ?? DEFAULTS.operatingHours.delivery.start;
-const deliveryEnd =
-  operatingHours.delivery?.end ?? DEFAULTS.operatingHours.delivery.end;
+const kitchenStart = operatingHours.kitchen?.start ?? DEFAULTS.operatingHours.kitchen.start;
+const kitchenEnd = operatingHours.kitchen?.end ?? DEFAULTS.operatingHours.kitchen.end;
+const deliveryStart = operatingHours.delivery?.start ?? DEFAULTS.operatingHours.delivery.start;
+const deliveryEnd = operatingHours.delivery?.end ?? DEFAULTS.operatingHours.delivery.end;
 const deliveryFeeEur = (Number(deliveryFee?.cents ?? 0) / 100).toFixed(2);
 const deliveryAreaSummary = "Lloret de Mar · 17310";
 
@@ -243,10 +172,7 @@ const specialDateRowsRaw = await db
   .from(SpecialDate)
   .orderBy(SpecialDate.dateISO, SpecialDate.channel);
 
-const openingHourByKey = new Map<
-  string,
-  { isClosed: boolean; openMins: number; closeMins: number }
->();
+const openingHourByKey = new Map<string, { isClosed: boolean; openMins: number; closeMins: number }>();
 
 for (const row of openingHourRows) {
   const dayKey = normalizeDow(row.dayOfWeek);
@@ -264,11 +190,7 @@ for (const row of openingHourRows) {
   }
 
   if (prev.isClosed || next.isClosed) {
-    openingHourByKey.set(key, {
-      isClosed: true,
-      openMins: prev.openMins,
-      closeMins: prev.closeMins,
-    });
+    openingHourByKey.set(key, { isClosed: true, openMins: prev.openMins, closeMins: prev.closeMins });
     continue;
   }
 
@@ -285,43 +207,27 @@ const weeklyRows: WeeklyRow[] = DAYS.map((day) => ({
   channels: CHANNELS.map((channel) => {
     const fallback = fallbackWindowForChannel(channel.key, operatingHours);
     const row = openingHourByKey.get(`${day.key}:${channel.key}`);
-    const resolutionSource = row ? "OPENING_HOUR" : "APP_SETTING";
-    const resolutionMeta = weeklySourceMeta(resolutionSource);
 
     return {
       key: channel.key,
       label: channel.label,
-      badgeClass: channel.badgeClass,
-      panelClass: channel.panelClass,
       isClosed: row?.isClosed ?? false,
       open: row ? minsToHHMM(row.openMins) : fallback.start,
       close: row ? minsToHHMM(row.closeMins) : fallback.end,
-      resolutionSource,
-      resolutionLabel: resolutionMeta.label,
-      resolutionTone: resolutionMeta.tone,
+      resolutionSource: (row ? "OPENING_HOUR" : "APP_SETTING") as "OPENING_HOUR" | "APP_SETTING",
     };
   }),
 }));
 
 const specialDates: SpecialDateSummary[] = specialDateRowsRaw.map((row) => {
-  const fallback = fallbackWindowForChannel(
-    row.channel as ArcadiaChannel,
-    operatingHours,
-  );
-
+  const fallback = fallbackWindowForChannel(row.channel as ArcadiaChannel, operatingHours);
   return {
     id: row.id,
     dateISO: row.dateISO,
     channel: row.channel as ArcadiaChannel,
     isClosed: !!row.isClosed,
-    open:
-      typeof row.openMins === "number"
-        ? minsToHHMM(row.openMins)
-        : fallback.start,
-    close:
-      typeof row.closeMins === "number"
-        ? minsToHHMM(row.closeMins)
-        : fallback.end,
+    open: typeof row.openMins === "number" ? minsToHHMM(row.openMins) : fallback.start,
+    close: typeof row.closeMins === "number" ? minsToHHMM(row.closeMins) : fallback.end,
     note: String(row.note ?? ""),
   };
 });
@@ -334,1158 +240,365 @@ const hoursError = url.searchParams.get("hoursError") ?? "";
 const specialDatesError = url.searchParams.get("specialDatesError") ?? "";
 
 const hoursErrorMessage =
-  hoursError === "invalid-hours"
-    ? "Hay una franja semanal inválida. Revisa horas de inicio y fin."
-    : hoursError === "invalid-channel"
-      ? "Se recibió un canal horario no válido."
-      : "";
+  hoursError === "invalid-hours" ? "Hay una franja semanal inválida. Revisa horas de inicio y fin." :
+  hoursError === "invalid-channel" ? "Se recibió un canal horario no válido." :
+  "";
 
 const specialDatesErrorMessage =
-  specialDatesError === "invalid-special-date"
-    ? "La excepción indicada no es válida."
-    : specialDatesError === "invalid-date"
-      ? "La fecha especial no tiene un formato válido."
-      : specialDatesError === "invalid-channel"
-        ? "El canal de la fecha especial no es válido."
-        : specialDatesError === "invalid-hours"
-          ? "La franja de la fecha especial no es válida."
-          : specialDatesError === "duplicate-special-date"
-            ? "Ya existe una excepción para esa fecha y ese canal."
-            : specialDatesError === "invalid-intent"
-              ? "Acción de fecha especial no válida."
-              : "";
+  specialDatesError === "invalid-special-date" ? "La excepción indicada no es válida." :
+  specialDatesError === "invalid-date" ? "La fecha especial no tiene un formato válido." :
+  specialDatesError === "invalid-channel" ? "El canal de la fecha especial no es válido." :
+  specialDatesError === "invalid-hours" ? "La franja de la fecha especial no es válida." :
+  specialDatesError === "invalid-range" ? "La fecha final del periodo es anterior a la inicial." :
+  specialDatesError === "range-too-long" ? "El periodo no puede superar un año." :
+  specialDatesError === "duplicate-special-date" ? "Ya existe una excepción para esa fecha y ese canal." :
+  specialDatesError === "invalid-intent" ? "Acción de fecha especial no válida." :
+  "";
 
 const totalWeeklySlots = DAYS.length * CHANNELS.length;
 const structuredWeeklySlots = weeklyRows.reduce(
-  (count, day) =>
-    count +
-    day.channels.filter(
-      (channel) => channel.resolutionSource === "OPENING_HOUR",
-    ).length,
+  (count, day) => count + day.channels.filter((channel) => channel.resolutionSource === "OPENING_HOUR").length,
   0,
 );
 const fallbackWeeklySlots = totalWeeklySlots - structuredWeeklySlots;
-const partiallyStructuredWeeklyHours =
-  structuredWeeklySlots > 0 && structuredWeeklySlots < totalWeeklySlots;
-const weeklyResolutionHelp =
-  structuredWeeklySlots === totalWeeklySlots
-    ? "Cobertura completa en OpeningHour"
-    : structuredWeeklySlots === 0
-      ? "Ahora mismo todo cae a AppSetting"
-      : `${structuredWeeklySlots}/${totalWeeklySlots} franjas en OpeningHour · ${fallbackWeeklySlots} en fallback`;
-const todayDateISO = availability.todayDateISO;
-const todaySpecialDates = specialDates.filter(
-  (row) => row.dateISO === todayDateISO,
-);
-const upcomingSpecialDates = specialDates.filter(
-  (row) => row.dateISO >= todayDateISO,
-);
+const partiallyStructuredWeeklyHours = structuredWeeklySlots > 0 && structuredWeeklySlots < totalWeeklySlots;
 
-const statusCards = [
-  {
-    label: "Local",
-    value: availability.localOpen ? "Abierto" : "Cerrado",
-    tone: availability.localOpen
-      ? "border-emerald-400/15 bg-emerald-400/8 text-emerald-200"
-      : "border-rose-400/15 bg-rose-400/8 text-rose-200",
-    help: `${availability.windows.open.start} - ${availability.windows.open.end} · ${sourceLabel(availability.sources.open)}`,
-  },
-  {
-    label: "Pickup",
-    value: availability.pickupAvailable ? "Disponible" : "No disponible",
-    tone: availability.pickupAvailable
-      ? "border-sky-400/15 bg-sky-400/8 text-sky-200"
-      : "border-amber-400/15 bg-amber-400/8 text-amber-200",
-    help: `${availability.windows.pickup.start} - ${availability.windows.pickup.end} · ${sourceLabel(availability.sources.pickup)}`,
-  },
-  {
-    label: "Delivery",
-    value: opsFlags.forcePickup
-      ? "Forzado a pickup"
-      : availability.deliveryAvailable
-        ? "Disponible"
-        : "No disponible",
-    tone: opsFlags.forcePickup
-      ? "border-amber-400/15 bg-amber-400/8 text-amber-200"
-      : availability.deliveryAvailable
-        ? "border-cyan-400/15 bg-cyan-400/8 text-cyan-200"
-        : "border-amber-400/15 bg-amber-400/8 text-amber-200",
-    help: `${availability.windows.delivery.start} - ${availability.windows.delivery.end} · ${sourceLabel(availability.sources.delivery)}`,
-  },
-  {
-    label: "Kitchen",
-    value: availability.kitchenOpen ? "Activa" : "Cerrada",
-    tone: availability.kitchenOpen
-      ? "border-violet-400/15 bg-violet-400/8 text-violet-200"
-      : "border-amber-400/15 bg-amber-400/8 text-amber-200",
-    help: `${availability.windows.kitchen.start} - ${availability.windows.kitchen.end} · AppSetting`,
-  },
-  {
-    label: "Pedidos",
-    value: opsFlags.pauseOrders ? "Pausados" : "Activos",
-    tone: opsFlags.pauseOrders
-      ? "border-rose-400/15 bg-rose-400/8 text-rose-200"
-      : "border-emerald-400/15 bg-emerald-400/8 text-emerald-200",
-    help: opsFlags.pauseOrders ? "Checkout bloqueado" : "Checkout operativo",
-  },
-  {
-    label: "Fee delivery",
-    value: money(deliveryFee.cents),
-    tone: "border-white/10 bg-white/[0.03] text-slate-300",
-    help: "Tarifa aplicada al envío",
-  },
-  {
-    label: "Área delivery",
-    value: deliveryAreaRule.enabled ? "Activa" : "Desactivada",
-    tone: deliveryAreaRule.enabled
-      ? "border-fuchsia-400/15 bg-fuchsia-400/8 text-fuchsia-200"
-      : "border-white/10 bg-white/[0.03] text-slate-300",
-    help: deliveryAreaSummary,
-  },
+const todayDateISO = availability.todayDateISO;
+const upcomingSpecialDates = specialDates.filter((row) => row.dateISO >= todayDateISO);
+
+const statusRows = [
+  { label: "Local", value: availability.localOpen ? "Abierto" : "Cerrado", tone: (availability.localOpen ? "success" : "danger") as ToneName, help: `${availability.windows.open.start} – ${availability.windows.open.end} · ${sourceLabel(availability.sources.open)}` },
+  { label: "Pickup", value: availability.pickupAvailable ? "Disponible" : "No disponible", tone: (availability.pickupAvailable ? "primary" : "warning") as ToneName, help: `${availability.windows.pickup.start} – ${availability.windows.pickup.end} · ${sourceLabel(availability.sources.pickup)}` },
+  { label: "Delivery", value: opsFlags.forcePickup ? "Forzado a pickup" : availability.deliveryAvailable ? "Disponible" : "No disponible", tone: (opsFlags.forcePickup ? "warning" : availability.deliveryAvailable ? "cyan" : "warning") as ToneName, help: `${availability.windows.delivery.start} – ${availability.windows.delivery.end} · ${sourceLabel(availability.sources.delivery)}` },
+  { label: "Cocina", value: availability.kitchenOpen ? "Activa" : "Cerrada", tone: (availability.kitchenOpen ? "violet" : "warning") as ToneName, help: `${availability.windows.kitchen.start} – ${availability.windows.kitchen.end} · AppSetting` },
+  { label: "Área delivery", value: deliveryAreaRule.enabled ? "Activa" : "Desactivada", tone: (deliveryAreaRule.enabled ? "fuchsia" : "neutral") as ToneName, help: deliveryAreaSummary },
 ];
+
+const timeInputClass = "w-full rounded-xl border border-admin-border bg-white/[0.03] px-2.5 py-1.5 text-xs text-white focus:border-sky-400/40 focus:outline-none";
+const fieldInputClass = "w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none";
+const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted";
 ---
 
-<AdminLayout
-  title="Operativa · Admin · Arcadia"
-  heading="Operativa"
-  description="Pantalla central de horarios, flags y excepciones. La he reordenado para que respire más: menos bloques apretados y una lectura mucho más clara de qué manda realmente en cada capa."
-  actions={true}
->
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/ajustes/pagos"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Ajustes de pago
-      </a>
+<AdminLayout title="Operativa · Admin · Arcadia" heading="Operativa" description="Horarios por canal, flags inmediatos y excepciones de calendario.">
+  <div class="space-y-6">
+    {saved ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">Base operativa y flags guardados correctamente.</section> : null}
+    {hoursSaved ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">Horario semanal guardado correctamente.</section> : null}
+    {specialDatesSaved ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">Fechas especiales actualizadas correctamente.</section> : null}
+    {hoursErrorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{hoursErrorMessage}</section> : null}
+    {specialDatesErrorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{specialDatesErrorMessage}</section> : null}
 
-      <a
-        href="/admin/ajustes/fees"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-      >
-        Ver fees
-      </a>
-    </div>
-  </Fragment>
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard icon="live" label="Pedidos" value={opsFlags.pauseOrders ? "Pausados" : "Activos"} helper={opsFlags.pauseOrders ? "Checkout bloqueado" : "Checkout operativo"} />
+      <StatCard icon="coin" label="Fee de delivery" value={money(deliveryFee.cents)} helper={`${structuredWeeklySlots}/${totalWeeklySlots} franjas en OpeningHour`} />
+    </section>
 
-  {
-    saved ? (
-      <section class="mb-6 rounded-[26px] border border-emerald-400/15 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-100">
-        Base operativa y flags guardados correctamente.
-      </section>
-    ) : null
-  }
-
-  {
-    hoursSaved ? (
-      <section class="mb-6 rounded-[26px] border border-sky-400/15 bg-sky-400/10 px-5 py-4 text-sm text-sky-100">
-        Horario semanal estructurado guardado correctamente.
-      </section>
-    ) : null
-  }
-
-  {
-    specialDatesSaved ? (
-      <section class="mb-6 rounded-[26px] border border-violet-400/15 bg-violet-400/10 px-5 py-4 text-sm text-violet-100">
-        Fechas especiales actualizadas correctamente.
-      </section>
-    ) : null
-  }
-
-  {
-    hoursErrorMessage ? (
-      <section class="mb-6 rounded-[26px] border border-rose-400/15 bg-rose-400/10 px-5 py-4 text-sm text-rose-100">
-        {hoursErrorMessage}
-      </section>
-    ) : null
-  }
-
-  {
-    specialDatesErrorMessage ? (
-      <section class="mb-6 rounded-[26px] border border-rose-400/15 bg-rose-400/10 px-5 py-4 text-sm text-rose-100">
-        {specialDatesErrorMessage}
-      </section>
-    ) : null
-  }
-
-  <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-    {
-      statusCards.map((card) => (
-        <article
-          class:list={[
-            "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
-            card.tone,
-          ]}
-        >
-          <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            {card.label}
-          </div>
-          <div class="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">
-            {card.value}
-          </div>
-          <p class="mt-3 text-sm leading-6 text-slate-400">{card.help}</p>
-        </article>
-      ))
-    }
-  </section>
-
-  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-    <article
-      class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-    >
-      <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-      >
-        Precedencia real
+    <Card padded={false}>
+      <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+        <h2 class="text-base font-semibold text-white">Estado ahora mismo</h2>
       </div>
-      <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-        SpecialDate → OpeningHour → AppSetting
-      </h2>
-      <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-        La resolución es por canal y por fecha. Si falta una celda semanal
-        concreta, no se cae todo el sistema: solo esa celda vuelve al fallback
-        base. Eso permite migrar la operativa poco a poco sin dejar ambigüedad.
-      </p>
-
-      <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <article
-          class="rounded-[24px] border border-white/10 bg-white/[0.03] p-5"
-        >
-          <div
-            class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-          >
-            Cobertura semanal
-          </div>
-          <div
-            class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white"
-          >
-            {structuredWeeklySlots}/{totalWeeklySlots}
-          </div>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Franjas ya resueltas desde OpeningHour.
-          </p>
-        </article>
-
-        <article
-          class="rounded-[24px] border border-white/10 bg-white/[0.03] p-5"
-        >
-          <div
-            class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-          >
-            Fallback activo
-          </div>
-          <div
-            class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white"
-          >
-            {fallbackWeeklySlots}
-          </div>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Celdas que todavía siguen dependiendo de AppSetting.
-          </p>
-        </article>
-
-        <article
-          class="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 md:col-span-2 xl:col-span-1"
-        >
-          <div
-            class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-          >
-            Lectura rápida
-          </div>
-          <div class="mt-3 text-base font-semibold text-white">
-            {weeklyResolutionHelp}
-          </div>
-          <p class="mt-2 text-sm leading-6 text-slate-400">
-            Resumen del estado real del horario semanal estructurado.
-          </p>
-        </article>
+      <div class="overflow-x-auto">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Canal</th>
+              <th>Estado</th>
+              <th>Ventana y origen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {statusRows.map((row) => (
+              <tr>
+                <td class="font-semibold text-white">{row.label}</td>
+                <td><Badge tone={row.tone}>{row.value}</Badge></td>
+                <td class="text-admin-muted">{row.help}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </article>
+    </Card>
 
-    <aside class="space-y-6">
-      <section
-        class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Zona delivery
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Regla simple de reparto
-        </h2>
-        <p class="mt-3 text-sm leading-7 text-slate-400">
-          Si este control está activo, checkout solo permite <strong
-            class="text-slate-200">delivery</strong
-          > para <strong class="text-slate-200">Lloret de Mar</strong> con <strong
-            class="text-slate-200">17310</strong
-          >. Fuera de ese criterio, el sistema fuerza pickup.
-        </p>
-      </section>
-
-      {
-        todaySpecialDates.length > 0 ? (
-          <section class="rounded-[30px] border border-amber-400/15 bg-amber-400/10 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.28)] lg:p-7">
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200">
-              Hoy
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Excepciones activas
-            </h2>
-            <p class="mt-3 text-sm leading-7 text-amber-100/85">
-              El {formatDateISO(todayDateISO)} hay {todaySpecialDates.length}{" "}
-              excepción{todaySpecialDates.length === 1 ? "" : "es"} activa
-              {todaySpecialDates.length === 1 ? "" : "s"}. Conviene revisar esto
-              antes de tocar flags globales.
-            </p>
-          </section>
-        ) : null
-      }
-    </aside>
-  </section>
-
-  <form class="mt-6" method="post" action="/api/admin/operativa/save">
-    <section
-      class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
-    >
-      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
-        <div class="flex flex-wrap items-end justify-between gap-4">
+    <form method="post" action="/api/admin/operativa/save">
+      <Card>
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              Base operativa
-            </div>
-            <h2
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
-            >
-              Fallback general y flags inmediatos
-            </h2>
-            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-              Esta capa sigue gobernando la cocina, la fee de delivery y los
-              flags operativos. Además, sigue siendo el fallback si todavía
-              faltan celdas reales en OpeningHour.
-            </p>
+            <div class="admin-eyebrow">Base operativa</div>
+            <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Ventanas base y flags</h2>
           </div>
+          <Badge tone="neutral">Fallback de AppSetting</Badge>
+        </div>
 
-          <div
-            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-300"
-          >
-            Hora Madrid: <span class="ml-2 font-semibold text-white"
-              >{availability.now}</span
-            >
+        <div class="mt-5 grid gap-4 lg:grid-cols-3">
+          {[
+            { label: "Local", startName: "openStart", endName: "openEnd", start: openStart, end: openEnd },
+            { label: "Cocina", startName: "kitchenStart", endName: "kitchenEnd", start: kitchenStart, end: kitchenEnd },
+            { label: "Delivery", startName: "deliveryStart", endName: "deliveryEnd", start: deliveryStart, end: deliveryEnd },
+          ].map((block) => (
+            <div class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-4">
+              <div class="text-sm font-semibold text-white">{block.label}</div>
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                <label class="block">
+                  <span class={labelClass}>Inicio</span>
+                  <input class={fieldInputClass} type="time" name={block.startName} value={block.start} required />
+                </label>
+                <label class="block">
+                  <span class={labelClass}>Fin</span>
+                  <input class={fieldInputClass} type="time" name={block.endName} value={block.end} required />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <label class="block">
+            <span class={labelClass}>Fee delivery €</span>
+            <input class={fieldInputClass} type="number" step="0.01" min="0" name="deliveryFeeEur" value={deliveryFeeEur} required />
+          </label>
+
+          <div class="flex flex-wrap items-end gap-x-6 gap-y-2.5 pb-1">
+            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="pauseOrders" checked={opsFlags.pauseOrders} />
+              Pausar pedidos
+            </label>
+            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="forcePickup" checked={opsFlags.forcePickup} />
+              Forzar pickup
+            </label>
+            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="deliveryAreaEnabled" checked={deliveryAreaRule.enabled} />
+              Restringir área de delivery
+            </label>
           </div>
         </div>
-      </div>
 
-      <div
-        class="grid gap-6 px-6 py-6 lg:px-8 lg:py-8 2xl:grid-cols-[minmax(0,1.35fr)_360px]"
-      >
-        <div class="space-y-6">
-          <div class="grid gap-6 xl:grid-cols-3">
-            <article
-              class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-base font-semibold text-white">Local</div>
-                  <p class="mt-2 text-sm leading-6 text-slate-400">
-                    Ventana general usada como fallback para local y pickup.
-                  </p>
-                </div>
-                <span
-                  class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300"
-                >
-                  Fallback
-                </span>
-              </div>
+        <button type="submit" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+          Guardar base y flags
+        </button>
+      </Card>
+    </form>
 
-              <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Inicio</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="openStart"
-                    value={openStart}
-                    required
-                  />
-                </label>
-
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Fin</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="openEnd"
-                    value={openEnd}
-                    required
-                  />
-                </label>
-              </div>
-            </article>
-
-            <article
-              class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-base font-semibold text-white">Cocina</div>
-                  <p class="mt-2 text-sm leading-6 text-slate-400">
-                    Sigue viviendo en AppSetting porque el schema de horarios no
-                    tiene canal de cocina.
-                  </p>
-                </div>
-                <span
-                  class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300"
-                >
-                  AppSetting
-                </span>
-              </div>
-
-              <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Inicio</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="kitchenStart"
-                    value={kitchenStart}
-                    required
-                  />
-                </label>
-
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Fin</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="kitchenEnd"
-                    value={kitchenEnd}
-                    required
-                  />
-                </label>
-              </div>
-            </article>
-
-            <article
-              class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6"
-            >
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-base font-semibold text-white">Delivery</div>
-                  <p class="mt-2 text-sm leading-6 text-slate-400">
-                    Fallback general de reparto si no existe horario semanal o
-                    excepción para ese día.
-                  </p>
-                </div>
-                <span
-                  class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300"
-                >
-                  Fallback
-                </span>
-              </div>
-
-              <div class="mt-6 grid gap-4 sm:grid-cols-2">
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Inicio</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="deliveryStart"
-                    value={deliveryStart}
-                    required
-                  />
-                </label>
-
-                <label class="block">
-                  <span
-                    class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                    >Fin</span
-                  >
-                  <input
-                    class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                    type="time"
-                    name="deliveryEnd"
-                    value={deliveryEnd}
-                    required
-                  />
-                </label>
-              </div>
-            </article>
+    <form method="post" action="/api/admin/operativa/hours">
+      <Card padded={false}>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+          <div>
+            <h2 class="text-base font-semibold text-white">Horario semanal por canal</h2>
+            <p class="mt-1 text-xs text-admin-muted">Cada celda pisa solo su franja; las vacías caen al fallback.</p>
           </div>
+          <Badge tone={structuredWeeklySlots === totalWeeklySlots ? "success" : structuredWeeklySlots === 0 ? "warning" : "primary"}>
+            {structuredWeeklySlots}/{totalWeeklySlots} en OpeningHour
+          </Badge>
+        </div>
 
-          <article
-            class="rounded-[30px] border border-white/10 bg-[#091121]/80 p-6 lg:p-7"
-          >
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              Costes
+        {
+          partiallyStructuredWeeklyHours ? (
+            <div class="border-b border-admin-border bg-amber-400/[0.06] px-5 py-3 text-xs text-amber-100 lg:px-6">
+              Cobertura parcial: {fallbackWeeklySlots} franja(s) siguen resolviéndose por fallback.
             </div>
-            <h3
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white"
-            >
-              Tarifa de delivery
-            </h3>
-            <p class="mt-3 max-w-xl text-sm leading-7 text-slate-400">
-              Fee base que se suma al pedido cuando el envío a domicilio está
-              activo y permitido.
-            </p>
+          ) : null
+        }
 
-            <div class="mt-6 max-w-sm">
+        <div class="overflow-x-auto">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Día</th>
+                {CHANNELS.map((channel) => <th>{channel.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {weeklyRows.map((day) => (
+                <tr>
+                  <td class="font-semibold text-white">{day.dayLabel}</td>
+                  {day.channels.map((channel) => (
+                    <td>
+                      <div class="flex items-center gap-1.5">
+                        <input class={timeInputClass} type="time" name={`hours_${day.dayKey}_${channel.key}_open`} value={channel.open} required />
+                        <span class="text-admin-faint">–</span>
+                        <input class={timeInputClass} type="time" name={`hours_${day.dayKey}_${channel.key}_close`} value={channel.close} required />
+                      </div>
+                      <label class="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-admin-muted">
+                        <input class="h-3.5 w-3.5 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name={`hours_${day.dayKey}_${channel.key}_closed`} checked={channel.isClosed} />
+                        Cerrado
+                        {channel.resolutionSource === "APP_SETTING" ? <span class="ml-1 text-amber-300/70">· fallback</span> : null}
+                      </label>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="border-t border-admin-border px-5 py-4 lg:px-6">
+          <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+            Guardar horario semanal
+          </button>
+        </div>
+      </Card>
+    </form>
+
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Fechas especiales</h2>
+          <p class="mt-1 text-xs text-admin-muted">Excepciones puntuales; tienen prioridad sobre el horario semanal.</p>
+        </div>
+
+        <Modal id="special-date-create" title="Nueva excepción" description="Un día suelto o un periodo completo, para un canal o para todos." triggerLabel="+ Nueva excepción">
+          <form method="post" action="/api/admin/operativa/special-dates" class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
+
+            <div class="grid grid-cols-2 gap-4">
               <label class="block">
-                <span
-                  class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-                  >Importe en €</span
-                >
-                <input
-                  class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="deliveryFeeEur"
-                  value={deliveryFeeEur}
-                />
+                <span class={labelClass}>Desde</span>
+                <input class={fieldInputClass} type="date" name="dateFrom" required />
+              </label>
+              <label class="block">
+                <span class={labelClass}>Hasta (opcional)</span>
+                <input class={fieldInputClass} type="date" name="dateTo" />
               </label>
             </div>
-          </article>
-        </div>
 
-        <aside
-          class="rounded-[30px] border border-white/10 bg-[#091121]/80 p-6 lg:p-7"
-        >
-          <div
-            class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-          >
-            Flags
-          </div>
-          <h3 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-            Estado operativo inmediato
-          </h3>
-
-          <div class="mt-6 space-y-4">
-            <label
-              class="block rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                  type="checkbox"
-                  name="pauseOrders"
-                  checked={opsFlags.pauseOrders}
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">
-                    Pausar pedidos
-                  </div>
-                  <p class="mt-1 text-sm leading-6 text-slate-400">
-                    Bloquea checkout y deja la venta temporalmente inactiva.
-                  </p>
-                </div>
-              </div>
+            <label class="block">
+              <span class={labelClass}>Canal</span>
+              <select name="channel" class={fieldInputClass}>
+                <option value="ALL">Todos los canales</option>
+                {CHANNELS.map((channel) => <option value={channel.key}>{channel.label}</option>)}
+              </select>
             </label>
 
-            <label
-              class="block rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                  type="checkbox"
-                  name="forcePickup"
-                  checked={opsFlags.forcePickup}
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">
-                    Forzar recogida
-                  </div>
-                  <p class="mt-1 text-sm leading-6 text-slate-400">
-                    Desactiva delivery aunque exista franja válida y obliga al
-                    cliente a pickup.
-                  </p>
-                </div>
-              </div>
-            </label>
-
-            <label
-              class="block rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-            >
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400"
-                  type="checkbox"
-                  name="deliveryAreaEnabled"
-                  checked={deliveryAreaRule.enabled}
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">
-                    Limitar delivery por ciudad / CP
-                  </div>
-                  <p class="mt-1 text-sm leading-6 text-slate-400">
-                    Solo deja delivery para Lloret de Mar con 17310 cuando esta
-                    regla está activa.
-                  </p>
-                </div>
-              </div>
-            </label>
-          </div>
-
-          <div
-            class="mt-6 rounded-[24px] border border-amber-400/15 bg-amber-400/10 p-4"
-          >
-            <div class="text-sm font-semibold text-amber-100">
-              Nota operativa
+            <div class="grid grid-cols-2 gap-4">
+              <label class="block">
+                <span class={labelClass}>Apertura</span>
+                <input class={fieldInputClass} type="time" name="openTime" value={openStart} />
+              </label>
+              <label class="block">
+                <span class={labelClass}>Cierre</span>
+                <input class={fieldInputClass} type="time" name="closeTime" value={openEnd} />
+              </label>
             </div>
-            <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              Estos flags siguen afectando directamente a checkout aunque exista
-              horario semanal o excepciones por fecha.
+
+            <label class="block">
+              <span class={labelClass}>Nota</span>
+              <input class={fieldInputClass} type="text" name="note" placeholder="Festivo local" />
+            </label>
+
+            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="isClosed" />
+              Cerrado todo el día
+            </label>
+
+            <p class="text-xs leading-5 text-admin-muted">
+              Si el periodo abarca varios días se crea una excepción por día y canal. Las que ya existan para esas fechas se sobrescriben.
             </p>
-          </div>
-        </aside>
-      </div>
 
-      <div class="border-t border-white/[0.08] px-6 py-5 lg:px-8">
-        <button
-          class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-          type="submit"
-        >
-          Guardar base operativa
-        </button>
-      </div>
-    </section>
-  </form>
-
-  <form class="mt-6" method="post" action="/api/admin/operativa/hours">
-    <section
-      class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
-    >
-      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              OpeningHour
-            </div>
-            <h2
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
-            >
-              Horario semanal estructurado por canal
-            </h2>
-            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-              Cada celda pisa solo su franja concreta. Si falta una, esa
-              resolución cae a la base general sin arrastrar al resto.
-            </p>
-          </div>
-
-          <div
-            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-300"
-          >
-            {weeklyResolutionHelp}
-          </div>
-        </div>
+            <button type="submit" class="mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+              Crear excepción
+            </button>
+          </form>
+        </Modal>
       </div>
 
       {
-        partiallyStructuredWeeklyHours ? (
-          <div class="mx-6 mt-6 rounded-[26px] border border-amber-400/15 bg-amber-400/10 px-5 py-4 text-sm text-amber-100 lg:mx-8">
-            Hay cobertura semanal parcial. Es válida, pero conviene terminar la
-            matriz para que no queden lecturas mixtas entre OpeningHour y
-            fallback.
-          </div>
-        ) : null
-      }
-
-      <div class="space-y-6 px-6 py-6 lg:px-8 lg:py-8">
-        {
-          weeklyRows.map((day) => (
-            <section class="rounded-[30px] border border-white/10 bg-[#091121]/80 p-5 lg:p-6">
-              <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
-                <div>
-                  <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Día {day.dayKey}
-                  </div>
-                  <h3 class="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
-                    {day.dayLabel}
-                  </h3>
-                </div>
-              </div>
-
-              <div class="mt-6 grid gap-4 xl:grid-cols-3">
-                {day.channels.map((channel) => (
-                  <article class="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                      <span
-                        class:list={[
-                          "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                          channel.badgeClass,
-                        ]}
-                      >
-                        {channel.label}
-                      </span>
-
-                      <label class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                        <input
-                          class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                          type="checkbox"
-                          name={`hours_${day.dayKey}_${channel.key}_closed`}
-                          checked={channel.isClosed}
-                        />
-                        Cerrado
-                      </label>
-                    </div>
-
-                    <div class="mt-4 flex flex-wrap items-center justify-between gap-2">
-                      <span
-                        class:list={[
-                          "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                          channel.resolutionTone,
-                        ]}
-                      >
-                        {channel.resolutionLabel}
-                      </span>
-
-                      {channel.resolutionSource === "APP_SETTING" ? (
-                        <span class="text-xs text-slate-500">
-                          Sigue usando la ventana base
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                      <label class="block">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Inicio
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                          type="time"
-                          name={`hours_${day.dayKey}_${channel.key}_open`}
-                          value={channel.open}
-                          required
-                        />
-                      </label>
-
-                      <label class="block">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Fin
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
-                          type="time"
-                          name={`hours_${day.dayKey}_${channel.key}_close`}
-                          value={channel.close}
-                          required
-                        />
-                      </label>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          ))
-        }
-      </div>
-
-      <div class="border-t border-white/[0.08] px-6 py-5 lg:px-8">
-        <button
-          class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-          type="submit"
-        >
-          Guardar horario semanal
-        </button>
-      </div>
-    </section>
-  </form>
-
-  <section
-    id="special-dates"
-    class="mt-6 grid gap-6 2xl:grid-cols-[minmax(0,1.3fr)_360px]"
-  >
-    <article
-      class="overflow-hidden rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
-    >
-      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              SpecialDate
-            </div>
-            <h2
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
-            >
-              Excepciones por fecha
-            </h2>
-            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-              Usa excepciones para festivos, cierres puntuales o cambios de
-              franja sin tocar el horario semanal.
-            </p>
-          </div>
-
-          <div
-            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-300"
-          >
-            {upcomingSpecialDates.length} excepción{
-              upcomingSpecialDates.length === 1 ? "" : "es"
-            } desde hoy
-          </div>
-        </div>
-      </div>
-
-      {
-        specialDates.length === 0 ? (
-          <div class="px-6 py-16 text-center lg:px-8">
-            <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-[#091121] p-8">
-              <div class="text-lg font-semibold text-white">
-                No hay fechas especiales
-              </div>
-              <p class="mt-2 text-sm leading-6 text-slate-400">
-                El calendario especial está vacío. El sistema resolverá con
-                horario semanal o fallback.
-              </p>
-            </div>
+        upcomingSpecialDates.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin excepciones próximas" description="Crea una para cerrar un día concreto o cambiar su franja." />
           </div>
         ) : (
-          <div class="space-y-5 px-6 py-6 lg:px-8 lg:py-8">
-            {specialDates.map((row) => (
-              <section class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.22)] lg:p-6">
-                <div class="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.08] pb-5">
-                  <div>
-                    <div class="text-xl font-semibold tracking-[-0.03em] text-white">
-                      {formatDateISO(row.dateISO)}
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2.5">
-                      <span
-                        class:list={[
-                          "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                          CHANNELS.find(
-                            (channel) => channel.key === row.channel,
-                          )?.badgeClass ??
-                            "border-white/10 bg-white/[0.04] text-slate-300",
-                        ]}
-                      >
-                        {channelLabel(row.channel)}
-                      </span>
-
-                      <span
-                        class:list={[
-                          "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                          row.isClosed
-                            ? "border-rose-400/15 bg-rose-400/10 text-rose-200"
-                            : "border-emerald-400/15 bg-emerald-400/10 text-emerald-200",
-                        ]}
-                      >
-                        {row.isClosed
-                          ? "Cerrado"
-                          : `${row.open} - ${row.close}`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <form
-                  method="post"
-                  action="/api/admin/operativa/special-dates"
-                  class="mt-6 grid gap-5 xl:grid-cols-[180px_180px_minmax(0,1fr)_minmax(0,1fr)_auto]"
-                >
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="specialDateId" value={row.id} />
-
-                  <label class="block">
-                    <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Fecha
-                    </span>
-                    <input
-                      class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                      type="date"
-                      name="dateISO"
-                      value={row.dateISO}
-                      required
-                    />
-                  </label>
-
-                  <label class="block">
-                    <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Canal
-                    </span>
-                    <select
-                      class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                      name="channel"
-                    >
-                      {CHANNELS.map((channel) => (
-                        <option
-                          value={channel.key}
-                          selected={channel.key === row.channel}
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Canal</th>
+                  <th>Franja</th>
+                  <th>Nota</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {upcomingSpecialDates.map((row) => (
+                  <tr>
+                    <td>
+                      <div class="font-semibold text-white">{formatDateISO(row.dateISO)}</div>
+                      {row.dateISO === todayDateISO ? <div class="text-xs text-amber-300">Hoy</div> : null}
+                    </td>
+                    <td><Badge tone={channelTone(row.channel)}>{channelLabel(row.channel)}</Badge></td>
+                    <td>
+                      {row.isClosed ? <Badge tone="danger">Cerrado</Badge> : <span class="text-admin-muted">{row.open} – {row.close}</span>}
+                    </td>
+                    <td class="max-w-[240px] truncate text-admin-muted">{row.note || "—"}</td>
+                    <td>
+                      <div class="flex justify-end">
+                        <Modal
+                          id={`special-date-edit-${row.id}`}
+                          title={`${formatDateISO(row.dateISO)} · ${channelLabel(row.channel)}`}
+                          triggerLabel="Editar"
+                          triggerClass="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]"
                         >
-                          {channel.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                          <form method="post" action="/api/admin/operativa/special-dates" class="grid gap-4">
+                            <input type="hidden" name="intent" value="update" />
+                            <input type="hidden" name="specialDateId" value={row.id} />
 
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <label class="block">
-                      <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Inicio
-                      </span>
-                      <input
-                        class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                        type="time"
-                        name="openTime"
-                        value={row.open}
-                      />
-                    </label>
+                            <div class="grid grid-cols-2 gap-4">
+                              <label class="block">
+                                <span class={labelClass}>Fecha</span>
+                                <input class={fieldInputClass} type="date" name="dateISO" value={row.dateISO} required />
+                              </label>
+                              <label class="block">
+                                <span class={labelClass}>Canal</span>
+                                <select name="channel" class={fieldInputClass}>
+                                  {CHANNELS.map((channel) => (
+                                    <option value={channel.key} selected={row.channel === channel.key}>{channel.label}</option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
 
-                    <label class="block">
-                      <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Fin
-                      </span>
-                      <input
-                        class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                        type="time"
-                        name="closeTime"
-                        value={row.close}
-                      />
-                    </label>
-                  </div>
+                            <div class="grid grid-cols-2 gap-4">
+                              <label class="block">
+                                <span class={labelClass}>Apertura</span>
+                                <input class={fieldInputClass} type="time" name="openTime" value={row.open} />
+                              </label>
+                              <label class="block">
+                                <span class={labelClass}>Cierre</span>
+                                <input class={fieldInputClass} type="time" name="closeTime" value={row.close} />
+                              </label>
+                            </div>
 
-                  <label class="block">
-                    <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Nota
-                    </span>
-                    <input
-                      class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                      type="text"
-                      name="note"
-                      value={row.note}
-                      placeholder="Festivo local, cierre por evento, horario reducido..."
-                    />
-                  </label>
+                            <label class="block">
+                              <span class={labelClass}>Nota</span>
+                              <input class={fieldInputClass} type="text" name="note" value={row.note} />
+                            </label>
 
-                  <div class="flex flex-col items-end justify-between gap-3">
-                    <label class="inline-flex items-center gap-3 text-sm text-slate-300">
-                      <input
-                        class="h-4 w-4 rounded border-white/20 bg-slate-950 text-violet-300"
-                        type="checkbox"
-                        name="isClosed"
-                        checked={row.isClosed}
-                      />
-                      Cerrado
-                    </label>
+                            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="isClosed" checked={row.isClosed} />
+                              Cerrado todo el día
+                            </label>
 
-                    <button
-                      type="submit"
-                      class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-400/25 hover:bg-violet-400/15"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                </form>
+                            <button type="submit" class="mt-1 inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+                              Guardar
+                            </button>
+                          </form>
 
-                <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] pt-5">
-                  <p class="text-sm text-slate-500">
-                    Las excepciones pisan el horario semanal para esa fecha y
-                    canal.
-                  </p>
-
-                  <form
-                    method="post"
-                    action="/api/admin/operativa/special-dates"
-                  >
-                    <input type="hidden" name="intent" value="delete" />
-                    <input type="hidden" name="specialDateId" value={row.id} />
-                    <button
-                      type="submit"
-                      class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-rose-400/15 bg-rose-400/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition hover:border-rose-400/25 hover:bg-rose-400/15"
-                    >
-                      Borrar excepción
-                    </button>
-                  </form>
-                </div>
-              </section>
-            ))}
+                          <form method="post" action="/api/admin/operativa/special-dates" class="mt-3 border-t border-admin-border pt-3">
+                            <input type="hidden" name="intent" value="delete" />
+                            <input type="hidden" name="specialDateId" value={row.id} />
+                            <button type="submit" class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15">
+                              Borrar excepción
+                            </button>
+                          </form>
+                        </Modal>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       }
-    </article>
-
-    <aside class="space-y-6">
-      <form
-        method="post"
-        action="/api/admin/operativa/special-dates"
-        class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-      >
-        <input type="hidden" name="intent" value="create" />
-
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Alta
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Nueva excepción
-        </h2>
-
-        <div class="mt-6 grid gap-4">
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-              >Fecha</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-              type="date"
-              name="dateISO"
-              value={todayDateISO}
-              required
-            />
-          </label>
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-              >Canal</span
-            >
-            <select
-              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-              name="channel"
-            >
-              {
-                CHANNELS.map((channel) => (
-                  <option value={channel.key}>{channel.label}</option>
-                ))
-              }
-            </select>
-          </label>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <label class="block">
-              <span
-                class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-                >Inicio</span
-              >
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                type="time"
-                name="openTime"
-                value={openStart}
-              />
-            </label>
-
-            <label class="block">
-              <span
-                class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-                >Fin</span
-              >
-              <input
-                class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-                type="time"
-                name="closeTime"
-                value={openEnd}
-              />
-            </label>
-          </div>
-
-          <label class="inline-flex items-center gap-3 text-sm text-slate-300">
-            <input
-              class="h-4 w-4 rounded border-white/20 bg-slate-950 text-violet-300"
-              type="checkbox"
-              name="isClosed"
-            />
-            Marcar como cerrado
-          </label>
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-              >Nota</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-300/30 focus:outline-none"
-              type="text"
-              name="note"
-              placeholder="Festivo, cierre por evento, horario reducido..."
-            />
-          </label>
-
-          <button
-            type="submit"
-            class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-400/25 hover:bg-violet-400/15"
-          >
-            Crear excepción
-          </button>
-        </div>
-      </form>
-
-      <section
-        class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Modelo
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Cómo resuelve el sistema
-        </h2>
-
-        <div class="mt-6 space-y-4">
-          <article
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-          >
-            <div class="text-sm font-semibold text-white">Prioridad real</div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              <code>SpecialDate</code> pisa primero. Si no hay excepción para ese
-              canal y fecha, se usa <code>OpeningHour</code>. Si falta esa
-              franja concreta, se cae solo esa resolución al fallback de <code
-                >AppSetting</code
-              >.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[24px] border border-amber-400/15 bg-amber-400/10 p-4"
-          >
-            <div class="text-sm font-semibold text-amber-100">
-              Límite actual del schema
-            </div>
-            <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              La cocina no tiene canal propio en <code>OpeningHour</code>, así
-              que su ventana sigue viviendo en la configuración base.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-          >
-            <div class="text-sm font-semibold text-white">Impacto real</div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              Checkout, disponibilidad pública y home ya pasan por esta
-              resolución. Esta pantalla debe dejar claro dónde manda cada capa
-              para no inducir a error.
-            </p>
-          </article>
-        </div>
-      </section>
-    </aside>
-  </section>
+    </Card>
+  </div>
 </AdminLayout>

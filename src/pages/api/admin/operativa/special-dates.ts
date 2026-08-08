@@ -92,6 +92,41 @@ async function getNextId() {
   return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
 }
 
+/** Máximo de días que puede abarcar un periodo en una sola operación. */
+const MAX_RANGE_DAYS = 366;
+
+/** Suma días a una fecha ISO usando UTC (evita saltos por zona horaria). */
+function shiftISO(dateISO: string, days: number) {
+  const date = new Date(`${dateISO}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Lista de fechas ISO entre from y to, ambas incluidas. */
+function enumerateDates(fromISO: string, toISO: string) {
+  const dates: string[] = [];
+  let cursor = fromISO;
+  let guard = 0;
+  while (cursor <= toISO && guard <= MAX_RANGE_DAYS) {
+    dates.push(cursor);
+    cursor = shiftISO(cursor, 1);
+    guard += 1;
+  }
+  return dates;
+}
+
+/**
+ * Canales a los que aplica el formulario. `ALL` no se guarda en base: el
+ * esquema indexa (dateISO, channel) de forma única y la resolución horaria
+ * busca por canal concreto, así que se expande a una fila por canal.
+ */
+function parseChannelSelection(value: FormDataEntryValue | null): ChannelKey[] | null {
+  const raw = String(value ?? "").trim();
+  if (raw === "ALL") return [...CHANNELS];
+  const single = parseChannel(value);
+  return single ? [single] : null;
+}
+
 const REDIRECT_PATH = "/admin/operativa";
 
 export const POST: APIRoute = async (context) => {
@@ -105,18 +140,32 @@ export const POST: APIRoute = async (context) => {
   const { ip, userAgent } = getRequestAuditMeta(context.request);
 
   if (intent === "create") {
-    const dateISO = parseDateISO(form.get("dateISO"));
-    const channel = parseChannel(form.get("channel"));
+    // Acepta un día suelto (solo dateFrom) o un periodo (dateFrom..dateTo), y
+    // un canal concreto o "ALL". Se mantiene `dateISO` como alias de dateFrom
+    // por compatibilidad con formularios antiguos.
+    const dateFrom = parseDateISO(form.get("dateFrom") ?? form.get("dateISO"));
+    const dateToRaw = parseDateISO(form.get("dateTo"));
+    const channels = parseChannelSelection(form.get("channel"));
     const isClosed = form.get("isClosed") === "on";
     const note = toNullableText(form.get("note"));
     const openMins = parseTime(form.get("openTime"), "open");
     const closeMins = parseTime(form.get("closeTime"), "close");
 
-    if (!dateISO) {
+    if (!dateFrom) {
       return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "invalid-date" }));
     }
 
-    if (!channel) {
+    const dateTo = dateToRaw ?? dateFrom;
+    if (dateTo < dateFrom) {
+      return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "invalid-range" }));
+    }
+
+    const dates = enumerateDates(dateFrom, dateTo);
+    if (dates.length > MAX_RANGE_DAYS) {
+      return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "range-too-long" }));
+    }
+
+    if (!channels) {
       return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "invalid-channel" }));
     }
 
@@ -124,48 +173,68 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(REDIRECT_PATH, { specialDatesError: "invalid-hours" }));
     }
 
-    const existingSameDate = await db
-      .select({
-        id: SpecialDate.id,
-        channel: SpecialDate.channel,
-      })
-      .from(SpecialDate)
-      .where(eq(SpecialDate.dateISO, dateISO));
+    // Las combinaciones que ya existen se actualizan en vez de fallar: aplicar
+    // un cierre sobre un periodo que ya tenía alguna excepción suelta es el
+    // caso normal, no un error.
+    const existingRows = await db
+      .select({ id: SpecialDate.id, dateISO: SpecialDate.dateISO, channel: SpecialDate.channel })
+      .from(SpecialDate);
 
-    if (existingSameDate.some((row) => row.channel === channel)) {
-      return context.redirect(
-        withQuery(REDIRECT_PATH, { specialDatesError: "duplicate-special-date" })
-      );
-    }
+    const existingByKey = new Map(existingRows.map((row) => [`${row.dateISO}:${row.channel}`, row.id]));
 
-    const nextId = await getNextId();
+    let nextId = await getNextId();
+    const inserts: Array<typeof SpecialDate.$inferInsert> = [];
+    let updated = 0;
 
-    await db.insert(SpecialDate).values({
-      id: nextId,
-      dateISO,
-      channel,
+    const sharedValues = {
       isClosed,
       openMins: isClosed ? undefined : openMins ?? undefined,
       closeMins: isClosed ? undefined : closeMins ?? undefined,
       note: note ?? undefined,
-    });
+    };
+
+    for (const dateISO of dates) {
+      for (const channel of channels) {
+        const existingId = existingByKey.get(`${dateISO}:${channel}`);
+
+        if (existingId) {
+          await db.update(SpecialDate).set({ dateISO, channel, ...sharedValues }).where(eq(SpecialDate.id, existingId));
+          updated += 1;
+          continue;
+        }
+
+        inserts.push({ id: nextId++, dateISO, channel, ...sharedValues });
+      }
+    }
+
+    if (inserts.length) {
+      await db.insert(SpecialDate).values(inserts);
+    }
 
     try {
       await writeAuditLog({
         actorUserId: user.id,
         action: "SPECIAL_DATE_SAVED",
         entityType: "special_date",
-        entityId: `${dateISO}:${channel}`,
+        entityId: dates.length === 1 ? `${dateFrom}:${channels.join("+")}` : `${dateFrom}..${dateTo}:${channels.join("+")}`,
         diff: {
           previous: null,
-          next: toAuditShape({
-            dateISO,
-            channel,
-            isClosed,
-            openMins: isClosed ? null : openMins,
-            closeMins: isClosed ? null : closeMins,
-            note,
-          }),
+          next: {
+            dateFrom,
+            dateTo,
+            days: dates.length,
+            channels,
+            created: inserts.length,
+            updated,
+            ...toAuditShape({
+              dateISO: dateFrom,
+              channel: channels[0],
+              isClosed,
+              openMins: isClosed ? null : openMins,
+              closeMins: isClosed ? null : closeMins,
+              note,
+            }),
+          },
         },
         ip,
         userAgent,
