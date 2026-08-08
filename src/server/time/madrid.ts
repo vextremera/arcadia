@@ -72,6 +72,46 @@ export function getMadridClock(now = new Date()) {
   return { hour, minute, mins, hhmm };
 }
 
+/** Offset UTC (en minutos) de Europe/Madrid en el instante dado (gestiona DST). */
+function getMadridOffsetMinutes(instant: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Madrid",
+    timeZoneName: "shortOffset",
+  }).formatToParts(instant);
+
+  const raw = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+1";
+  const match = raw.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  if (!match) return 60;
+
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = Number(match[2] ?? "1");
+  const mins = Number(match[3] ?? "0");
+  return sign * (hours * 60 + mins);
+}
+
+/**
+ * Límites [inicio, fin) de un día natural en Europe/Madrid, como instantes UTC.
+ * Usado por la capa de analítica para acotar consultas por día sin escanear
+ * la tabla completa de pedidos.
+ */
+export function getMadridDayBoundsUTC(dateISO: string) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const utcGuess = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1, 0, 0, 0));
+  const offsetMin = getMadridOffsetMinutes(utcGuess);
+
+  const startUTC = new Date(utcGuess.getTime() - offsetMin * 60_000);
+  const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000);
+  return { startUTC, endUTC };
+}
+
+/** dateISO (Europe/Madrid) de N días antes del dado. */
+export function shiftDateISO(dateISO: string, deltaDays: number) {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const base = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1, 12, 0, 0));
+  base.setUTCDate(base.getUTCDate() + deltaDays);
+  return getMadridDateInfo(base).dateISO;
+}
+
 export function inWindow(mins: number, start: number, end: number) {
   return mins >= start && mins <= end;
 }

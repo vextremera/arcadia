@@ -1,0 +1,290 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import { orderStatusTone } from "@/lib/admin/tones";
+import { getTodayDateISO, resolveRange, shiftAnchor, type RangeKind } from "@/server/analytics/queries";
+import { getMadridDayBoundsUTC } from "@/server/time/madrid";
+import { db, Order, DeliveryZone, and, gte, lt } from "astro:db";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function dateAtNoon(dateISO: string) {
+  return new Date(`${dateISO}T12:00:00Z`);
+}
+
+function formatRangeLabel(kind: RangeKind, fromISO: string, toISO: string) {
+  if (kind === "day") {
+    const label = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  if (kind === "month") {
+    const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  const fmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${fmt.format(dateAtNoon(fromISO))} – ${fmt.format(dateAtNoon(toISO))}`;
+}
+
+/** Minutos entre creación y última actualización, como proxy de tiempo de ciclo. */
+function cycleMinutes(createdAt: Date | string, updatedAt: Date | string) {
+  const start = new Date(createdAt).getTime();
+  const end = new Date(updatedAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.round((end - start) / 60000);
+}
+
+function formatMinutes(value: number | null) {
+  if (value === null) return "—";
+  if (value < 60) return `${value} min`;
+  const h = Math.floor(value / 60);
+  const m = value % 60;
+  return `${h} h ${String(m).padStart(2, "0")} min`;
+}
+
+function median(values: number[]) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+const OPEN_STATUSES = ["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
+const CLOSED_STATUSES = ["DELIVERED"];
+
+const url = Astro.url;
+const rangeParam = url.searchParams.get("range");
+const kind: RangeKind = rangeParam === "day" || rangeParam === "week" ? rangeParam : "month";
+
+const todayISO = getTodayDateISO();
+const anchorParam = url.searchParams.get("anchor");
+const anchorISO = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : todayISO;
+
+const { current } = resolveRange(kind, anchorISO);
+const startUTC = getMadridDayBoundsUTC(current.fromISO).startUTC;
+const endUTC = getMadridDayBoundsUTC(current.toISO).endUTC;
+
+const orders = await db
+  .select({
+    id: Order.id,
+    publicId: Order.publicId,
+    type: Order.type,
+    status: Order.status,
+    zoneId: Order.zoneId,
+    totalCents: Order.totalCents,
+    deliveryFeeCents: Order.deliveryFeeCents,
+    addressSnapshot: Order.addressSnapshot,
+    createdAt: Order.createdAt,
+    updatedAt: Order.updatedAt,
+  })
+  .from(Order)
+  .where(and(gte(Order.createdAt, startUTC), lt(Order.createdAt, endUTC)));
+
+const zones = await db
+  .select({ id: DeliveryZone.id, name: DeliveryZone.name, active: DeliveryZone.active })
+  .from(DeliveryZone);
+const zoneById = new Map(zones.map((zone) => [zone.id, zone]));
+
+const activeOrders = orders.filter((order) => order.status !== "CANCELLED");
+const deliveryOrders = activeOrders.filter((order) => order.type === "DELIVERY");
+const pickupOrders = activeOrders.filter((order) => order.type === "PICKUP");
+const cancelledCount = orders.length - activeOrders.length;
+
+const forcedPickupCount = activeOrders.filter((order) => {
+  const meta = (order.addressSnapshot ?? {}) as Record<string, unknown>;
+  return Boolean(meta.forcedPickup);
+}).length;
+
+const openOrders = activeOrders.filter((order) => OPEN_STATUSES.includes(order.status));
+const completedOrders = activeOrders.filter((order) => CLOSED_STATUSES.includes(order.status));
+
+const completedCycles = completedOrders
+  .map((order) => cycleMinutes(order.createdAt, order.updatedAt))
+  .filter((value): value is number => value !== null);
+
+const medianCycle = median(completedCycles);
+const deliveryFeeTotal = deliveryOrders.reduce((sum, order) => sum + Number(order.deliveryFeeCents ?? 0), 0);
+
+const deliveryShare = activeOrders.length ? Math.round((deliveryOrders.length / activeOrders.length) * 100) : 0;
+
+// Reparto por zona (solo pedidos de delivery, agrupados por Order.zoneId).
+const byZone = new Map<string, { name: string; count: number; revenueCents: number; feeCents: number }>();
+for (const order of deliveryOrders) {
+  const key = typeof order.zoneId === "number" ? String(order.zoneId) : "sin-zona";
+  const name = typeof order.zoneId === "number" ? (zoneById.get(order.zoneId)?.name ?? `Zona #${order.zoneId}`) : "Sin zona asignada";
+  const current = byZone.get(key) ?? { name, count: 0, revenueCents: 0, feeCents: 0 };
+  current.count += 1;
+  current.revenueCents += Number(order.totalCents ?? 0);
+  current.feeCents += Number(order.deliveryFeeCents ?? 0);
+  byZone.set(key, current);
+}
+const zoneRows = [...byZone.values()].sort((a, b) => b.count - a.count);
+
+// Cola operativa actual: pedidos abiertos ordenados por antigüedad.
+const queue = [...openOrders]
+  .map((order) => ({ ...order, waitingMinutes: cycleMinutes(order.createdAt, new Date()) ?? 0 }))
+  .sort((a, b) => b.waitingMinutes - a.waitingMinutes)
+  .slice(0, 10);
+
+const overdueCount = queue.filter((order) => order.waitingMinutes >= 20).length;
+
+const rangeLabel = formatRangeLabel(kind, current.fromISO, current.toISO);
+const prevAnchorISO = shiftAnchor(kind, anchorISO, -1);
+const nextAnchorISO = shiftAnchor(kind, anchorISO, 1);
+const isAtToday = current.toISO >= todayISO;
+
+function hrefFor(nextKind: RangeKind, nextAnchor: string) {
+  return `/admin/dashboard/logistica?range=${nextKind}&anchor=${nextAnchor}`;
+}
+---
+
+<AdminLayout
+  title="Logística · Admin · Arcadia"
+  heading="Logística"
+  description="Reparto, zonas y tiempos de ciclo de los pedidos del periodo."
+>
+  <div class="space-y-8">
+    <section class="flex flex-wrap items-center justify-between gap-4">
+      <div class="inline-flex rounded-admin-lg border border-admin-border bg-white/[0.02] p-1">
+        {
+          (["day", "week", "month"] as RangeKind[]).map((option) => (
+            <a
+              href={hrefFor(option, option === kind ? anchorISO : todayISO)}
+              class:list={[
+                "rounded-admin px-4 py-2 text-sm font-semibold transition",
+                option === kind ? "bg-sky-400/15 text-sky-200" : "text-admin-muted hover:text-white",
+              ]}
+            >
+              {option === "day" ? "Hoy" : option === "week" ? "Semana" : "Mes"}
+            </a>
+          ))
+        }
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href={hrefFor(kind, prevAnchorISO)} class="admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border border-admin-border bg-white/[0.03] text-slate-300 transition hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white" aria-label="Periodo anterior">
+          ‹
+        </a>
+        <div class="min-w-[220px] rounded-admin border border-admin-border bg-white/[0.03] px-4 py-2 text-center text-sm font-semibold text-white">
+          {rangeLabel}
+        </div>
+        <a
+          href={isAtToday ? hrefFor(kind, anchorISO) : hrefFor(kind, nextAnchorISO)}
+          aria-disabled={isAtToday}
+          class:list={[
+            "admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border transition",
+            isAtToday
+              ? "cursor-not-allowed border-admin-border bg-white/[0.02] text-slate-600"
+              : "border-admin-border bg-white/[0.03] text-slate-300 hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white",
+          ]}
+        >
+          ›
+        </a>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard icon="live" label="Delivery vs pickup" value={`${deliveryOrders.length} / ${pickupOrders.length}`} helper={`${deliveryShare}% del volumen es reparto`} />
+      <StatCard icon="cart" label="Tiempo de ciclo (mediana)" value={formatMinutes(medianCycle)} helper={`${completedOrders.length} pedidos entregados en el periodo`} />
+    </section>
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard icon="coin" label="Fees de envío" value={money(deliveryFeeTotal)} helper="Cobrado en tarifas de reparto" />
+      <StatCard label="Incidencias" value={String(forcedPickupCount + cancelledCount)} helper={`${forcedPickupCount} forced pickup · ${cancelledCount} cancelados`} />
+    </section>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <Card padded={false}>
+        <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+          <h2 class="text-base font-semibold text-white">Reparto por zona</h2>
+          <p class="mt-1 text-xs text-admin-muted">{rangeLabel}</p>
+        </div>
+        {
+          zoneRows.length === 0 ? (
+            <div class="px-6 py-14">
+              <EmptyState title="Sin pedidos de reparto en este periodo" />
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Zona</th>
+                    <th>Pedidos</th>
+                    <th class="text-right">Facturación</th>
+                    <th class="text-right">Fees</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zoneRows.map((zone) => (
+                    <tr>
+                      <td class="font-semibold text-white">{zone.name}</td>
+                      <td class="text-admin-muted">{zone.count}</td>
+                      <td class="text-right text-admin-muted">{money(zone.revenueCents)}</td>
+                      <td class="text-right text-admin-muted">{money(zone.feeCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Card>
+
+      <Card padded={false}>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+          <div>
+            <h2 class="text-base font-semibold text-white">Cola operativa</h2>
+            <p class="mt-1 text-xs text-admin-muted">Pedidos abiertos, del más antiguo al más reciente.</p>
+          </div>
+          {overdueCount > 0 ? <Badge tone="warning">{overdueCount} con 20+ min</Badge> : null}
+        </div>
+        {
+          queue.length === 0 ? (
+            <div class="px-6 py-14">
+              <EmptyState title="No hay pedidos abiertos" description="Todo lo del periodo está cerrado o cancelado." />
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Pedido</th>
+                    <th>Canal</th>
+                    <th>Estado</th>
+                    <th class="text-right">En cola</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {queue.map((order) => (
+                    <tr>
+                      <td>
+                        <a href={`/admin/pedidos/${order.publicId}`} class="font-semibold text-white transition hover:text-sky-300">#{order.publicId}</a>
+                      </td>
+                      <td class="text-admin-muted">{order.type === "DELIVERY" ? "Delivery" : "Pickup"}</td>
+                      <td><Badge tone={orderStatusTone(order.status)}>{order.status}</Badge></td>
+                      <td class:list={["text-right font-semibold", order.waitingMinutes >= 20 ? "text-amber-300" : "text-admin-muted"]}>
+                        {formatMinutes(order.waitingMinutes)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Card>
+    </div>
+
+    <Card>
+      <div class="admin-eyebrow">Nota</div>
+      <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Cómo se calcula el tiempo de ciclo</h2>
+      <p class="mt-3 text-sm leading-6 text-admin-muted">
+        No hay marcas de tiempo por transición de estado, así que el ciclo se mide como la diferencia entre <code class="rounded-lg border border-admin-border bg-white/[0.04] px-1.5 py-0.5 text-xs text-white">createdAt</code> y <code class="rounded-lg border border-admin-border bg-white/[0.04] px-1.5 py-0.5 text-xs text-white">updatedAt</code> de los pedidos entregados. Es un proxy fiable mientras el último cambio de estado sea la entrega; para tiempos por fase (aceptación, cocina, reparto) haría falta registrar cada transición.
+      </p>
+    </Card>
+  </div>
+</AdminLayout>

@@ -1,0 +1,478 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import AreaChart from "@/islands/admin/charts/AreaChart";
+import BarChart from "@/islands/admin/charts/BarChart";
+import {
+  getSummary,
+  getDailySeries,
+  getTopProducts,
+  getCategorySales,
+  getCouponUsage,
+  getTodayDateISO,
+  resolveRange,
+  shiftAnchor,
+  type RangeKind,
+} from "@/server/analytics/queries";
+import { shiftDateISO } from "@/server/time/madrid";
+import type { Time } from "lightweight-charts";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function formatDelta(deltaPct: number | null) {
+  if (deltaPct === null) return { text: undefined as string | undefined, trend: "flat" as const };
+  if (Math.abs(deltaPct) < 0.05) return { text: "0.0%", trend: "flat" as const };
+  const trend: "up" | "down" = deltaPct > 0 ? "up" : "down";
+  return { text: `${deltaPct > 0 ? "+" : ""}${deltaPct.toFixed(1)}%`, trend };
+}
+
+function dateAtNoon(dateISO: string) {
+  return new Date(`${dateISO}T12:00:00Z`);
+}
+
+function formatRangeLabel(kind: RangeKind, fromISO: string, toISO: string) {
+  if (kind === "day") {
+    const label = new Intl.DateTimeFormat("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  if (kind === "month") {
+    const label = new Intl.DateTimeFormat("es-ES", {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+
+  const fmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${fmt.format(dateAtNoon(fromISO))} – ${fmt.format(dateAtNoon(toISO))}`;
+}
+
+const url = Astro.url;
+const rangeParam = url.searchParams.get("range");
+const kind: RangeKind = rangeParam === "week" || rangeParam === "month" ? rangeParam : "day";
+
+const todayISO = getTodayDateISO();
+const anchorParam = url.searchParams.get("anchor");
+const anchorISO = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : todayISO;
+
+const { current, previous } = resolveRange(kind, anchorISO);
+
+const [summary, currentSeries, previousSeries, topProducts, historySeries, categorySales, couponUsage] =
+  await Promise.all([
+    getSummary(kind, anchorISO),
+    getDailySeries(current),
+    getDailySeries(previous),
+    getTopProducts(current, 8),
+    getDailySeries({ fromISO: shiftDateISO(todayISO, -29), toISO: todayISO }),
+    getCategorySales(current),
+    getCouponUsage(current),
+  ]);
+
+const totalCategoryRevenue = categorySales.reduce((sum, row) => sum + row.revenueCents, 0);
+const totalCouponDiscount = couponUsage.reduce((sum, row) => sum + row.discountCents, 0);
+
+const rangeLabel = formatRangeLabel(kind, current.fromISO, current.toISO);
+const prevAnchorISO = shiftAnchor(kind, anchorISO, -1);
+const nextAnchorISO = shiftAnchor(kind, anchorISO, 1);
+const isAtToday = current.toISO >= todayISO;
+
+function hrefFor(nextKind: RangeKind, nextAnchor: string) {
+  return `/admin/estadisticas?range=${nextKind}&anchor=${nextAnchor}`;
+}
+
+const revenueDelta = formatDelta(summary.revenueCents.deltaPct);
+const ordersDelta = formatDelta(summary.ordersCount.deltaPct);
+const avgTicketDelta = formatDelta(summary.avgTicketCents.deltaPct);
+const discountDelta = formatDelta(summary.discountCents.deltaPct);
+
+const dayLabels = currentSeries.map((d) =>
+  new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(dateAtNoon(d.dateISO)),
+);
+const labelByIndex = new Map(dayLabels.map((label, i) => [i + 1, label]));
+const dayFormatter = (time: Time) => labelByIndex.get(Number(time)) ?? "";
+
+const revenueData = currentSeries.map((d, i) => ({ time: (i + 1) as Time, value: Math.round(d.revenueCents / 100) }));
+const revenueCompareData = previousSeries.map((d, i) => ({ time: (i + 1) as Time, value: Math.round(d.revenueCents / 100) }));
+const ordersData = currentSeries.map((d, i) => ({ time: (i + 1) as Time, value: d.ordersCount }));
+
+const deliveryTotal = summary.deliveryCount.value + summary.pickupCount.value;
+const deliveryPct = deliveryTotal > 0 ? (summary.deliveryCount.value / deliveryTotal) * 100 : 0;
+
+const paymentTotal = summary.cashCents.value + summary.cardCents.value;
+const cardPct = paymentTotal > 0 ? (summary.cardCents.value / paymentTotal) * 100 : 0;
+
+const historyRows = [...historySeries].reverse();
+const historyCsv = [
+  ["Fecha", "Pedidos", "Facturación (€)", "Ticket medio (€)", "Delivery", "Pickup"].join(","),
+  ...historyRows.map((row) =>
+    [
+      row.dateISO,
+      row.ordersCount,
+      (row.revenueCents / 100).toFixed(2),
+      (row.avgTicketCents / 100).toFixed(2),
+      row.deliveryCount,
+      row.pickupCount,
+    ].join(","),
+  ),
+].join("\n");
+---
+
+<AdminLayout
+  title="Estadísticas · Admin · Arcadia"
+  heading="Estadísticas"
+  description="Facturación, pedidos, familias y cupones del periodo, con comparativa contra el anterior."
+>
+  <div class="space-y-8">
+  <section class="flex flex-wrap items-center justify-between gap-4">
+    <div class="inline-flex rounded-admin-lg border border-admin-border bg-white/[0.02] p-1">
+      {
+        (["day", "week", "month"] as RangeKind[]).map((option) => (
+          <a
+            href={hrefFor(option, option === kind ? anchorISO : todayISO)}
+            class:list={[
+              "rounded-admin px-4 py-2 text-sm font-semibold transition",
+              option === kind
+                ? "bg-sky-400/15 text-sky-200"
+                : "text-admin-muted hover:text-white",
+            ]}
+          >
+            {option === "day" ? "Hoy" : option === "week" ? "Semana" : "Mes"}
+          </a>
+        ))
+      }
+    </div>
+
+    <div class="flex items-center gap-2">
+      <a
+        href={hrefFor(kind, prevAnchorISO)}
+        class="admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border border-admin-border bg-white/[0.03] text-slate-300 transition hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white"
+        aria-label="Periodo anterior"
+      >
+        ‹
+      </a>
+      <div class="min-w-[220px] rounded-admin border border-admin-border bg-white/[0.03] px-4 py-2 text-center text-sm font-semibold text-white">
+        {rangeLabel}
+      </div>
+      <a
+        href={isAtToday ? hrefFor(kind, anchorISO) : hrefFor(kind, nextAnchorISO)}
+        aria-disabled={isAtToday}
+        class:list={[
+          "admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border transition",
+          isAtToday
+            ? "cursor-not-allowed border-admin-border bg-white/[0.02] text-slate-600"
+            : "border-admin-border bg-white/[0.03] text-slate-300 hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white",
+        ]}
+      >
+        ›
+      </a>
+      {
+        !isAtToday ? (
+          <a
+            href={hrefFor(kind, todayISO)}
+            class="inline-flex items-center justify-center rounded-admin border border-sky-400/20 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+          >
+            Hoy
+          </a>
+        ) : null
+      }
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+    <StatCard
+      icon="coin"
+      label="Facturación"
+      value={money(summary.revenueCents.value)}
+      delta={revenueDelta.text}
+      trend={revenueDelta.trend}
+      helper="vs. periodo anterior equivalente"
+    />
+    <StatCard
+      icon="cart"
+      label="Pedidos"
+      value={String(summary.ordersCount.value)}
+      delta={ordersDelta.text}
+      trend={ordersDelta.trend}
+      helper="vs. periodo anterior equivalente"
+    />
+    <StatCard
+      icon="receipt"
+      label="Ticket medio"
+      value={money(summary.avgTicketCents.value)}
+      delta={avgTicketDelta.text}
+      trend={avgTicketDelta.trend}
+      helper="Facturación / pedidos no cancelados"
+    />
+    <StatCard
+      icon="ticket"
+      label="Descuentos"
+      value={money(summary.discountCents.value)}
+      delta={discountDelta.text}
+      trend={discountDelta.trend}
+      helper="Cupones aplicados en el periodo"
+    />
+  </section>
+
+  <section>
+    <Card padded={false}>
+      <div class="border-b border-admin-border px-7 py-7 lg:px-8 lg:py-8">
+        <div class="admin-eyebrow text-sky-300/80">Facturación</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
+          Evolución en el periodo
+        </h2>
+        <p class="mt-2 text-sm leading-6 text-admin-muted">
+          Línea sólida: periodo actual. Línea discontinua: periodo anterior equivalente.
+        </p>
+      </div>
+      <div class="px-3 pb-4 pt-4 lg:px-5">
+        <AreaChart
+          client:visible
+          data={revenueData}
+          compareData={revenueCompareData}
+          height={340}
+          timeLabelFormatter={dayFormatter}
+        />
+      </div>
+    </Card>
+  </section>
+
+  <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+    <Card padded={false}>
+      <div class="px-7 pt-7 lg:px-8 lg:pt-8">
+        <div class="admin-eyebrow text-sky-300/80">Volumen</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Pedidos por día</h2>
+      </div>
+      <div class="px-3 pb-4 pt-2 lg:px-5">
+        <BarChart client:visible data={ordersData} height={280} timeLabelFormatter={dayFormatter} />
+      </div>
+    </Card>
+
+    <Card>
+      <div class="admin-eyebrow">Desglose</div>
+      <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Canal y método de pago</h2>
+
+      <div class="mt-8">
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-medium text-white">Delivery vs. Pickup</span>
+          <span class="text-admin-muted">{Math.round(deliveryPct)}% delivery</span>
+        </div>
+        <div class="mt-3 h-3 overflow-hidden rounded-full bg-white/[0.06]">
+          <div class="h-full bg-cyan-400/70" style={`width: ${deliveryPct}%`} />
+        </div>
+        <div class="mt-2 flex items-center justify-between text-sm">
+          <span class="text-cyan-300">Delivery · {summary.deliveryCount.value}</span>
+          <span class="text-indigo-300">Pickup · {summary.pickupCount.value}</span>
+        </div>
+      </div>
+
+      <div class="mt-8">
+        <div class="flex items-center justify-between text-sm">
+          <span class="font-medium text-white">Efectivo vs. Tarjeta</span>
+          <span class="text-admin-muted">{Math.round(cardPct)}% tarjeta</span>
+        </div>
+        <div class="mt-3 h-3 overflow-hidden rounded-full bg-white/[0.06]">
+          <div class="h-full bg-emerald-400/70" style={`width: ${cardPct}%`} />
+        </div>
+        <div class="mt-2 flex items-center justify-between text-sm">
+          <span class="text-amber-300">Cash · {money(summary.cashCents.value)}</span>
+          <span class="text-emerald-300">Card · {money(summary.cardCents.value)}</span>
+        </div>
+      </div>
+    </Card>
+  </section>
+
+  <section>
+    <Card>
+      <div class="admin-eyebrow">Ventas</div>
+      <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Top productos del periodo</h2>
+
+      {
+        topProducts.length === 0 ? (
+          <EmptyState class="mt-6" title="Sin ventas en este periodo" />
+        ) : (
+          <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {topProducts.map((product, index) => (
+              <div class="flex items-center justify-between gap-3 rounded-admin-lg border border-admin-border bg-white/[0.02] px-5 py-4">
+                <div class="flex min-w-0 items-center gap-4">
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-sm font-semibold text-admin-muted">
+                    {index + 1}
+                  </span>
+                  <div class="min-w-0 truncate text-sm font-semibold text-white">{product.name}</div>
+                </div>
+                <div class="shrink-0 text-base font-semibold text-white">{money(product.revenueCents)}</div>
+              </div>
+            ))}
+          </div>
+        )
+      }
+    </Card>
+  </section>
+
+  <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+    <Card padded={false}>
+      <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+        <div class="admin-eyebrow">Negocio</div>
+        <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Facturación por familia</h2>
+      </div>
+      {
+        categorySales.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin ventas en este periodo" />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Familia</th>
+                  <th>Uds.</th>
+                  <th class="text-right">Facturación</th>
+                  <th class="text-right">% del total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categorySales.map((row) => (
+                  <tr>
+                    <td class="font-semibold text-white">{row.name}</td>
+                    <td class="text-admin-muted">{row.qty}</td>
+                    <td class="text-right text-admin-muted">{money(row.revenueCents)}</td>
+                    <td class="text-right text-admin-muted">
+                      {totalCategoryRevenue > 0
+                        ? `${((row.revenueCents / totalCategoryRevenue) * 100).toFixed(1)}%`
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
+
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <div class="admin-eyebrow">Negocio</div>
+          <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Cupones aplicados</h2>
+        </div>
+        <div class="text-right">
+          <div class="text-xs text-admin-muted">Descuento total</div>
+          <div class="text-sm font-semibold text-white">{money(totalCouponDiscount)}</div>
+        </div>
+      </div>
+      {
+        couponUsage.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin cupones aplicados en este periodo" />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Usos</th>
+                  <th class="text-right">Descuento total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {couponUsage.map((row) => (
+                  <tr>
+                    <td class="font-semibold text-white">{row.code}</td>
+                    <td class="text-admin-muted">{row.uses}</td>
+                    <td class="text-right text-admin-muted">{money(row.discountCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
+  </section>
+
+  <section>
+    <Card>
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div class="admin-eyebrow">Historial</div>
+          <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
+            Cierres diarios (últimos 30 días)
+          </h2>
+        </div>
+        <button
+          type="button"
+          id="export-history-csv"
+          class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-admin-border bg-white/[0.03] px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+        >
+          Exportar CSV
+        </button>
+      </div>
+
+      <div class="mt-6 overflow-x-auto">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Pedidos</th>
+              <th>Facturación</th>
+              <th>Ticket medio</th>
+              <th>Delivery</th>
+              <th>Pickup</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              historyRows.map((row) => (
+                <tr>
+                  <td class="font-semibold text-white">{row.dateISO}</td>
+                  <td class="text-admin-muted">{row.ordersCount}</td>
+                  <td class="text-admin-muted">{money(row.revenueCents)}</td>
+                  <td class="text-admin-muted">{money(row.avgTicketCents)}</td>
+                  <td class="text-admin-muted">{row.deliveryCount}</td>
+                  <td class="text-admin-muted">{row.pickupCount}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  </section>
+  </div>
+
+  <script type="application/json" id="history-csv-data" set:html={JSON.stringify(historyCsv)} />
+  <script is:inline>
+    (() => {
+      const button = document.getElementById("export-history-csv");
+      const dataEl = document.getElementById("history-csv-data");
+      if (!button || !dataEl) return;
+
+      button.addEventListener("click", () => {
+        const csv = JSON.parse(dataEl.textContent || '""');
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `arcadia-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    })();
+  </script>
+</AdminLayout>

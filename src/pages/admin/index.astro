@@ -1,47 +1,26 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import RadialGauge from "@/components/admin/ui/RadialGauge.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
 import RecentAuditActivity from "@/components/admin/RecentAuditActivity.astro";
+import AreaChart from "@/islands/admin/charts/AreaChart";
+import BarChart from "@/islands/admin/charts/BarChart";
+import { orderStatusTone, orderTypeTone } from "@/lib/admin/tones";
 import {
-  db,
-  AppSetting,
-  AuditLog,
-  Coupon,
-  NewsletterSubscriber,
-  Order,
-  Product,
-  User,
-  eq,
-} from "astro:db";
+  getSummary,
+  getHourlyToday,
+  getTopProducts,
+  getRecentOrders,
+  getTodayDateISO,
+  resolveRange,
+} from "@/server/analytics/queries";
+import { db, AppSetting, Order, Coupon, Product, NewsletterSubscriber, eq, inArray } from "astro:db";
+import type { Time } from "lightweight-charts";
 
-type OrderRow = {
-  id: number;
-  publicId: string;
-  type: "DELIVERY" | "PICKUP";
-  status:
-    | "PENDING"
-    | "PAID"
-    | "ACCEPTED"
-    | "PREPARING"
-    | "READY"
-    | "OUT_FOR_DELIVERY"
-    | "DELIVERED"
-    | "CANCELLED";
-  paymentStatus:
-    | "UNPAID"
-    | "AUTH"
-    | "PAID"
-    | "FAILED"
-    | "REFUNDED"
-    | "PARTIALLY_REFUNDED";
-  totalCents: number;
-  customerName: string | null;
-  createdAt: Date;
-};
-
-type OpsFlags = {
-  pauseOrders?: boolean;
-  forcePickup?: boolean;
-};
+type OpsFlags = { pauseOrders?: boolean; forcePickup?: boolean };
 
 function money(cents: number) {
   return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
@@ -56,224 +35,90 @@ function formatDate(value: Date | string) {
   }).format(date);
 }
 
-function statusTone(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
-    case "PAID":
-      return "border-sky-400/20 bg-sky-400/10 text-sky-300";
-    case "ACCEPTED":
-      return "border-cyan-400/20 bg-cyan-400/10 text-cyan-300";
-    case "PREPARING":
-      return "border-violet-400/20 bg-violet-400/10 text-violet-300";
-    case "READY":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-    case "OUT_FOR_DELIVERY":
-      return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
-    case "DELIVERED":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
-    case "CANCELLED":
-      return "border-rose-400/20 bg-rose-400/10 text-rose-300";
-    default:
-      return "border-white/10 bg-white/[0.03] text-slate-300";
-  }
+function formatDelta(deltaPct: number | null) {
+  if (deltaPct === null) return { text: undefined as string | undefined, trend: "flat" as const };
+  if (Math.abs(deltaPct) < 0.05) return { text: "0.0%", trend: "flat" as const };
+  const trend: "up" | "down" = deltaPct > 0 ? "up" : "down";
+  return { text: `${deltaPct > 0 ? "+" : ""}${deltaPct.toFixed(1)}%`, trend };
 }
 
-function paymentTone(status: string) {
-  switch (status) {
-    case "PAID":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
-    case "UNPAID":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-300";
-    case "AUTH":
-      return "border-sky-400/20 bg-sky-400/10 text-sky-300";
-    case "FAILED":
-      return "border-rose-400/20 bg-rose-400/10 text-rose-300";
-    case "REFUNDED":
-    case "PARTIALLY_REFUNDED":
-      return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
-    default:
-      return "border-white/10 bg-white/[0.03] text-slate-300";
-  }
-}
+const hourFormatter = (time: Time) => {
+  const hour = Math.floor(Number(time) / 3600);
+  return `${String(hour).padStart(2, "0")}:00`;
+};
 
-const orders = (await db
-  .select({
-    id: Order.id,
-    publicId: Order.publicId,
-    type: Order.type,
-    status: Order.status,
-    paymentStatus: Order.paymentStatus,
-    totalCents: Order.totalCents,
-    customerName: Order.customerName,
-    createdAt: Order.createdAt,
-  })
-  .from(Order)) as OrderRow[];
+const PENDING_STATUSES = [
+  "PENDING",
+  "PAID",
+  "ACCEPTED",
+  "PREPARING",
+  "READY",
+  "OUT_FOR_DELIVERY",
+] as const;
 
-const users = await db.select({ id: User.id }).from(User);
-const products = await db
-  .select({ id: Product.id, active: Product.active })
-  .from(Product);
-const coupons = await db
-  .select({ id: Coupon.id, active: Coupon.active })
-  .from(Coupon);
-const newsletterSubscribers = await db
-  .select({ id: NewsletterSubscriber.id, active: NewsletterSubscriber.active })
-  .from(NewsletterSubscriber);
-const auditRows = await db
-  .select({ id: AuditLog.id, createdAt: AuditLog.createdAt })
-  .from(AuditLog);
+const todayISO = getTodayDateISO();
 
-const [opsFlagsRow] = await db
-  .select({ value: AppSetting.value })
-  .from(AppSetting)
-  .where(eq(AppSetting.key, "opsFlags"))
-  .limit(1);
+const [
+  summary,
+  hourly,
+  topProducts,
+  recentOrders,
+  pendingOrders,
+  opsFlagsRows,
+  activeCoupons,
+  products,
+  activeSubscribers,
+] = await Promise.all([
+  getSummary("day", todayISO),
+  getHourlyToday(),
+  getTopProducts(resolveRange("day", todayISO).current, 5),
+  getRecentOrders(5),
+  db.select({ id: Order.id }).from(Order).where(inArray(Order.status, [...PENDING_STATUSES])),
+  db.select({ value: AppSetting.value }).from(AppSetting).where(eq(AppSetting.key, "opsFlags")).limit(1),
+  db.select({ id: Coupon.id }).from(Coupon).where(eq(Coupon.active, true)),
+  db.select({ id: Product.id, active: Product.active }).from(Product),
+  db
+    .select({ id: NewsletterSubscriber.id })
+    .from(NewsletterSubscriber)
+    .where(eq(NewsletterSubscriber.active, true)),
+]);
 
-const opsFlags = (opsFlagsRow?.value ?? {}) as OpsFlags;
+const opsFlags = (opsFlagsRows[0]?.value ?? {}) as OpsFlags;
 
-const sortedOrders = [...orders].sort(
-  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-);
-
-const latestOrders = sortedOrders.slice(0, 8);
-
-const now = Date.now();
-const todayStart = new Date();
-todayStart.setHours(0, 0, 0, 0);
-const todayStartMs = todayStart.getTime();
-const last24hMs = now - 24 * 60 * 60 * 1000;
-
-const ordersToday = sortedOrders.filter(
-  (order) => new Date(order.createdAt).getTime() >= todayStartMs,
-);
-
-const revenueTodayCents = ordersToday
-  .filter((order) => order.status !== "CANCELLED")
-  .reduce((sum, order) => sum + Number(order.totalCents ?? 0), 0);
-
-const pendingOrdersCount = sortedOrders.filter((order) =>
-  [
-    "PENDING",
-    "PAID",
-    "ACCEPTED",
-    "PREPARING",
-    "READY",
-    "OUT_FOR_DELIVERY",
-  ].includes(order.status),
-).length;
-
-const activeProductsCount = products.filter((product) => product.active).length;
+const activeProductsCount = products.filter((p) => p.active).length;
 const inactiveProductsCount = products.length - activeProductsCount;
-const activeCouponsCount = coupons.filter((coupon) => coupon.active).length;
-const activeSubscribersCount = newsletterSubscribers.filter(
-  (row) => row.active,
-).length;
-const auditLast24h = auditRows.filter(
-  (row) => new Date(row.createdAt).getTime() >= last24hMs,
-).length;
 
-const deliveryTodayCount = ordersToday.filter(
-  (order) => order.type === "DELIVERY",
-).length;
-const pickupTodayCount = ordersToday.filter(
-  (order) => order.type === "PICKUP",
-).length;
-const paidTodayCount = ordersToday.filter(
-  (order) => order.paymentStatus === "PAID",
-).length;
+const revenueDelta = formatDelta(summary.revenueCents.deltaPct);
+const ordersDelta = formatDelta(summary.ordersCount.deltaPct);
 
-const dashboardCards = [
-  {
-    label: "Pedidos hoy",
-    value: String(ordersToday.length),
-    helper: "Pedidos creados desde medianoche",
-    tone: "border-sky-400/15 bg-sky-400/8",
-  },
-  {
-    label: "Facturación hoy",
-    value: money(revenueTodayCents),
-    helper: "Excluye pedidos cancelados",
-    tone: "border-emerald-400/15 bg-emerald-400/8",
-  },
-  {
-    label: "En curso",
-    value: String(pendingOrdersCount),
-    helper: "Pendientes de cierre operativo",
-    tone: "border-violet-400/15 bg-violet-400/8",
-  },
-  {
-    label: "Productos activos",
-    value: String(activeProductsCount),
-    helper: `${inactiveProductsCount} inactivos en catálogo`,
-    tone: "border-white/10 bg-white/[0.03]",
-  },
-  {
-    label: "Suscriptores activos",
-    value: String(activeSubscribersCount),
-    helper: "Base actual del newsletter",
-    tone: "border-cyan-400/15 bg-cyan-400/8",
-  },
-  {
-    label: "Audit 24h",
-    value: String(auditLast24h),
-    helper: "Cambios recientes del admin",
-    tone: "border-amber-400/15 bg-amber-400/8",
-  },
-];
+const hourlyRevenueData = hourly.today.map((b) => ({
+  time: (b.hour * 3600) as Time,
+  value: Math.round(b.revenueCents / 100),
+}));
+const hourlyRevenueCompare = hourly.lastWeek.map((b) => ({
+  time: (b.hour * 3600) as Time,
+  value: Math.round(b.revenueCents / 100),
+}));
+const hourlyOrdersData = hourly.today.map((b) => ({
+  time: (b.hour * 3600) as Time,
+  value: b.ordersCount,
+}));
 
-const opsChips = [
-  {
-    label: "Pedidos",
-    value: opsFlags.pauseOrders ? "Pausados" : "Activos",
-    tone: opsFlags.pauseOrders
-      ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-      : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-  },
-  {
-    label: "Delivery",
-    value: opsFlags.forcePickup ? "Solo recogida" : "Normal",
-    tone: opsFlags.forcePickup
-      ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
-      : "border-sky-400/20 bg-sky-400/10 text-sky-300",
-  },
-  {
-    label: "Cupones activos",
-    value: String(activeCouponsCount),
-    tone: "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300",
-  },
-  {
-    label: "Usuarios",
-    value: String(users.length),
-    tone: "border-white/10 bg-white/[0.03] text-slate-300",
-  },
-];
+const lastWeekRevenueCents = hourly.lastWeek.reduce((sum, b) => sum + b.revenueCents, 0);
+const progressPct =
+  lastWeekRevenueCents > 0
+    ? (summary.revenueCents.value / lastWeekRevenueCents) * 100
+    : summary.revenueCents.value > 0
+      ? 100
+      : 0;
+const progressDiffCents = summary.revenueCents.value - lastWeekRevenueCents;
+const progressUp = progressDiffCents >= 0;
 
 const quickLinks = [
-  {
-    href: "/admin/pedidos",
-    title: "Pedidos",
-    description: "Seguimiento completo y detalle operativo",
-    tone: "border-sky-400/20 bg-sky-400/10 text-sky-300",
-  },
-  {
-    href: "/admin/cocina",
-    title: "Cocina",
-    description: "Board vivo para tickets en curso",
-    tone: "border-violet-400/20 bg-violet-400/10 text-violet-300",
-  },
-  {
-    href: "/admin/operativa",
-    title: "Operativa",
-    description: "Flags, horarios y force pickup",
-    tone: "border-amber-400/20 bg-amber-400/10 text-amber-300",
-  },
-  {
-    href: "/admin/catalogo/productos",
-    title: "Catálogo",
-    description: "Productos, ingredientes y compatibilidades",
-    tone: "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
-  },
+  { href: "/admin/pedidos", title: "Pedidos", description: "Seguimiento y detalle operativo", tone: "primary" as const },
+  { href: "/admin/cocina", title: "Cocina", description: "Board vivo para tickets en curso", tone: "violet" as const },
+  { href: "/admin/operativa", title: "Operativa", description: "Flags, horarios y force pickup", tone: "warning" as const },
+  { href: "/admin/catalogo/productos", title: "Catálogo", description: "Productos e ingredientes", tone: "cyan" as const },
 ];
 ---
 
@@ -281,364 +126,222 @@ const quickLinks = [
   title="Dashboard · Admin · Arcadia"
   heading="Dashboard"
   description="Visión rápida de pedidos, operativa, catálogo y actividad reciente."
-  actions={true}
 >
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/pedidos"
-        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
-      >
-        Ir a pedidos
-      </a>
+  <div class="space-y-8">
+    <!-- Fila 1 · KPIs principales -->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <StatCard
+        icon="coin"
+        label="Facturación hoy"
+        value={money(summary.revenueCents.value)}
+        delta={revenueDelta.text}
+        trend={revenueDelta.trend}
+      />
+      <StatCard
+        icon="cart"
+        label="Pedidos hoy"
+        value={String(summary.ordersCount.value)}
+        delta={ordersDelta.text}
+        trend={ordersDelta.trend}
+      />
+    </section>
 
-      <a
-        href="/admin/cocina"
-        class="inline-flex items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-300 transition hover:border-violet-400/30 hover:bg-violet-400/15"
-      >
-        Abrir cocina
-      </a>
+    <!-- Fila 2 · Volumen por hora + progreso vs. semana pasada -->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:gap-8">
+      <Card padded={false}>
+        <div class="px-7 pt-7 lg:px-8 lg:pt-8">
+          <div class="admin-eyebrow text-sky-300/80">Volumen</div>
+          <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Pedidos por franja horaria</h2>
+        </div>
+        <div class="px-3 pb-4 pt-2 lg:px-5">
+          <BarChart client:visible data={hourlyOrdersData} height={300} timeLabelFormatter={hourFormatter} />
+        </div>
+      </Card>
 
-      <a
-        href="/admin/operativa"
-        class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Ver operativa
-      </a>
-    </div>
-  </Fragment>
+      <Card class="flex flex-col">
+        <div class="admin-eyebrow">Progreso</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Vs. semana pasada</h2>
+        <p class="mt-2 text-sm leading-6 text-admin-muted">Facturación de hoy comparada con el mismo día de la semana anterior.</p>
 
-  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-    {
-      dashboardCards.map((card) => (
-        <article
-          class:list={[
-            "rounded-[28px] border p-6 shadow-[0_20px_60px_rgba(0,0,0,0.25)]",
-            card.tone,
-          ]}
-        >
-          <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-            {card.label}
+        <div class="relative mx-auto mt-6 w-full max-w-[260px]">
+          <RadialGauge percent={progressPct} />
+          <div class="absolute inset-x-0 top-[42%] flex flex-col items-center">
+            <div class="text-4xl font-semibold tracking-[-0.03em] text-white">{Math.round(progressPct)}%</div>
+            <Badge tone={progressUp ? "success" : "danger"} class="mt-2">
+              {progressUp ? "▲" : "▼"} {money(Math.abs(progressDiffCents))}
+            </Badge>
           </div>
-          <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
-            {card.value}
-          </div>
-          <p class="mt-3 text-sm leading-6 text-slate-400">{card.helper}</p>
-        </article>
-      ))
-    }
-  </section>
+        </div>
 
-  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
-    <div class="space-y-6">
-      <article
-        class="rounded-[32px] border border-white/10 bg-[#111827]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7"
-      >
-        <div
-          class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5"
-        >
+        <p class="mt-6 text-center text-sm leading-6 text-admin-muted">
+          Hoy llevas <span class="font-semibold text-white">{money(summary.revenueCents.value)}</span>, {" "}
+          {progressUp ? "por encima" : "por debajo"} de los {money(lastWeekRevenueCents)} del mismo día hace una semana.
+        </p>
+
+        <div class="mt-auto grid grid-cols-3 gap-3 border-t border-admin-border pt-6">
+          <div class="text-center">
+            <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-admin-muted">Ticket medio</div>
+            <div class="mt-1.5 text-lg font-semibold text-white">{money(summary.avgTicketCents.value)}</div>
+          </div>
+          <div class="text-center">
+            <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-admin-muted">En curso</div>
+            <div class="mt-1.5 text-lg font-semibold text-white">{pendingOrders.length}</div>
+          </div>
+          <div class="text-center">
+            <div class="text-[11px] font-semibold uppercase tracking-[0.14em] text-admin-muted">Clientes</div>
+            <div class="mt-1.5 text-lg font-semibold text-white">{summary.newCustomers.value}</div>
+          </div>
+        </div>
+      </Card>
+    </section>
+
+    <!-- Fila 3 · Facturación por hora, ancho completo -->
+    <section>
+      <Card padded={false}>
+        <div class="flex flex-wrap items-end justify-between gap-4 px-7 pt-7 lg:px-8 lg:pt-8">
           <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
-            >
-              Snapshot diario
-            </div>
-            <h2
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white"
-            >
-              Ritmo operativo de hoy
-            </h2>
-            <p class="mt-3 text-sm leading-7 text-slate-400">
-              Lectura rápida del día actual para saber si el flujo está
-              concentrado en delivery, pickup o cierre de cobro.
+            <div class="admin-eyebrow text-sky-300/80">Facturación</div>
+            <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Ritmo de hoy por hora</h2>
+            <p class="mt-2 text-sm leading-6 text-admin-muted">
+              Línea sólida: hoy. Línea discontinua: mismo día de la semana pasada.
             </p>
           </div>
         </div>
-
-        <div class="mt-6 grid gap-4 md:grid-cols-3">
-          <article
-            class="rounded-[26px] border border-cyan-400/20 bg-cyan-400/10 p-5"
-          >
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200"
-            >
-              Delivery hoy
-            </div>
-            <div
-              class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white"
-            >
-              {deliveryTodayCount}
-            </div>
-            <p class="mt-2 text-sm leading-6 text-cyan-100/80">
-              Pedidos con reparto creados hoy.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[26px] border border-indigo-400/20 bg-indigo-400/10 p-5"
-          >
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-200"
-            >
-              Pickup hoy
-            </div>
-            <div
-              class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white"
-            >
-              {pickupTodayCount}
-            </div>
-            <p class="mt-2 text-sm leading-6 text-indigo-100/80">
-              Pedidos de recogida creados hoy.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 p-5"
-          >
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200"
-            >
-              Paid hoy
-            </div>
-            <div
-              class="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white"
-            >
-              {paidTodayCount}
-            </div>
-            <p class="mt-2 text-sm leading-6 text-emerald-100/80">
-              Payment status PAID entre los pedidos de hoy.
-            </p>
-          </article>
+        <div class="px-3 pb-4 pt-4 lg:px-5">
+          <AreaChart
+            client:visible
+            data={hourlyRevenueData}
+            compareData={hourlyRevenueCompare}
+            height={340}
+            timeLabelFormatter={hourFormatter}
+          />
         </div>
-      </article>
+      </Card>
+    </section>
 
-      <article
-        class="rounded-[32px] border border-white/10 bg-[#111827]/82 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-      >
-        <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
-          <div class="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <div
-                class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300/80"
-              >
-                Pedidos
-              </div>
-              <h2
-                class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white"
-              >
-                Últimos pedidos
-              </h2>
-              <p class="mt-3 text-sm leading-7 text-slate-400">
-                He dejado esta zona como lista de fichas amplias, con más aire y
-                mejor lectura del workflow y el cobro.
-              </p>
-            </div>
-
-            <a
-              href="/admin/pedidos"
-              class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-            >
-              Ver todos
-            </a>
-          </div>
-        </div>
+    <!-- Fila 4 · Top productos + últimos pedidos -->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <Card>
+        <div class="admin-eyebrow">Ventas</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Top productos de hoy</h2>
 
         {
-          latestOrders.length === 0 ? (
-            <div class="px-6 py-14 text-center text-sm text-slate-400 lg:px-8">
-              Todavía no hay pedidos.
-            </div>
+          topProducts.length === 0 ? (
+            <EmptyState class="mt-6" title="Sin ventas todavía hoy" />
           ) : (
-            <div class="space-y-5 px-6 py-6 lg:px-8 lg:py-8">
-              {latestOrders.map((order) => (
-                <article class="rounded-[28px] border border-white/10 bg-[#0b1220]/90 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.22)]">
-                  <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-center gap-2.5">
-                        <a
-                          href={`/admin/pedidos/${order.publicId}`}
-                          class="text-lg font-semibold text-white transition hover:text-sky-300"
-                        >
-                          {order.publicId}
-                        </a>
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            statusTone(order.status),
-                          ]}
-                        >
-                          {order.status}
-                        </span>
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            paymentTone(order.paymentStatus),
-                          ]}
-                        >
-                          {order.paymentStatus}
-                        </span>
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            order.type === "DELIVERY"
-                              ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
-                              : "border-indigo-400/20 bg-indigo-400/10 text-indigo-300",
-                          ]}
-                        >
-                          {order.type}
-                        </span>
-                      </div>
-
-                      <div class="mt-4 grid gap-4 md:grid-cols-2">
-                        <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                          <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Cliente
-                          </div>
-                          <div class="mt-3 text-sm font-semibold text-white">
-                            {order.customerName?.trim() || "Cliente sin nombre"}
-                          </div>
-                        </section>
-
-                        <section class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                          <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            Creado
-                          </div>
-                          <div class="mt-3 text-sm font-semibold text-white">
-                            {formatDate(order.createdAt)}
-                          </div>
-                        </section>
-                      </div>
-                    </div>
-
-                    <div class="flex flex-col gap-3 lg:min-w-[180px] lg:items-end">
-                      <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-right">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Total
-                        </div>
-                        <div class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">
-                          {money(order.totalCents)}
-                        </div>
-                      </div>
-
-                      <a
-                        href={`/admin/pedidos/${order.publicId}`}
-                        class="inline-flex items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
-                      >
-                        Abrir pedido
-                      </a>
+            <div class="mt-6 space-y-3">
+              {topProducts.map((product, index) => (
+                <div class="flex items-center justify-between gap-3 rounded-admin-lg border border-admin-border bg-white/[0.02] px-5 py-4">
+                  <div class="flex min-w-0 items-center gap-4">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-sm font-semibold text-admin-muted">
+                      {index + 1}
+                    </span>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-white">{product.name}</div>
+                      <div class="text-xs text-admin-muted">{product.qty} uds.</div>
                     </div>
                   </div>
-                </article>
+                  <div class="shrink-0 text-base font-semibold text-white">{money(product.revenueCents)}</div>
+                </div>
               ))}
             </div>
           )
         }
-      </article>
+      </Card>
 
-      <section class="mt-0">
-        <RecentAuditActivity limit={8} />
-      </section>
-    </div>
-
-    <aside class="space-y-6">
-      <article
-        class="rounded-[32px] border border-white/10 bg-[#111827]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300/80"
-        >
-          Operativa
+      <Card padded={false}>
+        <div class="flex flex-wrap items-end justify-between gap-4 px-7 pt-7 lg:px-8 lg:pt-8">
+          <div>
+            <div class="admin-eyebrow text-sky-300/80">Pedidos</div>
+            <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Últimos pedidos</h2>
+          </div>
+          <a href="/admin/pedidos" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white">
+            Ver todos
+          </a>
         </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Estado rápido
-        </h2>
-        <p class="mt-3 text-sm leading-7 text-slate-400">
-          Resumen de flags y señales que afectan de forma directa a pedidos,
-          checkout y servicio real.
+
+        {
+          recentOrders.length === 0 ? (
+            <div class="px-7 py-10 lg:px-8">
+              <EmptyState title="Todavía no hay pedidos" />
+            </div>
+          ) : (
+            <div class="mt-4 divide-y divide-admin-border">
+              {recentOrders.map((order) => (
+                <div class="flex flex-wrap items-center justify-between gap-4 px-7 py-4 lg:px-8">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <a href={`/admin/pedidos/${order.publicId}`} class="font-semibold text-white transition hover:text-sky-300">
+                        {order.publicId}
+                      </a>
+                      <Badge tone={orderStatusTone(order.status)}>{order.status}</Badge>
+                      <Badge tone={orderTypeTone(order.type)}>{order.type}</Badge>
+                    </div>
+                    <div class="mt-1.5 text-sm text-admin-muted">
+                      {order.customerName?.trim() || "Cliente sin nombre"} · {formatDate(order.createdAt)}
+                    </div>
+                  </div>
+                  <div class="text-lg font-semibold text-white">{money(order.totalCents)}</div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </Card>
+    </section>
+
+    <!-- Fila 5 · Operativa + atajos -->
+    <section class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <Card>
+        <div class="admin-eyebrow text-amber-300/80">Operativa</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Estado rápido</h2>
+        <p class="mt-2 text-sm leading-6 text-admin-muted">
+          Flags y señales que afectan de forma directa a pedidos, checkout y servicio real.
         </p>
 
         <div class="mt-6 flex flex-wrap gap-2">
-          {
-            opsChips.map((chip) => (
-              <span
-                class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]",
-                  chip.tone,
-                ]}
-              >
-                {chip.label}: {chip.value}
-              </span>
-            ))
-          }
+          <Badge tone={opsFlags.pauseOrders ? "danger" : "success"}>
+            Pedidos: {opsFlags.pauseOrders ? "Pausados" : "Activos"}
+          </Badge>
+          <Badge tone={opsFlags.forcePickup ? "warning" : "primary"}>
+            Delivery: {opsFlags.forcePickup ? "Solo recogida" : "Normal"}
+          </Badge>
+          <Badge tone="fuchsia">Cupones activos: {activeCoupons.length}</Badge>
+          <Badge tone="neutral">Catálogo: {activeProductsCount} activos · {inactiveProductsCount} inactivos</Badge>
+          <Badge tone="cyan">Newsletter: {activeSubscribers.length}</Badge>
         </div>
 
-        <div class="mt-6 grid gap-3">
-          <a
-            href="/admin/operativa"
-            class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-          >
+        <div class="mt-6 grid grid-cols-2 gap-3">
+          <a href="/admin/operativa" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white">
             Ajustar operativa
           </a>
-
-          <a
-            href="/admin/newsletter"
-            class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
-          >
-            Abrir newsletter
-          </a>
-
-          <a
-            href="/admin/audit"
-            class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-300 transition hover:border-amber-400/30 hover:bg-amber-400/15"
-          >
+          <a href="/admin/audit" class="inline-flex items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-300 transition hover:border-amber-400/30 hover:bg-amber-400/15">
             Ver audit log
           </a>
         </div>
-      </article>
+      </Card>
 
-      <article
-        class="rounded-[32px] border border-white/10 bg-[#111827]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Navegación
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Atajos del admin
-        </h2>
+      <Card>
+        <div class="admin-eyebrow">Navegación</div>
+        <h2 class="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Atajos del admin</h2>
 
-        <div class="mt-6 space-y-4">
+        <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
           {
             quickLinks.map((item) => (
-              <a
-                href={item.href}
-                class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4 transition hover:border-white/15 hover:bg-white/[0.05]"
-              >
+              <a href={item.href} class="block rounded-admin-lg border border-admin-border bg-white/[0.02] p-4 transition hover:border-admin-border-strong hover:bg-white/[0.04]">
                 <div class="flex items-center justify-between gap-3">
-                  <div class="text-sm font-semibold text-white">
-                    {item.title}
-                  </div>
-                  <span
-                    class:list={[
-                      "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                      item.tone,
-                    ]}
-                  >
-                    Abrir
-                  </span>
+                  <div class="text-sm font-semibold text-white">{item.title}</div>
+                  <Badge tone={item.tone}>Abrir</Badge>
                 </div>
-                <p class="mt-2 text-sm leading-6 text-slate-400">
-                  {item.description}
-                </p>
+                <p class="mt-1.5 text-sm leading-6 text-admin-muted">{item.description}</p>
               </a>
             ))
           }
         </div>
-      </article>
-    </aside>
-  </section>
+      </Card>
+    </section>
+
+    <!-- Fila 6 · Audit, ancho completo -->
+    <RecentAuditActivity limit={6} />
+  </div>
 </AdminLayout>

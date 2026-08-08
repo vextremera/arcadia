@@ -1,0 +1,352 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import AreaChart from "@/islands/admin/charts/AreaChart";
+import { getTodayDateISO, resolveRange, shiftAnchor, type RangeKind } from "@/server/analytics/queries";
+import { getMadridDateInfo, getMadridDayBoundsUTC, shiftDateISO } from "@/server/time/madrid";
+import { db, User, Order, NewsletterSubscriber, and, gte, lt, eq } from "astro:db";
+import type { Time } from "lightweight-charts";
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+function pct(part: number, total: number) {
+  if (!total) return "0%";
+  return `${Math.round((part / total) * 100)}%`;
+}
+
+function dateAtNoon(dateISO: string) {
+  return new Date(`${dateISO}T12:00:00Z`);
+}
+
+function formatRangeLabel(kind: RangeKind, fromISO: string, toISO: string) {
+  if (kind === "day") {
+    const label = new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  if (kind === "month") {
+    const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(dateAtNoon(fromISO));
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  const fmt = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" });
+  return `${fmt.format(dateAtNoon(fromISO))} – ${fmt.format(dateAtNoon(toISO))}`;
+}
+
+function formatDateOnly(value: Date | string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeZone: "Europe/Madrid" }).format(new Date(value));
+}
+
+function isPaid(status: string) {
+  return status === "PAID" || status === "PARTIALLY_REFUNDED";
+}
+
+/** Fecha ISO (Madrid) de un timestamp, para agrupar por día. */
+function madridDateISO(value: Date | string) {
+  return getMadridDateInfo(new Date(value)).dateISO;
+}
+
+const url = Astro.url;
+const rangeParam = url.searchParams.get("range");
+const kind: RangeKind = rangeParam === "day" || rangeParam === "week" ? rangeParam : "month";
+
+const todayISO = getTodayDateISO();
+const anchorParam = url.searchParams.get("anchor");
+const anchorISO = anchorParam && /^\d{4}-\d{2}-\d{2}$/.test(anchorParam) ? anchorParam : todayISO;
+
+const { current, previous } = resolveRange(kind, anchorISO);
+const startUTC = getMadridDayBoundsUTC(current.fromISO).startUTC;
+const endUTC = getMadridDayBoundsUTC(current.toISO).endUTC;
+const prevStartUTC = getMadridDayBoundsUTC(previous.fromISO).startUTC;
+const prevEndUTC = getMadridDayBoundsUTC(previous.toISO).endUTC;
+
+// --- Altas de clientes -------------------------------------------------
+const customers = await db
+  .select({ id: User.id, name: User.name, email: User.email, active: User.active, createdAt: User.createdAt })
+  .from(User)
+  .where(eq(User.role, "CUSTOMER"));
+
+const newCustomers = customers.filter((user) => {
+  const t = new Date(user.createdAt).getTime();
+  return t >= startUTC.getTime() && t < endUTC.getTime();
+});
+
+const prevNewCustomers = customers.filter((user) => {
+  const t = new Date(user.createdAt).getTime();
+  return t >= prevStartUTC.getTime() && t < prevEndUTC.getTime();
+});
+
+const signupDelta = prevNewCustomers.length
+  ? Math.round(((newCustomers.length - prevNewCustomers.length) / prevNewCustomers.length) * 100)
+  : null;
+
+// --- Pedidos del periodo: invitado vs registrado ------------------------
+const periodOrders = await db
+  .select({ id: Order.id, userId: Order.userId, totalCents: Order.totalCents, paymentStatus: Order.paymentStatus, status: Order.status, createdAt: Order.createdAt })
+  .from(Order)
+  .where(and(gte(Order.createdAt, startUTC), lt(Order.createdAt, endUTC)));
+
+const validOrders = periodOrders.filter((order) => order.status !== "CANCELLED");
+const guestOrders = validOrders.filter((order) => typeof order.userId !== "number");
+const accountOrders = validOrders.filter((order) => typeof order.userId === "number");
+
+// --- Recurrencia: histórico completo por cliente ------------------------
+const allOrders = await db
+  .select({ userId: Order.userId, paymentStatus: Order.paymentStatus, status: Order.status, totalCents: Order.totalCents, createdAt: Order.createdAt })
+  .from(Order);
+
+const ordersByUser = new Map<number, { count: number; spentCents: number; lastAt: Date | string }>();
+for (const order of allOrders) {
+  if (typeof order.userId !== "number" || order.status === "CANCELLED") continue;
+  const entry = ordersByUser.get(order.userId) ?? { count: 0, spentCents: 0, lastAt: order.createdAt };
+  entry.count += 1;
+  if (isPaid(order.paymentStatus)) entry.spentCents += Number(order.totalCents ?? 0);
+  if (new Date(order.createdAt).getTime() > new Date(entry.lastAt).getTime()) entry.lastAt = order.createdAt;
+  ordersByUser.set(order.userId, entry);
+}
+
+const buyers = [...ordersByUser.values()];
+const repeatBuyers = buyers.filter((entry) => entry.count > 1);
+const convertedCustomers = customers.filter((user) => ordersByUser.has(user.id));
+const dormantCustomers = customers.filter((user) => !ordersByUser.has(user.id));
+
+// --- Newsletter ---------------------------------------------------------
+const subscribers = await db
+  .select({ id: NewsletterSubscriber.id, active: NewsletterSubscriber.active, createdAt: NewsletterSubscriber.createdAt })
+  .from(NewsletterSubscriber);
+
+const activeSubscribers = subscribers.filter((row) => row.active).length;
+const newSubscribers = subscribers.filter((row) => {
+  const t = new Date(row.createdAt).getTime();
+  return t >= startUTC.getTime() && t < endUTC.getTime();
+}).length;
+
+// --- Serie diaria de altas ---------------------------------------------
+function enumerateDates(fromISO: string, toISO: string) {
+  const dates: string[] = [];
+  let cursor = fromISO;
+  let guard = 0;
+  while (cursor <= toISO && guard < 400) {
+    dates.push(cursor);
+    cursor = shiftDateISO(cursor, 1);
+    guard += 1;
+  }
+  return dates;
+}
+
+const signupsByDate = new Map<string, number>();
+for (const user of newCustomers) {
+  const key = madridDateISO(user.createdAt);
+  signupsByDate.set(key, (signupsByDate.get(key) ?? 0) + 1);
+}
+
+const signupSeries = enumerateDates(current.fromISO, current.toISO).map((dateISO) => ({
+  time: dateISO as Time,
+  value: signupsByDate.get(dateISO) ?? 0,
+}));
+
+const hasSignupData = signupSeries.some((point) => point.value > 0);
+
+// --- Últimos registros --------------------------------------------------
+const latestCustomers = [...newCustomers]
+  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  .slice(0, 10)
+  .map((user) => {
+    const activity = ordersByUser.get(user.id);
+    return {
+      ...user,
+      orderCount: activity?.count ?? 0,
+      spentCents: activity?.spentCents ?? 0,
+    };
+  });
+
+const rangeLabel = formatRangeLabel(kind, current.fromISO, current.toISO);
+const prevAnchorISO = shiftAnchor(kind, anchorISO, -1);
+const nextAnchorISO = shiftAnchor(kind, anchorISO, 1);
+const isAtToday = current.toISO >= todayISO;
+
+function hrefFor(nextKind: RangeKind, nextAnchor: string) {
+  return `/admin/dashboard/visitantes?range=${nextKind}&anchor=${nextAnchor}`;
+}
+
+const signupTrend: "up" | "down" | "flat" = signupDelta === null || signupDelta === 0 ? "flat" : signupDelta > 0 ? "up" : "down";
+---
+
+<AdminLayout
+  title="Visitantes · Admin · Arcadia"
+  heading="Visitantes"
+  description="Audiencia y captación: altas de cuenta, compra como invitado y recurrencia."
+>
+  <div class="space-y-8">
+    <section class="flex flex-wrap items-center justify-between gap-4">
+      <div class="inline-flex rounded-admin-lg border border-admin-border bg-white/[0.02] p-1">
+        {
+          (["day", "week", "month"] as RangeKind[]).map((option) => (
+            <a
+              href={hrefFor(option, option === kind ? anchorISO : todayISO)}
+              class:list={[
+                "rounded-admin px-4 py-2 text-sm font-semibold transition",
+                option === kind ? "bg-sky-400/15 text-sky-200" : "text-admin-muted hover:text-white",
+              ]}
+            >
+              {option === "day" ? "Hoy" : option === "week" ? "Semana" : "Mes"}
+            </a>
+          ))
+        }
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href={hrefFor(kind, prevAnchorISO)} class="admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border border-admin-border bg-white/[0.03] text-slate-300 transition hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white" aria-label="Periodo anterior">
+          ‹
+        </a>
+        <div class="min-w-[220px] rounded-admin border border-admin-border bg-white/[0.03] px-4 py-2 text-center text-sm font-semibold text-white">
+          {rangeLabel}
+        </div>
+        <a
+          href={isAtToday ? hrefFor(kind, anchorISO) : hrefFor(kind, nextAnchorISO)}
+          aria-disabled={isAtToday}
+          class:list={[
+            "admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin border transition",
+            isAtToday
+              ? "cursor-not-allowed border-admin-border bg-white/[0.02] text-slate-600"
+              : "border-admin-border bg-white/[0.03] text-slate-300 hover:border-admin-border-strong hover:bg-white/[0.06] hover:text-white",
+          ]}
+        >
+          ›
+        </a>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard
+        icon="users"
+        label="Altas de cuenta"
+        value={String(newCustomers.length)}
+        delta={signupDelta === null ? undefined : `${signupDelta > 0 ? "+" : ""}${signupDelta}%`}
+        trend={signupTrend}
+        helper="Clientes registrados en el periodo"
+      />
+      <StatCard icon="cart" label="Pedidos sin cuenta" value={`${guestOrders.length} / ${validOrders.length}`} helper={`${pct(guestOrders.length, validOrders.length)} del periodo compró como invitado`} />
+    </section>
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard label="Clientes que repiten" value={`${repeatBuyers.length} / ${buyers.length}`} helper={`${pct(repeatBuyers.length, buyers.length)} de los compradores con cuenta`} />
+      <StatCard label="Newsletter" value={String(activeSubscribers)} helper={`${newSubscribers} altas nuevas en el periodo`} />
+    </section>
+
+    <Card>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="admin-eyebrow">Captación</div>
+          <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Altas por día</h2>
+        </div>
+        <Badge tone="primary">{rangeLabel}</Badge>
+      </div>
+
+      <div class="mt-5">
+        {
+          hasSignupData ? (
+            <AreaChart client:only="preact" data={signupSeries} height={260} />
+          ) : (
+            <EmptyState title="Sin altas en este periodo" description="Cuando haya registros nuevos, aquí aparece su evolución diaria." />
+          )
+        }
+      </div>
+    </Card>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+      <Card padded={false}>
+        <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+          <h2 class="text-base font-semibold text-white">Embudo de audiencia</h2>
+          <p class="mt-1 text-xs text-admin-muted">Base histórica completa, no solo el periodo.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Etapa</th>
+                <th>Personas</th>
+                <th class="text-right">% sobre registrados</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-semibold text-white">Registrados</td>
+                <td class="text-admin-muted">{customers.length}</td>
+                <td class="text-right text-admin-muted">100%</td>
+              </tr>
+              <tr>
+                <td class="font-semibold text-white">Han comprado</td>
+                <td class="text-admin-muted">{convertedCustomers.length}</td>
+                <td class="text-right text-admin-muted">{pct(convertedCustomers.length, customers.length)}</td>
+              </tr>
+              <tr>
+                <td class="font-semibold text-white">Han repetido</td>
+                <td class="text-admin-muted">{repeatBuyers.length}</td>
+                <td class="text-right text-admin-muted">{pct(repeatBuyers.length, customers.length)}</td>
+              </tr>
+              <tr>
+                <td class="font-semibold text-white">Sin pedidos</td>
+                <td class="text-admin-muted">{dormantCustomers.length}</td>
+                <td class="text-right text-admin-muted">{pct(dormantCustomers.length, customers.length)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card padded={false}>
+        <div class="border-b border-admin-border px-5 py-4 lg:px-6">
+          <h2 class="text-base font-semibold text-white">Altas recientes</h2>
+          <p class="mt-1 text-xs text-admin-muted">{rangeLabel}</p>
+        </div>
+        {
+          latestCustomers.length === 0 ? (
+            <div class="px-6 py-14">
+              <EmptyState title="Sin altas en este periodo" />
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Alta</th>
+                    <th>Pedidos</th>
+                    <th class="text-right">Gasto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestCustomers.map((user) => (
+                    <tr>
+                      <td>
+                        <a href={`/admin/usuarios/${user.id}`} class="font-semibold text-white transition hover:text-sky-300">
+                          {user.name ?? user.email}
+                        </a>
+                        <div class="truncate text-xs text-admin-muted">{user.email}</div>
+                      </td>
+                      <td class="text-admin-muted">{formatDateOnly(user.createdAt)}</td>
+                      <td class="text-admin-muted">{user.orderCount}</td>
+                      <td class="text-right text-admin-muted">{money(user.spentCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </Card>
+    </div>
+
+    <Card>
+      <div class="admin-eyebrow">Alcance de esta pantalla</div>
+      <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Qué mide y qué no</h2>
+      <p class="mt-3 text-sm leading-6 text-admin-muted">
+        Arcadia no registra páginas vistas ni sesiones anónimas, así que aquí no hay tráfico web: todo lo anterior sale de datos que la app ya guarda (altas de cuenta, pedidos con y sin cuenta, y newsletter). Medir visitas reales requiere una capa de tracking propia y, al ser un sitio público en la UE, su correspondiente aviso de cookies y consentimiento.
+      </p>
+    </Card>
+  </div>
+</AdminLayout>

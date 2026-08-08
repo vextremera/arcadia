@@ -1,0 +1,11 @@
+---
+/**
+ * Ventas se fusionó con Estadísticas: eran la misma vista con los mismos KPIs
+ * y el mismo selector de periodo. La ruta se mantiene como redirección para no
+ * romper enlaces guardados, arrastrando el rango que viniera en la URL.
+ */
+const url = new URL(Astro.request.url);
+const target = `/admin/estadisticas${url.search}`;
+
+return Astro.redirect(target, 301);
+---
