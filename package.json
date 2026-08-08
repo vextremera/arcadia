@@ -19,12 +19,13 @@
     "build:vercel": "npm run db:push:remote && npm run db:bootstrap:remote && astro build --remote"
   },
   "dependencies": {
-    "@astrojs/db": "^0.20.1",
+    "@astrojs/db": "^0.21.3",
     "@astrojs/preact": "^5.1.1",
     "@astrojs/vercel": "^10.0.4",
     "@upstash/redis": "^1.35.3",
     "@vercel/blob": "^1.1.1",
     "astro": "^6.0.0",
+    "lightweight-charts": "^5.2.0",
     "nodemailer": "^8.0.4",
     "preact": "^10.22.0"
   },
