@@ -1,0 +1,219 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
+import { db, MenuDish, MenuDishAssignment } from "astro:db";
+
+const PAGE_PATH = "/admin/menu/platos";
+
+type MenuKind = "DIARIO" | "FESTIVO";
+type MenuCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
+
+const COURSES: Array<{ key: MenuCourse; label: string }> = [
+  { key: "PRIMERO", label: "1º" },
+  { key: "SEGUNDO", label: "2º" },
+  { key: "POSTRE", label: "Postre" },
+];
+
+const dishRows = await db
+  .select({ id: MenuDish.id, name: MenuDish.name, slug: MenuDish.slug })
+  .from(MenuDish);
+
+const dishes = [...dishRows].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+const assignmentRows = await db
+  .select({
+    id: MenuDishAssignment.id,
+    dishId: MenuDishAssignment.dishId,
+    kind: MenuDishAssignment.kind,
+    course: MenuDishAssignment.course,
+  })
+  .from(MenuDishAssignment);
+
+const assignmentByDishKind = new Map<string, { id: number; course: MenuCourse }>();
+for (const row of assignmentRows) {
+  assignmentByDishKind.set(`${row.dishId}:${row.kind}`, { id: row.id, course: row.course as MenuCourse });
+}
+
+const assignedDishIds = new Set(assignmentRows.map((row) => row.dishId));
+const totalDishes = dishes.length;
+const unassignedCount = totalDishes - assignedDishIds.size;
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const error = url.searchParams.get("error") ?? "";
+
+const successMessage =
+  saved === "dish" ? "Biblioteca de platos actualizada." : saved === "assignment" ? "Asignación actualizada." : "";
+
+const errorMessage =
+  error === "missing-name"
+    ? "El nombre del plato es obligatorio."
+    : error === "invalid-slug"
+      ? "El slug no es válido."
+      : error === "dish-in-use"
+        ? "No se puede borrar: el plato sigue asignado a un menú."
+        : error === "dish-not-found"
+          ? "El plato ya no existe."
+          : error === "invalid-dish"
+            ? "El plato indicado no es válido."
+            : error === "invalid-intent"
+              ? "Acción no válida."
+              : "";
+
+function kindTriggerClass(active: boolean, kind: MenuKind) {
+  if (!active) {
+    return "rounded-lg border border-admin-border bg-white/[0.02] px-2 py-1 text-[11px] font-semibold text-admin-muted transition hover:border-white/15 hover:bg-white/[0.05] hover:text-slate-200";
+  }
+  return kind === "DIARIO"
+    ? "rounded-lg border border-sky-400/30 bg-sky-400/15 px-2 py-1 text-[11px] font-semibold text-sky-200"
+    : "rounded-lg border border-violet-400/30 bg-violet-400/15 px-2 py-1 text-[11px] font-semibold text-violet-200";
+}
+---
+
+<AdminLayout title="Platos del menú · Admin · Arcadia" heading="Platos del menú" description="Biblioteca de platos y su asignación a cada menú y bloque.">
+  <div class="space-y-6">
+    {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard label="Biblioteca" value={String(totalDishes)} helper="Platos totales" />
+      <StatCard label="Sin asignar" value={String(unassignedCount)} helper="No están en ningún menú" />
+    </section>
+
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <h2 class="text-base font-semibold text-white">Biblioteca de platos</h2>
+
+        <Modal id="dish-create" title="Nuevo plato de biblioteca" description="Sin curso ni orden: se asigna a un menú desde esta misma lista." triggerLabel="+ Nuevo plato">
+          <form method="post" action="/api/admin/menu-v2" class="grid gap-4">
+            <input type="hidden" name="intent" value="create-dish" />
+            <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+              <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" placeholder="Canelones de carne gratinados" required />
+            </label>
+            <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+              Crear plato
+            </button>
+          </form>
+        </Modal>
+      </div>
+
+      {
+        dishes.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Todavía no hay platos" description="Crea el primero con el botón de arriba." />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Plato</th>
+                  <th>Diario</th>
+                  <th>Festivo</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dishes.map((dish) => {
+                  const diario = assignmentByDishKind.get(`${dish.id}:DIARIO`) ?? null;
+                  const festivo = assignmentByDishKind.get(`${dish.id}:FESTIVO`) ?? null;
+                  const canDelete = !diario && !festivo;
+
+                  return (
+                    <tr>
+                      <td>
+                        <div class="font-semibold text-white">{dish.name}</div>
+                        <div class="text-xs text-admin-muted">{dish.slug}</div>
+                      </td>
+
+                      {(["DIARIO", "FESTIVO"] as MenuKind[]).map((kind) => {
+                        const current = kind === "DIARIO" ? diario : festivo;
+                        return (
+                          <td>
+                            <div class="flex gap-1.5">
+                              {COURSES.map((course) => {
+                                const isActive = current?.course === course.key;
+                                return (
+                                  <form method="post" action="/api/admin/menu-v2">
+                                    <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+                                    {isActive ? (
+                                      <>
+                                        <input type="hidden" name="intent" value="unassign-dish" />
+                                        <input type="hidden" name="assignmentId" value={current.id} />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <input type="hidden" name="intent" value="assign-dish" />
+                                        <input type="hidden" name="dishId" value={dish.id} />
+                                        <input type="hidden" name="kind" value={kind} />
+                                        <input type="hidden" name="course" value={course.key} />
+                                      </>
+                                    )}
+                                    <button type="submit" class={kindTriggerClass(isActive, kind)} title={`${kind === "DIARIO" ? "Diario" : "Festivo"} · ${course.label}`}>
+                                      {course.label}
+                                    </button>
+                                  </form>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        );
+                      })}
+
+                      <td>
+                        <div class="flex justify-end">
+                          <Modal
+                            id={`dish-edit-${dish.id}`}
+                            title="Editar plato"
+                            triggerLabel="Editar"
+                            triggerClass="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]"
+                          >
+                            <form method="post" action="/api/admin/menu-v2" class="grid gap-4">
+                              <input type="hidden" name="intent" value="update-dish" />
+                              <input type="hidden" name="dishId" value={dish.id} />
+                              <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+                              <label class="block">
+                                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+                                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" value={dish.name} required />
+                              </label>
+                              <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+                                Guardar
+                              </button>
+                            </form>
+
+                            <form method="post" action="/api/admin/menu-v2" class="mt-3 border-t border-admin-border pt-3">
+                              <input type="hidden" name="intent" value="delete-dish" />
+                              <input type="hidden" name="dishId" value={dish.id} />
+                              <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+                              <button
+                                type="submit"
+                                disabled={!canDelete}
+                                class:list={[
+                                  "inline-flex min-h-9 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition",
+                                  canDelete
+                                    ? "border border-rose-400/20 bg-rose-400/10 text-rose-300 hover:border-rose-400/30 hover:bg-rose-400/15"
+                                    : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-slate-500",
+                                ]}
+                              >
+                                Borrar plato
+                              </button>
+                            </form>
+                          </Modal>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
+  </div>
+</AdminLayout>

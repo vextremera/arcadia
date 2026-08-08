@@ -27,7 +27,12 @@ const DEFAULT_MENU_CONFIG: MenuConfig = {
   FESTIVO: { active: true, priceCents: 1590 },
 };
 
-const REDIRECT_PATH = "/admin/menu";
+const DEFAULT_REDIRECT_PATH = "/admin/menu/diario";
+
+function resolveRedirectBase(value: FormDataEntryValue | null): string {
+  const raw = String(value ?? "").trim();
+  return raw.startsWith("/admin/menu") ? raw : DEFAULT_REDIRECT_PATH;
+}
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -208,13 +213,14 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
   const intent = String(form.get("intent") ?? "").trim();
+  const redirectBase = resolveRedirectBase(form.get("redirectTo"));
 
   if (intent === "save-config") {
     const diarioPriceCents = parseEuroToCents(form.get("DIARIO_priceEur"));
     const festivoPriceCents = parseEuroToCents(form.get("FESTIVO_priceEur"));
 
     if (diarioPriceCents === null || festivoPriceCents === null) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-price" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-price" }));
     }
 
     await saveMenuConfig({
@@ -228,19 +234,19 @@ export const POST: APIRoute = async (context) => {
       },
     });
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "config" }));
+    return context.redirect(withQuery(redirectBase, { saved: "config" }));
   }
 
   if (intent === "create-dish") {
     const name = String(form.get("name") ?? "").trim();
 
     if (!name) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
+      return context.redirect(withQuery(redirectBase, { error: "missing-name" }));
     }
 
     const slug = await buildUniqueDishSlug(name);
     if (!slug) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-slug" }));
     }
 
     const nextId = await nextMenuDishId();
@@ -253,13 +259,13 @@ export const POST: APIRoute = async (context) => {
       updatedAt: new Date(),
     });
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "dish" }));
+    return context.redirect(withQuery(redirectBase, { saved: "dish" }));
   }
 
   if (intent === "update-dish") {
     const dishId = parseId(form.get("dishId"));
     if (!dishId) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-dish" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-dish" }));
     }
 
     const [dish] = await db
@@ -273,19 +279,19 @@ export const POST: APIRoute = async (context) => {
       .limit(1);
 
     if (!dish) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "dish-not-found" }));
+      return context.redirect(withQuery(redirectBase, { error: "dish-not-found" }));
     }
 
     const name = String(form.get("name") ?? "").trim();
     if (!name) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "missing-name" }));
+      return context.redirect(withQuery(redirectBase, { error: "missing-name" }));
     }
 
     const slug =
       name === dish.name ? dish.slug : await buildUniqueDishSlug(name, dishId);
 
     if (!slug) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-slug" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-slug" }));
     }
 
     await db
@@ -297,13 +303,13 @@ export const POST: APIRoute = async (context) => {
       })
       .where(eq(MenuDish.id, dishId));
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "dish" }));
+    return context.redirect(withQuery(redirectBase, { saved: "dish" }));
   }
 
   if (intent === "delete-dish") {
     const dishId = parseId(form.get("dishId"));
     if (!dishId) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-dish" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-dish" }));
     }
 
     const linked = await db
@@ -312,11 +318,11 @@ export const POST: APIRoute = async (context) => {
       .where(eq(MenuDishAssignment.dishId, dishId));
 
     if (linked.length > 0) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "dish-in-use" }));
+      return context.redirect(withQuery(redirectBase, { error: "dish-in-use" }));
     }
 
     await db.delete(MenuDish).where(eq(MenuDish.id, dishId));
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "dish" }));
+    return context.redirect(withQuery(redirectBase, { saved: "dish" }));
   }
 
   if (intent === "assign-dish") {
@@ -325,15 +331,15 @@ export const POST: APIRoute = async (context) => {
     const course = String(form.get("course") ?? "").trim();
 
     if (!dishId) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-dish" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-dish" }));
     }
 
     if (!isKind(kind)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-kind" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-kind" }));
     }
 
     if (!isCourse(course)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-course" }));
     }
 
     const [dish] = await db
@@ -343,7 +349,7 @@ export const POST: APIRoute = async (context) => {
       .limit(1);
 
     if (!dish) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "dish-not-found" }));
+      return context.redirect(withQuery(redirectBase, { error: "dish-not-found" }));
     }
 
     const existingAssignments = await db
@@ -366,7 +372,7 @@ export const POST: APIRoute = async (context) => {
           .where(eq(MenuDishAssignment.id, existingForKind.id));
       }
 
-      return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+      return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
     }
 
     const nextId = await nextAssignmentId();
@@ -379,7 +385,7 @@ export const POST: APIRoute = async (context) => {
       createdAt: new Date(),
     });
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+    return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
 
   if (intent === "move-assignment") {
@@ -388,15 +394,15 @@ export const POST: APIRoute = async (context) => {
     const course = String(form.get("course") ?? "").trim();
 
     if (!assignmentId) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-assignment" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-assignment" }));
     }
 
     if (!isKind(kind)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-kind" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-kind" }));
     }
 
     if (!isCourse(course)) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-course" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-course" }));
     }
 
     const [assignment] = await db
@@ -410,7 +416,7 @@ export const POST: APIRoute = async (context) => {
       .limit(1);
 
     if (!assignment) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "assignment-not-found" }));
+      return context.redirect(withQuery(redirectBase, { error: "assignment-not-found" }));
     }
 
     const duplicates = await db
@@ -428,7 +434,7 @@ export const POST: APIRoute = async (context) => {
 
     if (duplicateInTargetKind) {
       await db.delete(MenuDishAssignment).where(eq(MenuDishAssignment.id, assignmentId));
-      return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+      return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
     }
 
     await db
@@ -439,17 +445,17 @@ export const POST: APIRoute = async (context) => {
       })
       .where(eq(MenuDishAssignment.id, assignmentId));
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+    return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
 
   if (intent === "unassign-dish") {
     const assignmentId = parseId(form.get("assignmentId"));
     if (!assignmentId) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-assignment" }));
+      return context.redirect(withQuery(redirectBase, { error: "invalid-assignment" }));
     }
 
     await db.delete(MenuDishAssignment).where(eq(MenuDishAssignment.id, assignmentId));
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "assignment" }));
+    return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
 
   if (intent === "import-legacy") {
@@ -459,7 +465,7 @@ export const POST: APIRoute = async (context) => {
       .from(MenuDishAssignment);
 
     if (currentDishes.length > 0 || currentAssignments.length > 0) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "already-v2-data" }));
+      return context.redirect(withQuery(redirectBase, { error: "already-v2-data" }));
     }
 
     const legacyMenus = await db
@@ -496,7 +502,7 @@ export const POST: APIRoute = async (context) => {
     }>;
 
     if (selectedMenus.length === 0) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "import-failed" }));
+      return context.redirect(withQuery(redirectBase, { error: "import-failed" }));
     }
 
     const selectedMenuIds = selectedMenus.map((menu) => menu.id);
@@ -629,15 +635,15 @@ export const POST: APIRoute = async (context) => {
     }
 
     if (!dishesToInsert.length || !assignmentsToInsert.length) {
-      return context.redirect(withQuery(REDIRECT_PATH, { error: "import-failed" }));
+      return context.redirect(withQuery(redirectBase, { error: "import-failed" }));
     }
 
     await saveMenuConfig(nextConfig);
     await db.insert(MenuDish).values(dishesToInsert);
     await db.insert(MenuDishAssignment).values(assignmentsToInsert);
 
-    return context.redirect(withQuery(REDIRECT_PATH, { saved: "import" }));
+    return context.redirect(withQuery(redirectBase, { saved: "import" }));
   }
 
-  return context.redirect(withQuery(REDIRECT_PATH, { error: "invalid-intent" }));
+  return context.redirect(withQuery(redirectBase, { error: "invalid-intent" }));
 };

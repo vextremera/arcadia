@@ -1,0 +1,378 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
+import { db, AppSetting, MenuDish, MenuDishAssignment, eq } from "astro:db";
+
+const KIND = "FESTIVO" as const;
+const PAGE_PATH = "/admin/menu/festivo";
+const ROOT_ID = "menu-festivo-ajax-root";
+
+type MenuCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
+
+const COURSES: Array<{ key: MenuCourse; label: string }> = [
+  { key: "PRIMERO", label: "Primeros" },
+  { key: "SEGUNDO", label: "Segundos" },
+  { key: "POSTRE", label: "Postres" },
+];
+
+function money(cents: number) {
+  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+}
+
+const [configRow] = await db
+  .select({ value: AppSetting.value })
+  .from(AppSetting)
+  .where(eq(AppSetting.key, "menuConfigV2"))
+  .limit(1);
+
+const configValue = configRow?.value as
+  | Partial<Record<"DIARIO" | "FESTIVO", { active: boolean; priceCents: number }>>
+  | undefined;
+
+const kindConfig = {
+  active: configValue?.[KIND]?.active ?? true,
+  priceCents: configValue?.[KIND]?.priceCents ?? 1590,
+};
+
+const rows = await db
+  .select({
+    assignmentId: MenuDishAssignment.id,
+    course: MenuDishAssignment.course,
+    createdAt: MenuDishAssignment.createdAt,
+    dishId: MenuDish.id,
+    dishName: MenuDish.name,
+  })
+  .from(MenuDishAssignment)
+  .innerJoin(MenuDish, eq(MenuDishAssignment.dishId, MenuDish.id))
+  .where(eq(MenuDishAssignment.kind, KIND));
+
+const planner: Record<MenuCourse, typeof rows> = { PRIMERO: [], SEGUNDO: [], POSTRE: [] };
+for (const row of rows) {
+  planner[row.course as MenuCourse].push(row);
+}
+for (const course of COURSES) {
+  planner[course.key].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
+const totalAssignments = rows.length;
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const error = url.searchParams.get("error") ?? "";
+
+const successMessage = saved === "assignment" ? "Menú festivo actualizado correctamente." : "";
+const errorMessage =
+  error === "invalid-assignment"
+    ? "La asignación indicada no es válida."
+    : error === "assignment-not-found"
+      ? "La asignación ya no existe."
+      : error === "invalid-kind"
+        ? "El tipo de menú no es válido."
+        : error === "invalid-course"
+          ? "El bloque del menú no es válido."
+          : error === "invalid-intent"
+            ? "Acción no válida."
+            : "";
+---
+
+<AdminLayout title="Menú festivo · Admin · Arcadia" heading="Menú festivo" description="Planificación del menú festivo por bloques, arrastrando los platos.">
+  <div id={ROOT_ID} data-menu-admin-root class="space-y-6">
+    {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
+    <Card>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <Badge tone="violet">Festivo</Badge>
+          <Badge tone={kindConfig.active ? "success" : "neutral"}>{kindConfig.active ? "Publicado" : "Oculto"}</Badge>
+          <span class="text-sm text-admin-muted">{money(kindConfig.priceCents)} · {totalAssignments} platos</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <a href="/menu" target="_blank" rel="noreferrer" class="text-sm font-semibold text-admin-muted transition hover:text-white">
+            Ver pública ↗
+          </a>
+          <a href="/admin/menu/platos" class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 px-3.5 py-2 text-sm font-semibold text-violet-100 transition hover:border-violet-400/30 hover:bg-violet-400/15">
+            + Añadir platos
+          </a>
+        </div>
+      </div>
+    </Card>
+
+    <div class="space-y-4">
+      {
+        COURSES.map((course) => (
+          <Card padded={false}>
+            <div class="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-3">
+              <h2 class="text-sm font-semibold text-white">{course.label}</h2>
+              <span class="text-sm text-admin-muted">{planner[course.key].length}</span>
+            </div>
+
+            <div data-menu-dropzone data-kind={KIND} data-course={course.key} class="min-h-[120px] p-3 transition">
+              {planner[course.key].length === 0 ? (
+                <div class="flex min-h-[90px] items-center justify-center rounded-admin border border-dashed border-admin-border bg-white/[0.01] px-4 text-center text-sm text-admin-muted">
+                  Sin platos. Arrastra aquí o añade desde la biblioteca.
+                </div>
+              ) : (
+                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {planner[course.key].map((item) => (
+                    <article
+                      draggable="true"
+                      data-menu-assignment-card={item.assignmentId}
+                      data-kind={KIND}
+                      data-course={course.key}
+                      class="cursor-grab rounded-admin border border-admin-border bg-white/[0.04] p-3 active:cursor-grabbing"
+                    >
+                      <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0 text-sm font-semibold text-white">{item.dishName}</div>
+                        <div class="flex shrink-0 items-center gap-1.5">
+                          <Modal
+                            id={`menu-dish-edit-${KIND}-${item.assignmentId}`}
+                            title="Editar plato"
+                            description="El nombre se actualiza en la biblioteca y en los dos menús."
+                            triggerLabel="Editar"
+                            triggerClass="rounded-lg border border-admin-border bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.08]"
+                          >
+                            <form method="post" action="/api/admin/menu-v2" class="grid gap-4">
+                              <input type="hidden" name="intent" value="update-dish" />
+                              <input type="hidden" name="dishId" value={item.dishId} />
+                              <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+                              <label class="block">
+                                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+                                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-violet-400/40 focus:outline-none" type="text" name="name" value={item.dishName} required />
+                              </label>
+                              <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 px-4 py-2.5 text-sm font-semibold text-violet-100 transition hover:border-violet-400/30 hover:bg-violet-400/15">
+                                Guardar
+                              </button>
+                            </form>
+                          </Modal>
+
+                          <form method="post" action="/api/admin/menu-v2">
+                            <input type="hidden" name="intent" value="unassign-dish" />
+                            <input type="hidden" name="assignmentId" value={item.assignmentId} />
+                            <input type="hidden" name="redirectTo" value={PAGE_PATH} />
+                            <button type="submit" class="rounded-lg border border-rose-400/20 bg-rose-400/10 px-2 py-1 text-[11px] font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15">
+                              Quitar
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Card>
+        ))
+      }
+    </div>
+  </div>
+</AdminLayout>
+
+<script is:inline define:vars={{ ROOT_ID, PAGE_PATH, KIND }}>
+  (() => {
+    const ROOT_SELECTOR = `#${ROOT_ID}`;
+    let abortController = null;
+    let activeRequestId = 0;
+
+    function getRoot() {
+      return document.querySelector(ROOT_SELECTOR);
+    }
+
+    function parseHtml(htmlText) {
+      return new DOMParser().parseFromString(htmlText, "text/html");
+    }
+
+    function setBusy(root, busy) {
+      if (!(root instanceof HTMLElement)) return;
+      root.classList.toggle("pointer-events-none", busy);
+      root.classList.toggle("opacity-80", busy);
+      root.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+
+    async function swapWithHtmlResponse(response, fallbackUrl) {
+      const currentRoot = getRoot();
+      if (!currentRoot) {
+        window.location.href = fallbackUrl || PAGE_PATH;
+        return false;
+      }
+
+      const htmlText = await response.text();
+      const nextDocument = parseHtml(htmlText);
+      const nextRoot = nextDocument.querySelector(ROOT_SELECTOR);
+
+      if (!nextRoot) {
+        window.location.href = response.url || fallbackUrl || PAGE_PATH;
+        return false;
+      }
+
+      currentRoot.innerHTML = nextRoot.innerHTML;
+      document.title = nextDocument.title || document.title;
+      history.replaceState({}, "", response.url || fallbackUrl || PAGE_PATH);
+      init();
+      return true;
+    }
+
+    async function fetchAndSwap(url, options = {}) {
+      const currentRoot = getRoot();
+      if (!currentRoot) {
+        window.location.href = typeof url === "string" ? url : PAGE_PATH;
+        return false;
+      }
+
+      const requestId = ++activeRequestId;
+      setBusy(currentRoot, true);
+
+      try {
+        const response = await fetch(url, {
+          credentials: "same-origin",
+          ...options,
+          headers: { "X-Requested-With": "fetch", ...(options.headers || {}) },
+        });
+
+        if (requestId !== activeRequestId) return false;
+        return await swapWithHtmlResponse(response, typeof url === "string" ? url : PAGE_PATH);
+      } catch {
+        window.location.href = typeof url === "string" ? url : PAGE_PATH;
+        return false;
+      } finally {
+        const latestRoot = getRoot();
+        if (latestRoot) setBusy(latestRoot, false);
+      }
+    }
+
+    function attachAjaxForms(root, signal) {
+      root.addEventListener(
+        "submit",
+        async (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          const action = form.getAttribute("action") || "";
+          if (!action.startsWith("/api/admin/menu-v2")) return;
+
+          event.preventDefault();
+          const submitter = event.submitter;
+          const submitButtons = Array.from(form.querySelectorAll('button[type="submit"], input[type="submit"]'));
+          submitButtons.forEach((button) => button.setAttribute("disabled", "disabled"));
+
+          try {
+            const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+            const response = await fetch(action, {
+              method: "POST",
+              body: formData,
+              credentials: "same-origin",
+              headers: { "X-Requested-With": "fetch" },
+            });
+            await swapWithHtmlResponse(response, PAGE_PATH);
+          } catch {
+            window.location.href = PAGE_PATH;
+          }
+        },
+        { signal },
+      );
+    }
+
+    function attachDragAndDrop(root, signal) {
+      const state = { assignmentId: null, sourceCourse: null, draggedEl: null };
+      const zones = Array.from(root.querySelectorAll("[data-menu-dropzone]"));
+
+      function resetState() {
+        if (state.draggedEl instanceof Element) state.draggedEl.classList.remove("opacity-60");
+        zones.forEach((zone) => zone.classList.remove("ring-2", "ring-violet-400/30"));
+        state.assignmentId = null;
+        state.sourceCourse = null;
+        state.draggedEl = null;
+      }
+
+      function encode(params) {
+        return new URLSearchParams(params).toString();
+      }
+
+      document.addEventListener(
+        "dragstart",
+        (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const card = target.closest("[data-menu-assignment-card]");
+          if (!card || !root.contains(card)) return;
+
+          state.assignmentId = card.getAttribute("data-menu-assignment-card");
+          state.sourceCourse = card.getAttribute("data-course");
+          state.draggedEl = card;
+          card.classList.add("opacity-60");
+
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", state.assignmentId || "");
+          }
+        },
+        { signal },
+      );
+
+      document.addEventListener("dragend", () => resetState(), { signal });
+
+      zones.forEach((zone) => {
+        zone.addEventListener(
+          "dragover",
+          (event) => {
+            if (!state.assignmentId) return;
+            event.preventDefault();
+            zone.classList.add("ring-2", "ring-violet-400/30");
+          },
+          { signal },
+        );
+
+        zone.addEventListener("dragleave", () => zone.classList.remove("ring-2", "ring-violet-400/30"), { signal });
+
+        zone.addEventListener(
+          "drop",
+          async (event) => {
+            if (!state.assignmentId) return;
+            event.preventDefault();
+            const course = zone.getAttribute("data-course") || "";
+            zone.classList.remove("ring-2", "ring-violet-400/30");
+
+            if (state.sourceCourse === course) {
+              resetState();
+              return;
+            }
+
+            try {
+              await fetchAndSwap("/api/admin/menu-v2", {
+                method: "POST",
+                headers: { "content-type": "application/x-www-form-urlencoded;charset=UTF-8" },
+                body: encode({
+                  intent: "move-assignment",
+                  assignmentId: String(state.assignmentId || ""),
+                  kind: KIND,
+                  course,
+                  redirectTo: PAGE_PATH,
+                }),
+              });
+            } catch {
+              window.location.href = PAGE_PATH;
+            } finally {
+              resetState();
+            }
+          },
+          { signal },
+        );
+      });
+    }
+
+    function init() {
+      if (abortController) abortController.abort();
+      const root = getRoot();
+      if (!root) return;
+      abortController = new AbortController();
+      const { signal } = abortController;
+      attachAjaxForms(root, signal);
+      attachDragAndDrop(root, signal);
+    }
+
+    init();
+  })();
+</script>
