@@ -482,6 +482,53 @@ const AuditLog = defineTable({
   indexes: [{ on: "createdAt" }, { on: "actorUserId" }]
 });
 
+const SalesDaily = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    dateISO: column.text({ unique: true }),
+    ordersCount: column.number({ default: 0 }),
+    revenueCents: column.number({ default: 0 }),
+    avgTicketCents: column.number({ default: 0 }),
+    deliveryCount: column.number({ default: 0 }),
+    pickupCount: column.number({ default: 0 }),
+    cashCents: column.number({ default: 0 }),
+    cardCents: column.number({ default: 0 }),
+    discountCents: column.number({ default: 0 }),
+    newCustomers: column.number({ default: 0 }),
+    updatedAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "dateISO", unique: true }]
+});
+
+const ProductSalesDaily = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    dateISO: column.text(),
+    productId: column.number({ references: () => Product.columns.id }),
+    qty: column.number({ default: 0 }),
+    revenueCents: column.number({ default: 0 })
+  },
+  indexes: [
+    { on: ["dateISO", "productId"], unique: true },
+    { on: "dateISO" },
+    { on: "productId" }
+  ]
+});
+
+const TicketTemplate = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    name: column.text(),
+    kind: column.text({ enum: ["TICKET", "KITCHEN"], default: "TICKET" }),
+    paperWidth: column.number({ default: 80 }),
+    layout: column.json(),
+    active: column.boolean({ default: true }),
+    createdAt: column.date({ default: NOW }),
+    updatedAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "kind" }, { on: "active" }]
+});
+
 const UpsellItem = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -542,6 +589,11 @@ export default defineDb({
 
     AuditLog,
 
-    UpsellItem
+    TicketTemplate,
+
+    UpsellItem,
+
+    SalesDaily,
+    ProductSalesDaily
   }
 });
