@@ -1,5 +1,10 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
 import { db, Allergen, ProductAllergen, inArray } from "astro:db";
 
 const url = new URL(Astro.request.url);
@@ -14,8 +19,6 @@ const allergens = await db
     iconUrl: Allergen.iconUrl,
     sortOrder: Allergen.sortOrder,
     active: Allergen.active,
-    createdAt: Allergen.createdAt,
-    updatedAt: Allergen.updatedAt,
   })
   .from(Allergen)
   .orderBy(Allergen.sortOrder, Allergen.name);
@@ -24,28 +27,20 @@ const allergenIds = allergens.map((row) => row.id);
 
 const productLinks = allergenIds.length
   ? await db
-      .select({
-        allergenId: ProductAllergen.allergenId,
-        id: ProductAllergen.id,
-      })
+      .select({ allergenId: ProductAllergen.allergenId, id: ProductAllergen.id })
       .from(ProductAllergen)
       .where(inArray(ProductAllergen.allergenId, allergenIds))
   : [];
 
 const productCountByAllergen = new Map<number, number>();
 for (const row of productLinks) {
-  productCountByAllergen.set(
-    row.allergenId,
-    (productCountByAllergen.get(row.allergenId) ?? 0) + 1,
-  );
+  productCountByAllergen.set(row.allergenId, (productCountByAllergen.get(row.allergenId) ?? 0) + 1);
 }
 
 const totalAllergens = allergens.length;
 const activeAllergens = allergens.filter((row) => row.active).length;
 const withIcons = allergens.filter((row) => Boolean(row.iconUrl)).length;
-const linkedAllergens = allergens.filter(
-  (row) => (productCountByAllergen.get(row.id) ?? 0) > 0,
-).length;
+const linkedAllergens = allergens.filter((row) => (productCountByAllergen.get(row.id) ?? 0) > 0).length;
 
 const errorMessage =
   error === "missing-name"
@@ -65,513 +60,169 @@ const errorMessage =
                 : "";
 
 const stats = [
-  {
-    label: "Total",
-    value: totalAllergens,
-    note: "Catálogo global disponible",
-    tone: "border-white/10 bg-white/[0.03] text-slate-300",
-  },
-  {
-    label: "Activos",
-    value: activeAllergens,
-    note: "Disponibles para asociar",
-    tone: "border-emerald-400/15 bg-emerald-400/8 text-emerald-200",
-  },
-  {
-    label: "Con icono",
-    value: withIcons,
-    note: "Preview visual listo",
-    tone: "border-sky-400/15 bg-sky-400/8 text-sky-200",
-  },
-  {
-    label: "En uso",
-    value: linkedAllergens,
-    note: "Actualmente enlazados",
-    tone: "border-amber-400/15 bg-amber-400/8 text-amber-200",
-  },
+  { label: "Total", value: String(totalAllergens), helper: "Catálogo global disponible" },
+  { label: "Activos", value: String(activeAllergens), helper: "Disponibles para asociar" },
+  { label: "Con icono", value: String(withIcons), helper: "Preview visual listo" },
+  { label: "En uso", value: String(linkedAllergens), helper: "Actualmente enlazados" },
 ];
 ---
 
-<AdminLayout
-  title="Alérgenos · Admin · Arcadia"
-  heading="Alérgenos globales"
-  description="Catálogo visual global para pública y admin. He reordenado esta pantalla para que respire más: menos ruido, más separación y edición más clara por bloque."
-  actions={true}
->
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/catalogo/productos"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-      >
-        Ver productos
-      </a>
+<AdminLayout title="Alérgenos · Admin · Arcadia" heading="Alérgenos" description="Catálogo de alérgenos y su uso en los productos de la carta.">
+  <div class="space-y-6">
+    {saved ? <section class="rounded-admin-lg border border-emerald-400/15 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-100">Alérgenos actualizados correctamente.</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/15 bg-rose-400/10 px-5 py-3 text-sm text-rose-100">{errorMessage}</section> : null}
 
-      <a
-        href="/admin/catalogo/ingredientes"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Ver ingredientes
-      </a>
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      {stats.map((stat) => (
+        <StatCard label={stat.label} value={stat.value} helper={stat.helper} />
+      ))}
+    </section>
 
-      <a
-        href="/admin/catalogo/modificadores"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Ver modificadores
-      </a>
-    </div>
-  </Fragment>
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <h2 class="text-base font-semibold text-white">Alérgenos</h2>
 
-  {
-    saved ? (
-      <section class="mb-6 rounded-[26px] border border-emerald-400/15 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-100">
-        Alérgenos actualizados correctamente.
-      </section>
-    ) : null
-  }
-
-  {
-    errorMessage ? (
-      <section class="mb-6 rounded-[26px] border border-rose-400/15 bg-rose-400/10 px-5 py-4 text-sm text-rose-100">
-        {errorMessage}
-      </section>
-    ) : null
-  }
-
-  <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-    {
-      stats.map((stat) => (
-        <article
-          class:list={[
-            "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
-            stat.tone,
-          ]}
-        >
-          <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-            {stat.label}
-          </div>
-          <div class="mt-4 text-4xl font-semibold tracking-[-0.05em] text-white">
-            {stat.value}
-          </div>
-          <p class="mt-3 text-sm leading-6 text-slate-400">{stat.note}</p>
-        </article>
-      ))
-    }
-  </section>
-
-  <section
-    class="mt-6 grid gap-6 2xl:grid-cols-[380px_minmax(0,1fr)] 2xl:items-start"
-  >
-    <aside class="space-y-6 2xl:sticky 2xl:top-6">
-      <section
-        class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Alta
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Nuevo alérgeno
-        </h2>
-        <p class="mt-3 text-sm leading-7 text-slate-400">
-          Da de alta un nuevo alérgeno con nombre, slug, icono y orden global.
-        </p>
-
-        <form
-          method="post"
-          action="/api/admin/allergens"
-          class="mt-7 grid gap-5"
-        >
-          <input type="hidden" name="intent" value="create" />
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-              >Nombre</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#091121] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-              type="text"
-              name="name"
-              placeholder="Gluten"
-              required
-            />
-          </label>
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-              >Slug</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#091121] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-              type="text"
-              name="slug"
-              placeholder="Se genera automáticamente si lo dejas vacío"
-            />
-          </label>
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-              >Icon URL</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#091121] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-              type="text"
-              name="iconUrl"
-              placeholder="/images/allergens/gluten.webp"
-            />
-          </label>
-
-          <label class="block">
-            <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
-              >Orden</span
-            >
-            <input
-              class="w-full rounded-2xl border border-white/10 bg-[#091121] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-              type="number"
-              name="sortOrder"
-              min="0"
-              step="1"
-              value={allergens.length}
-              required
-            />
-          </label>
-
-          <label
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-          >
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="active"
-                checked
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Activo</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">
-                  Disponible para asociar a productos desde catálogo y
-                  formularios del admin.
-                </p>
-              </div>
-            </div>
-          </label>
-
-          <button
-            type="submit"
-            class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-          >
-            Crear alérgeno
-          </button>
-        </form>
-      </section>
-
-      <section
-        class="rounded-[30px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
-      >
-        <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-        >
-          Criterio
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Representación visual
-        </h2>
-
-        <div class="mt-6 space-y-4">
-          <article
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-          >
-            <div class="text-sm font-semibold text-white">
-              Iconos compartidos
-            </div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              El icono se reutiliza donde exista visualización del alérgeno en
-              admin y en pública.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
-          >
-            <div class="text-sm font-semibold text-white">Orden global</div>
-            <p class="mt-2 text-sm leading-6 text-slate-400">
-              El orden define cómo se presentan los alérgenos cuando la app
-              necesita una lista estable.
-            </p>
-          </article>
-
-          <article
-            class="rounded-[24px] border border-amber-400/15 bg-amber-400/8 p-4"
-          >
-            <div class="text-sm font-semibold text-amber-100">
-              Borrado protegido
-            </div>
-            <p class="mt-2 text-sm leading-6 text-amber-100/80">
-              Si un alérgeno sigue enlazado a productos, el borrado se bloquea
-              para evitar incoherencias.
-            </p>
-          </article>
-        </div>
-      </section>
-    </aside>
-
-    <section
-      class="overflow-hidden rounded-[32px] border border-white/10 bg-[#0f172a]/82 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
-    >
-      <div class="border-b border-white/[0.08] px-6 py-6 lg:px-8">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
-            >
-              Gestión
-            </div>
-            <h2
-              class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white lg:text-[2rem]"
-            >
-              Catálogo global de alérgenos
-            </h2>
-            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-              Edición más espaciosa y ordenada. Cada alérgeno tiene su propio
-              bloque visual con preview, datos y acciones sin comprimir el
-              contenido.
-            </p>
-          </div>
-
-          <div
-            class="inline-flex items-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm font-medium text-slate-300"
-          >
-            {totalAllergens} elemento{totalAllergens === 1 ? "" : "s"}
-          </div>
-        </div>
+        <Modal id="allergen-create" title="Nuevo alérgeno" triggerLabel="+ Nuevo alérgeno">
+          <form method="post" action="/api/admin/allergens" class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+              <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="name" placeholder="Gluten" required />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Slug</span>
+              <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="slug" placeholder="Automático si se deja vacío" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Icon URL</span>
+              <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="iconUrl" placeholder="/images/allergens/gluten.webp" />
+            </label>
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Orden</span>
+              <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="number" name="sortOrder" min="0" step="1" value={allergens.length} required />
+            </label>
+            <label class="inline-flex items-center gap-2.5 rounded-2xl border border-admin-border bg-white/[0.03] p-3.5 text-sm text-slate-300">
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked />
+              Activo
+            </label>
+            <button type="submit" class="mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15">
+              Crear alérgeno
+            </button>
+          </form>
+        </Modal>
       </div>
 
       {
         allergens.length === 0 ? (
-          <div class="px-6 py-16 text-center lg:px-8">
-            <div class="mx-auto max-w-md rounded-[28px] border border-white/10 bg-[#091121] p-8">
-              <div class="text-lg font-semibold text-white">
-                No hay alérgenos
-              </div>
-              <p class="mt-2 text-sm leading-6 text-slate-400">
-                Crea el primero desde el bloque lateral para empezar a construir
-                el catálogo global.
-              </p>
-            </div>
+          <div class="px-6 py-14">
+            <EmptyState title="No hay alérgenos" description="Crea el primero con el botón de arriba." />
           </div>
         ) : (
-          <div class="space-y-5 px-6 py-6 lg:px-8 lg:py-8">
-            {allergens.map((allergen) => {
-              const linkedProducts =
-                productCountByAllergen.get(allergen.id) ?? 0;
-              const canDelete = linkedProducts === 0;
-
-              return (
-                <section class="rounded-[28px] border border-white/10 bg-[#091121]/80 p-5 shadow-[0_18px_60px_rgba(2,6,23,0.22)] lg:p-6">
-                  <div class="flex flex-col gap-5 border-b border-white/[0.08] pb-5 lg:flex-row lg:items-start lg:justify-between">
-                    <div class="flex min-w-0 items-center gap-4">
-                      {allergen.iconUrl ? (
-                        <img
-                          src={allergen.iconUrl}
-                          alt={allergen.name}
-                          class="h-16 w-16 rounded-[22px] object-cover ring-1 ring-white/10"
-                        />
-                      ) : (
-                        <div class="flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/10 bg-white/[0.03] text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-                          {allergen.name.slice(0, 1)}
-                        </div>
-                      )}
-
-                      <div class="min-w-0">
-                        <div class="text-xl font-semibold tracking-[-0.03em] text-white">
-                          {allergen.name}
-                        </div>
-                        <div class="mt-2 flex flex-wrap items-center gap-2.5">
-                          <code class="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300">
-                            {allergen.slug}
-                          </code>
-
-                          <span
-                            class:list={[
-                              "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                              allergen.active
-                                ? "border-emerald-400/15 bg-emerald-400/10 text-emerald-200"
-                                : "border-rose-400/15 bg-rose-400/10 text-rose-200",
-                            ]}
-                          >
-                            {allergen.active ? "Activo" : "Inactivo"}
-                          </span>
-
-                          <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                            {linkedProducts} producto
-                            {linkedProducts === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="grid gap-3 sm:grid-cols-2 lg:w-[340px]">
-                      <div class="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Orden
-                        </div>
-                        <div class="mt-2 text-lg font-semibold text-white">
-                          {allergen.sortOrder}
-                        </div>
-                      </div>
-
-                      <div class="rounded-[22px] border border-white/10 bg-white/[0.03] px-4 py-3">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Icono
-                        </div>
-                        <div class="mt-2 text-sm font-medium text-slate-300">
-                          {allergen.iconUrl ? "Configurado" : "Sin icono"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <form
-                    method="post"
-                    action="/api/admin/allergens"
-                    class="mt-6 grid gap-5"
-                  >
-                    <input type="hidden" name="intent" value="update" />
-                    <input
-                      type="hidden"
-                      name="allergenId"
-                      value={allergen.id}
-                    />
-
-                    <div class="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_140px]">
-                      <label class="block xl:col-span-1">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Nombre
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-                          type="text"
-                          name="name"
-                          value={allergen.name}
-                          required
-                        />
-                      </label>
-
-                      <label class="block xl:col-span-1">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Icon URL
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-                          type="text"
-                          name="iconUrl"
-                          value={allergen.iconUrl ?? ""}
-                          placeholder="/images/allergens/gluten.webp"
-                        />
-                      </label>
-
-                      <label class="block">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Orden
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-                          type="number"
-                          name="sortOrder"
-                          min="0"
-                          step="1"
-                          value={allergen.sortOrder}
-                          required
-                        />
-                      </label>
-                    </div>
-
-                    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
-                      <label class="block">
-                        <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Slug
-                        </span>
-                        <input
-                          class="w-full rounded-2xl border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/30 focus:outline-none"
-                          type="text"
-                          name="slug"
-                          value={allergen.slug}
-                          required
-                        />
-                      </label>
-
-                      <label class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
-                        <div class="flex items-start gap-3">
-                          <input
-                            class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                            type="checkbox"
-                            name="active"
-                            checked={allergen.active}
-                          />
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Alérgeno</th>
+                  <th>Orden</th>
+                  <th>Icono</th>
+                  <th>Uso</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allergens.map((allergen) => {
+                  const linkedProducts = productCountByAllergen.get(allergen.id) ?? 0;
+                  const canDelete = linkedProducts === 0;
+                  return (
+                    <tr>
+                      <td>
+                        <div class="flex items-center gap-3">
+                          {allergen.iconUrl ? (
+                            <img src={allergen.iconUrl} alt={allergen.name} class="h-9 w-9 rounded-xl object-cover ring-1 ring-white/10" />
+                          ) : (
+                            <div class="flex h-9 w-9 items-center justify-center rounded-xl border border-admin-border bg-white/[0.03] text-xs font-semibold text-admin-muted">{allergen.name.slice(0, 1)}</div>
+                          )}
                           <div>
-                            <div class="text-sm font-semibold text-white">
-                              Activo
-                            </div>
-                            <p class="mt-1 text-sm leading-6 text-slate-400">
-                              Visible para asociación y uso operativo.
-                            </p>
+                            <div class="font-semibold text-white">{allergen.name}</div>
+                            <div class="text-xs text-admin-muted">{allergen.slug}</div>
                           </div>
                         </div>
-                      </label>
-                    </div>
+                      </td>
+                      <td class="text-admin-muted">#{allergen.sortOrder}</td>
+                      <td class="text-admin-muted">{allergen.iconUrl ? "Configurado" : "Sin icono"}</td>
+                      <td class="text-admin-muted">{linkedProducts}</td>
+                      <td><Badge tone={allergen.active ? "success" : "danger"}>{allergen.active ? "Activo" : "Inactivo"}</Badge></td>
+                      <td>
+                        <div class="flex justify-end">
+                          <Modal
+                            id={`allergen-edit-${allergen.id}`}
+                            title={allergen.name}
+                            triggerLabel="Editar"
+                            triggerClass="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]"
+                          >
+                            <form method="post" action="/api/admin/allergens" class="grid gap-4">
+                              <input type="hidden" name="intent" value="update" />
+                              <input type="hidden" name="allergenId" value={allergen.id} />
+                              <div class="grid grid-cols-2 gap-4">
+                                <label class="block">
+                                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+                                  <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="name" value={allergen.name} required />
+                                </label>
+                                <label class="block">
+                                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Slug</span>
+                                  <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="slug" value={allergen.slug} required />
+                                </label>
+                              </div>
+                              <label class="block">
+                                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Icon URL</span>
+                                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="text" name="iconUrl" value={allergen.iconUrl ?? ""} placeholder="/images/allergens/gluten.webp" />
+                              </label>
+                              <label class="block">
+                                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Orden</span>
+                                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" type="number" name="sortOrder" min="0" step="1" value={allergen.sortOrder} required />
+                              </label>
+                              <label class="inline-flex items-center gap-2.5 rounded-2xl border border-admin-border bg-white/[0.03] p-3.5 text-sm text-slate-300">
+                                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked={allergen.active} />
+                                Activo
+                              </label>
+                              <div class="flex items-center justify-between gap-3 border-t border-admin-border pt-4">
+                                <span class="text-xs leading-5 text-admin-muted">
+                                  {canDelete ? "Se puede borrar: sin uso." : "No se puede borrar: en uso."}
+                                </span>
+                                <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15">
+                                  Guardar
+                                </button>
+                              </div>
+                            </form>
 
-                    <div class="flex flex-col gap-4 border-t border-white/[0.08] pt-5 lg:flex-row lg:items-center lg:justify-between">
-                      <div class="text-sm leading-6 text-slate-400">
-                        {canDelete
-                          ? "Se puede borrar porque no está enlazado a productos."
-                          : "No se puede borrar porque sigue asociado a productos."}
-                      </div>
-
-                      <div class="flex flex-wrap gap-3">
-                        <button
-                          type="submit"
-                          class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15"
-                        >
-                          Guardar alérgeno
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-
-                  <div class="mt-5 border-t border-white/[0.08] pt-5">
-                    <form method="post" action="/api/admin/allergens">
-                      <input type="hidden" name="intent" value="delete" />
-                      <input
-                        type="hidden"
-                        name="allergenId"
-                        value={allergen.id}
-                      />
-                      <button
-                        type="submit"
-                        disabled={!canDelete}
-                        class:list={[
-                          "inline-flex min-h-10 items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-semibold transition",
-                          canDelete
-                            ? "border border-rose-400/15 bg-rose-400/10 text-rose-200 hover:border-rose-400/25 hover:bg-rose-400/15"
-                            : "cursor-not-allowed border border-white/10 bg-white/[0.03] text-slate-500",
-                        ]}
-                      >
-                        Borrar alérgeno
-                      </button>
-                    </form>
-                  </div>
-                </section>
-              );
-            })}
+                            <form method="post" action="/api/admin/allergens" class="mt-3 border-t border-admin-border pt-3">
+                              <input type="hidden" name="intent" value="delete" />
+                              <input type="hidden" name="allergenId" value={allergen.id} />
+                              <button
+                                type="submit"
+                                disabled={!canDelete}
+                                class:list={[
+                                  "inline-flex min-h-9 items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition",
+                                  canDelete
+                                    ? "border border-rose-400/15 bg-rose-400/10 text-rose-200 hover:border-rose-400/25 hover:bg-rose-400/15"
+                                    : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-slate-500",
+                                ]}
+                              >
+                                Borrar alérgeno
+                              </button>
+                            </form>
+                          </Modal>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )
       }
-    </section>
-  </section>
+    </Card>
+  </div>
 </AdminLayout>

@@ -56,25 +56,25 @@ export const POST: APIRoute = async (context) => {
 
   if (!name) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "missing-name" })
+      withQuery("/admin/catalogo/productos", { error: "missing-name" })
     );
   }
 
   if (!slug) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-slug" })
+      withQuery("/admin/catalogo/productos", { error: "invalid-slug" })
     );
   }
 
   if (!Number.isFinite(categoryId)) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" })
+      withQuery("/admin/catalogo/productos", { error: "invalid-category" })
     );
   }
 
   if (priceCents === null) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-price" })
+      withQuery("/admin/catalogo/productos", { error: "invalid-price" })
     );
   }
 
@@ -86,7 +86,7 @@ export const POST: APIRoute = async (context) => {
 
   if (!category) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "invalid-category" })
+      withQuery("/admin/catalogo/productos", { error: "invalid-category" })
     );
   }
 
@@ -98,7 +98,7 @@ export const POST: APIRoute = async (context) => {
 
   if (slugMatch) {
     return context.redirect(
-      withQuery("/admin/catalogo/productos/nuevo", { error: "duplicate-slug" })
+      withQuery("/admin/catalogo/productos", { error: "duplicate-slug" })
     );
   }
 
@@ -118,14 +118,14 @@ export const POST: APIRoute = async (context) => {
     } catch (error) {
       if (error instanceof ProductImageUploadError) {
         return context.redirect(
-          withQuery("/admin/catalogo/productos/nuevo", {
+          withQuery("/admin/catalogo/productos", {
             error: productImageErrorToQuery(error.code),
           })
         );
       }
 
       return context.redirect(
-        withQuery("/admin/catalogo/productos/nuevo", {
+        withQuery("/admin/catalogo/productos", {
           error: "image-upload-failed",
         })
       );

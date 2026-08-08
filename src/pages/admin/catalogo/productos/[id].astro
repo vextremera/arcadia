@@ -1,5 +1,11 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
+import { isMenuCategorySlug } from "@/lib/admin/catalog";
 import {
   db,
   Category,
@@ -100,15 +106,21 @@ if (!product) {
   return new Response("Producto no encontrado", { status: 404 });
 }
 
-const categories = await db
-  .select({
-    id: Category.id,
-    name: Category.name,
-    active: Category.active,
-    sortOrder: Category.sortOrder,
-  })
-  .from(Category)
-  .orderBy(Category.sortOrder);
+// Se excluye la categoría interna del menú del día para que no se pueda mover
+// un producto de carta/delivery al menú desde este desplegable. Si el producto
+// que se está editando ya pertenece a ella, se mantiene como opción.
+const categories = (
+  await db
+    .select({
+      id: Category.id,
+      name: Category.name,
+      slug: Category.slug,
+      active: Category.active,
+      sortOrder: Category.sortOrder,
+    })
+    .from(Category)
+    .orderBy(Category.sortOrder)
+).filter((category) => !isMenuCategorySlug(category.slug) || category.id === product.categoryId);
 
 const variants = await db
   .select({
@@ -396,1499 +408,719 @@ const modifierOptionErrorMessage =
             ? "Acción de opción no válida."
             : "";
 
-const summaryCards = [
-  {
-    label: "Precio base",
-    value: money(product.priceCents),
-    note: "Base del producto sin variantes",
-    tone: "border-white/10 bg-white/[0.03]",
-  },
-  {
-    label: "Variantes",
-    value: variantCount,
-    note: "Variantes activas",
-    tone: "border-sky-400/20 bg-sky-400/10",
-  },
-  {
-    label: "Ingredientes",
-    value: ingredientRows.length,
-    note: `${removableCount} removibles`,
-    tone: "border-cyan-400/20 bg-cyan-400/10",
-  },
-  {
-    label: "Groups",
-    value: modifierGroupCount,
-    note: "Modifier groups activos",
-    tone: "border-violet-400/20 bg-violet-400/10",
-  },
-  {
-    label: "Alérgenos",
-    value: allergenCount,
-    note: "Asociados al producto",
-    tone: "border-amber-400/20 bg-amber-400/10",
-  },
+
+const inputClass =
+  "w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none";
+const labelClass =
+  "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted";
+const primaryBtnClass =
+  "inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15";
+const ghostBtnClass =
+  "rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]";
+const dangerBtnClass =
+  "inline-flex min-h-9 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15";
+const checkboxClass = "h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400";
+
+const optionsRedirect = `/admin/catalogo/productos/${product.id}`;
+
+const notices = [
+  { ok: saved, okText: "Producto guardado correctamente.", error: errorMessage },
+  { ok: variantSaved, okText: "Variantes actualizadas.", error: variantErrorMessage },
+  { ok: ingredientSaved, okText: "Ingredientes actualizados.", error: ingredientErrorMessage },
+  { ok: allergenSaved, okText: "Alérgenos actualizados.", error: allergenErrorMessage },
+  { ok: modifierGroupSaved, okText: "Grupos de modificadores actualizados.", error: modifierGroupErrorMessage },
+  { ok: modifierOptionSaved, okText: "Opciones actualizadas.", error: modifierOptionErrorMessage },
 ];
+
+const successMessages = notices.filter((n) => n.ok).map((n) => n.okText);
+const errorMessages = notices.map((n) => n.error).filter(Boolean);
 ---
 
 <AdminLayout
   title={`${product.name} · Productos · Admin · Arcadia`}
   heading={product.name}
-  description="Ficha completa del producto apoyada en el schema real del proyecto. Aquí se concentran base, ingredientes, variantes, groups y alérgenos con una lectura bastante más limpia."
-  actions={true}
+  description="Ficha completa: variantes, ingredientes, modificadores y alérgenos."
 >
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/catalogo/productos"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Volver al listado
-      </a>
-
-      <a
-        href={`/admin/catalogo/compatibilidades?categoryId=${product.categoryId}`}
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/15"
-      >
-        Compatibilidad categoría
-      </a>
-
-      <a
-        href={`/api/products/${product.id}`}
-        target="_blank"
-        rel="noreferrer"
-        class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-300 transition hover:border-sky-400/30 hover:bg-sky-400/15"
-      >
-        Ver API pública
-      </a>
-    </div>
-  </Fragment>
-
-  {saved ? (
-    <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
-      Cambios guardados correctamente.
-    </section>
-  ) : null}
-
-  {errorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {errorMessage}
-    </section>
-  ) : null}
-
-  {variantSaved ? (
-    <section class="mb-6 rounded-[26px] border border-sky-400/20 bg-sky-400/10 px-5 py-4 text-sm text-sky-200">
-      Variantes actualizadas correctamente.
-    </section>
-  ) : null}
-
-  {variantErrorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {variantErrorMessage}
-    </section>
-  ) : null}
-
-  {ingredientSaved ? (
-    <section class="mb-6 rounded-[26px] border border-cyan-400/20 bg-cyan-400/10 px-5 py-4 text-sm text-cyan-200">
-      Ingredientes actualizados correctamente.
-    </section>
-  ) : null}
-
-  {ingredientErrorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {ingredientErrorMessage}
-    </section>
-  ) : null}
-
-  {allergenSaved ? (
-    <section class="mb-6 rounded-[26px] border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-200">
-      Alérgenos actualizados correctamente.
-    </section>
-  ) : null}
-
-  {allergenErrorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {allergenErrorMessage}
-    </section>
-  ) : null}
-
-  {modifierGroupSaved ? (
-    <section class="mb-6 rounded-[26px] border border-violet-400/20 bg-violet-400/10 px-5 py-4 text-sm text-violet-200">
-      Modifier groups actualizados correctamente.
-    </section>
-  ) : null}
-
-  {modifierGroupErrorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {modifierGroupErrorMessage}
-    </section>
-  ) : null}
-
-  {modifierOptionSaved ? (
-    <section class="mb-6 rounded-[26px] border border-fuchsia-400/20 bg-fuchsia-400/10 px-5 py-4 text-sm text-fuchsia-200">
-      Opciones actualizadas correctamente.
-    </section>
-  ) : null}
-
-  {modifierOptionErrorMessage ? (
-    <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
-      {modifierOptionErrorMessage}
-    </section>
-  ) : null}
-
-  <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-5">
-    {summaryCards.map((card) => (
-      <article
-        class:list={[
-          "rounded-[28px] border p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]",
-          card.tone,
-        ]}
-      >
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-          {card.label}
-        </div>
-        <div class="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">
-          {card.value}
-        </div>
-        <p class="mt-3 text-sm leading-6 text-slate-400">{card.note}</p>
-      </article>
+  <div class="space-y-6">
+    {successMessages.map((message) => (
+      <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">
+        {message}
+      </section>
     ))}
-  </section>
+    {errorMessages.map((message) => (
+      <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">
+        {message}
+      </section>
+    ))}
 
-  <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-    <div class="space-y-6">
+    <div class="flex flex-wrap items-center gap-2.5">
+      <Badge tone={product.active ? "success" : "danger"}>{product.active ? "Activo" : "Inactivo"}</Badge>
+      <Badge tone="neutral">{product.categoryName}</Badge>
+      <Badge tone={product.deliveryEnabled ? "cyan" : "neutral"}>Delivery</Badge>
+      <Badge tone={product.pickupEnabled ? "indigo" : "neutral"}>Pickup</Badge>
+      <Badge tone={product.dineInEnabled ? "violet" : "neutral"}>Sala</Badge>
+      <span class="text-xs text-admin-muted">Actualizado: {formatDate(product.updatedAt)}</span>
+    </div>
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard label="Precio base" value={money(product.priceCents)} helper="Sin variantes aplicadas" />
+      <StatCard label="Configurable" value={`${variantCount} / ${modifierGroupCount}`} helper="Variantes activas / grupos activos" />
+    </section>
+
+    {/* ---------------- Datos principales ---------------- */}
+    <Card>
+      <div class="admin-eyebrow">Producto</div>
+      <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Datos principales</h2>
+
       <form
         method="post"
         action={`/api/admin/products/${product.id}`}
         enctype="multipart/form-data"
-        class="rounded-[32px] border border-white/10 bg-[#111827] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7"
+        class="mt-5 grid gap-4"
       >
         <input type="hidden" name="intent" value="save-base" />
 
-        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.08] pb-5">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
-              Edición base
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Datos principales
-            </h2>
-          </div>
-          <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-right">
-            <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Actualizado
-            </div>
-            <div class="mt-2 text-sm font-semibold text-white">
-              {formatDate(product.updatedAt)}
-            </div>
-          </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class={labelClass}>Nombre</span>
+            <input class={inputClass} type="text" name="name" value={product.name} required />
+          </label>
+          <label class="block">
+            <span class={labelClass}>Slug</span>
+            <input class={inputClass} type="text" name="slug" value={product.slug} required />
+          </label>
         </div>
 
-        <div class="mt-6 grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class={labelClass}>Categoría</span>
+            <select class={inputClass} name="categoryId">
+              {categories.map((category) => (
+                <option value={category.id} selected={category.id === product.categoryId}>
+                  {category.name}{category.active ? "" : " (inactiva)"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label class="block">
+            <span class={labelClass}>Precio (€)</span>
+            <input
+              class={inputClass}
+              type="number"
+              name="priceEur"
+              min="0"
+              step="0.01"
+              value={(product.priceCents / 100).toFixed(2)}
+              required
+            />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class={labelClass}>Descripción</span>
+          <textarea class={`${inputClass} min-h-20`} name="description">{product.description ?? ""}</textarea>
+        </label>
+
+        <label class="block">
+          <span class={labelClass}>Detalles</span>
+          <textarea class={`${inputClass} min-h-20`} name="details">{product.details ?? ""}</textarea>
+        </label>
+
+        <div class="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+          <div class="h-24 w-24 shrink-0 overflow-hidden rounded-admin-lg border border-admin-border bg-white/[0.03]">
             {product.imageUrl ? (
-              <img
-                src={product.imageUrl}
-                alt={product.name}
-                class="h-60 w-full rounded-[28px] object-cover ring-1 ring-white/10"
-              />
+              <img src={product.imageUrl} alt={product.name} class="h-full w-full object-cover" />
             ) : (
-              <div class="flex h-60 w-full items-center justify-center rounded-[28px] border border-white/10 bg-slate-950/50 text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <div class="grid h-full w-full place-items-center text-[10px] font-semibold text-admin-faint">
                 Sin imagen
               </div>
             )}
           </div>
 
-          <div class="grid gap-5">
-            <div class="grid gap-4 md:grid-cols-2">
-              <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Nombre
-                </span>
-                <input
-                  class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                  type="text"
-                  name="name"
-                  value={product.name}
-                  required
-                />
-              </label>
-
-              <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Slug
-                </span>
-                <input
-                  class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                  type="text"
-                  name="slug"
-                  value={product.slug}
-                  required
-                />
-              </label>
-            </div>
-
-            <div class="grid gap-4 md:grid-cols-2">
-              <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Categoría
-                </span>
-                <select
-                  class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                  name="categoryId"
-                >
-                  {categories.map((category) => (
-                    <option value={category.id} selected={category.id === product.categoryId}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label class="block">
-                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Precio (€)
-                </span>
-                <input
-                  class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="priceEur"
-                  value={(Number(product.priceCents) / 100).toFixed(2)}
-                  required
-                />
-              </label>
-            </div>
-
+          <div class="grid gap-2">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Nueva imagen
-              </span>
+              <span class={labelClass}>Reemplazar imagen</span>
               <input
-                class="block w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white file:mr-4 file:rounded-xl file:border-0 file:bg-sky-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:bg-sky-400 focus:border-sky-400/40 focus:outline-none"
+                class={`${inputClass} file:mr-3 file:rounded-xl file:border-0 file:bg-sky-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-950 hover:file:bg-sky-400`}
                 type="file"
                 name="imageFile"
                 accept="image/jpeg,image/png,image/webp"
               />
-              <span class="mt-2 block text-xs leading-6 text-slate-500">
-                JPG, PNG o WEBP · máximo 4 MB. Si subes una nueva, sustituye la actual.
-              </span>
             </label>
-
-            <label class="block rounded-[26px] border border-white/10 bg-slate-950/40 p-4">
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                  type="checkbox"
-                  name="removeImage"
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">Eliminar imagen actual</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-400">
-                    Marca esto solo si quieres quitar la imagen sin reemplazarla.
-                  </p>
-                </div>
-              </div>
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Description
-              </span>
-              <textarea
-                class="min-h-28 w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
-                name="description"
-              >{product.description ?? ""}</textarea>
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Details
-              </span>
-              <textarea
-                class="min-h-36 w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none"
-                name="details"
-              >{product.details ?? ""}</textarea>
-            </label>
+            {product.imageUrl ? (
+              <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                <input class={checkboxClass} type="checkbox" name="removeImage" />
+                Quitar la imagen actual
+              </label>
+            ) : null}
           </div>
         </div>
 
-        <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <label class="block rounded-[26px] border border-white/10 bg-slate-950/50 p-4">
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="active"
-                checked={product.active}
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Activo</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en catálogo</p>
-              </div>
-            </div>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+            <input class={checkboxClass} type="checkbox" name="active" checked={product.active} />
+            Activo
           </label>
-
-          <label class="block rounded-[26px] border border-white/10 bg-slate-950/50 p-4">
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="deliveryEnabled"
-                checked={product.deliveryEnabled}
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Delivery</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible a domicilio</p>
-              </div>
-            </div>
+          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+            <input class={checkboxClass} type="checkbox" name="deliveryEnabled" checked={product.deliveryEnabled} />
+            Delivery
           </label>
-
-          <label class="block rounded-[26px] border border-white/10 bg-slate-950/50 p-4">
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="pickupEnabled"
-                checked={product.pickupEnabled}
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Pickup</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible para recogida</p>
-              </div>
-            </div>
+          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+            <input class={checkboxClass} type="checkbox" name="pickupEnabled" checked={product.pickupEnabled} />
+            Pickup
           </label>
-
-          <label class="block rounded-[26px] border border-white/10 bg-slate-950/50 p-4">
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="dineInEnabled"
-                checked={product.dineInEnabled}
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Sala</div>
-                <p class="mt-1 text-sm leading-6 text-slate-400">Disponible en consumo local</p>
-              </div>
-            </div>
+          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+            <input class={checkboxClass} type="checkbox" name="dineInEnabled" checked={product.dineInEnabled} />
+            Sala
           </label>
         </div>
 
-        <div class="mt-6 flex flex-wrap gap-3">
-          <button
-            class="inline-flex items-center justify-center rounded-[24px] bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-            type="submit"
-          >
-            Guardar producto
-          </button>
-
-          <a
-            href="/admin/catalogo/productos"
-            class="inline-flex items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.03] px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-          >
-            Volver al listado
-          </a>
-        </div>
+        <button type="submit" class={`${primaryBtnClass} mt-1 justify-self-start`}>Guardar producto</button>
       </form>
+    </Card>
 
-      <section
-        id="ingredientes"
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:p-7"
-      >
-        <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300">
-              Ingredientes
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Vinculación e ingredientes base
-            </h2>
-          </div>
-
-          <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-            {ingredientRows.length} ligados · {availableIngredients.length} disponibles
-          </div>
+    {/* ---------------- Ingredientes ---------------- */}
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Ingredientes base</h2>
+          <p class="mt-1 text-xs text-admin-muted">
+            Los marcados como removibles se pueden quitar desde el configurador público.
+          </p>
         </div>
 
-        {categoryCompatibilityEnabled ? (
-          <div class="mt-6 rounded-[26px] border border-cyan-400/20 bg-cyan-400/10 p-5">
-            <div class="text-sm font-semibold text-white">Matriz de categoría activa</div>
-            <p class="mt-3 text-sm leading-7 text-cyan-100/80">
-              La categoría <strong class="text-white">{product.categoryName}</strong> ya tiene whitelist de ingredientes.
-              Solo puedes añadir ingredientes compatibles desde aquí.
-            </p>
+        <Modal
+          id="ingredient-link"
+          title="Añadir ingrediente"
+          description="Solo se ofrecen los permitidos por la matriz de compatibilidad de la familia."
+          triggerLabel="+ Añadir ingrediente"
+        >
+          <form method="post" action={`/api/admin/products/${product.id}/ingredients`} class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
+
+            <label class="block">
+              <span class={labelClass}>Ingrediente</span>
+              <select class={inputClass} name="ingredientId" required>
+                {availableIngredients.map((ingredient) => (
+                  <option value={ingredient.id}>
+                    {ingredient.name}
+                    {ingredient.addPriceDeltaCents > 0 ? ` · +${money(ingredient.addPriceDeltaCents)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label class="block">
+              <span class={labelClass}>Orden</span>
+              <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={ingredientRows.length} />
+            </label>
+
+            <div class="flex flex-wrap gap-6">
+              <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                <input class={checkboxClass} type="checkbox" name="defaultIncluded" checked />
+                Incluido por defecto
+              </label>
+              <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                <input class={checkboxClass} type="checkbox" name="removable" checked />
+                Se puede quitar
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={availableIngredients.length === 0}
+              class:list={[
+                "mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                availableIngredients.length > 0
+                  ? "border border-sky-400/20 bg-sky-400/10 text-sky-100 hover:border-sky-400/30 hover:bg-sky-400/15"
+                  : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-slate-500",
+              ]}
+            >
+              {availableIngredients.length > 0 ? "Añadir ingrediente" : "No hay ingredientes compatibles"}
+            </button>
+          </form>
+        </Modal>
+      </div>
+
+      {
+        incompatibleLinkedIngredients.length > 0 ? (
+          <div class="border-b border-admin-border bg-amber-400/[0.06] px-5 py-3 text-xs text-amber-100 lg:px-6">
+            {incompatibleLinkedIngredients.length} ingrediente(s) enlazados ya no cumplen la compatibilidad de la
+            familia actual. Siguen aplicándose, pero conviene revisarlos.
+          </div>
+        ) : null
+      }
+
+      {
+        ingredientRows.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin ingredientes enlazados" description="Añade el primero con el botón de arriba." />
           </div>
         ) : (
-          <div class="mt-6 rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-            <div class="text-sm font-semibold text-white">Sin whitelist de categoría</div>
-            <p class="mt-3 text-sm leading-7 text-slate-400">
-              Esta categoría todavía no tiene matriz. Mientras siga así, el producto puede usar cualquier ingrediente activo.
-            </p>
-          </div>
-        )}
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Ingrediente</th>
+                  <th>Extra</th>
+                  <th>Por defecto</th>
+                  <th>Removible</th>
+                  <th>Orden</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingredientRows.map((row) => {
+                  const compatible =
+                    !categoryCompatibilityEnabled || categoryCompatibleIngredientIds.has(row.ingredientId);
 
-        {incompatibleLinkedIngredients.length > 0 ? (
-          <div class="mt-4 rounded-[26px] border border-rose-400/20 bg-rose-400/10 p-5">
-            <div class="text-sm font-semibold text-white">Desvío relacional detectado</div>
-            <p class="mt-3 text-sm leading-7 text-rose-100/80">
-              Este producto conserva ingredientes enlazados que ya no están permitidos por la whitelist actual de la categoría.
-            </p>
-            <div class="mt-4 flex flex-wrap gap-2">
-              {incompatibleLinkedIngredients.map((row) => (
-                <span class="inline-flex items-center rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1.5 text-xs font-semibold text-rose-100">
-                  {row.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <form
-          method="post"
-          action={`/api/admin/products/${product.id}/ingredients`}
-          class="mt-6 rounded-[28px] border border-cyan-400/20 bg-cyan-400/10 p-5"
-        >
-          <input type="hidden" name="intent" value="create" />
-
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_140px_auto]">
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-                Ingrediente
-              </span>
-              <select
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
-                name="ingredientId"
-                required
-              >
-                {availableIngredients.length === 0 ? (
-                  <option value="">No quedan ingredientes disponibles</option>
-                ) : (
-                  availableIngredients.map((ingredient) => (
-                    <option value={ingredient.id}>
-                      {ingredient.name} · {ingredient.addPriceDeltaCents > 0 ? `+${money(ingredient.addPriceDeltaCents)}` : "sin extra"}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100/80">
-                Orden
-              </span>
-              <input
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-cyan-300/40 focus:outline-none"
-                type="number"
-                name="sortOrder"
-                step="1"
-                value={ingredientRows.length}
-              />
-            </label>
-
-            <div class="flex items-end">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-[24px] bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-                type="submit"
-                disabled={availableIngredients.length === 0}
-              >
-                Añadir ingrediente
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
-            <label class="block rounded-[26px] border border-white/10 bg-slate-950/40 p-4">
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                  type="checkbox"
-                  name="defaultIncluded"
-                  checked
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">Incluido por defecto</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">
-                    El ingrediente aparece inicialmente dentro del producto.
-                  </p>
-                </div>
-              </div>
-            </label>
-
-            <label class="block rounded-[26px] border border-white/10 bg-slate-950/40 p-4">
-              <div class="flex items-start gap-3">
-                <input
-                  class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                  type="checkbox"
-                  name="removable"
-                />
-                <div>
-                  <div class="text-sm font-semibold text-white">Removible</div>
-                  <p class="mt-1 text-sm leading-6 text-slate-300">
-                    El cliente puede quitarlo del producto desde el configurador.
-                  </p>
-                </div>
-              </div>
-            </label>
-          </div>
-        </form>
-
-        {blockedAvailableIngredients.length > 0 ? (
-          <div class="mt-4 rounded-[26px] border border-amber-400/20 bg-amber-400/10 p-5">
-            <div class="text-sm font-semibold text-white">Bloqueados por matriz</div>
-            <p class="mt-3 text-sm leading-7 text-amber-100/80">
-              Estos ingredientes están activos globalmente, pero la categoría actual no los admite.
-            </p>
-            <div class="mt-4 flex flex-wrap gap-2">
-              {blockedAvailableIngredients.slice(0, 16).map((ingredient) => (
-                <span class="inline-flex items-center rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-100">
-                  {ingredient.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div class="mt-6 space-y-4">
-          {ingredientRows.length === 0 ? (
-            <div class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene ingredientes ligados.
-            </div>
-          ) : (
-            ingredientRows.map((row) => (
-              <article class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5">
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/ingredients`}
-                  class="grid gap-5"
-                >
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="productIngredientId" value={row.id} />
-
-                  <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-center gap-2.5">
-                        <div class="text-base font-semibold text-white">{row.name}</div>
-                        <code class="rounded-xl border border-white/10 bg-[#07101f] px-3 py-1.5 text-xs text-slate-300">
+                  return (
+                    <tr>
+                      <td>
+                        <div class="font-semibold text-white">{row.name}</div>
+                        <div class="text-xs text-admin-muted">
                           {row.slug}
-                        </code>
-
-                        {row.isCommon ? (
-                          <span class="inline-flex items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
-                            Common
-                          </span>
-                        ) : null}
-
-                        {row.addPriceDeltaCents > 0 ? (
-                          <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-300">
-                            +{money(row.addPriceDeltaCents)}
-                          </span>
-                        ) : null}
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            row.active
-                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                              : "border-rose-400/20 bg-rose-400/10 text-rose-300",
-                          ]}
-                        >
-                          {row.active ? "Ingrediente activo" : "Ingrediente inactivo"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <label class="block w-full max-w-[160px]">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Orden
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-cyan-400/40 focus:outline-none"
-                        type="number"
-                        name="sortOrder"
-                        step="1"
-                        value={row.sortOrder}
-                      />
-                    </label>
-                  </div>
-
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <label class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                      <div class="flex items-start gap-3">
-                        <input
-                          class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                          type="checkbox"
-                          name="defaultIncluded"
-                          checked={row.defaultIncluded}
-                        />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Incluido por defecto</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">
-                            Forma parte del producto al entrar en el configurador.
-                          </p>
+                          {compatible ? "" : " · fuera de compatibilidad"}
                         </div>
-                      </div>
-                    </label>
-
-                    <label class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                      <div class="flex items-start gap-3">
-                        <input
-                          class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
-                          type="checkbox"
-                          name="removable"
-                          checked={row.removable}
-                        />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Removible</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">
-                            El cliente puede quitarlo si estaba incluido de base.
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-                  </div>
-
-                  <div class="flex flex-wrap gap-3 border-t border-white/[0.08] pt-4">
-                    <button
-                      class="inline-flex items-center justify-center rounded-[24px] bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
-                      type="submit"
-                    >
-                      Guardar ingrediente
-                    </button>
-                  </div>
-                </form>
-
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/ingredients`}
-                  class="mt-3"
-                >
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="productIngredientId" value={row.id} />
-                  <button
-                    class="inline-flex items-center justify-center rounded-[24px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                    type="submit"
-                  >
-                    Quitar ingrediente
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-
-      <section
-        id="variantes"
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:p-7"
-      >
-        <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-300">
-              Variantes
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Crear y editar variantes
-            </h2>
-          </div>
-          <div class="text-sm text-slate-400">Precio base: {money(product.priceCents)}</div>
-        </div>
-
-        <form
-          method="post"
-          action={`/api/admin/products/${product.id}/variants`}
-          class="mt-6 rounded-[28px] border border-sky-400/20 bg-sky-400/10 p-5"
-        >
-          <input type="hidden" name="intent" value="create" />
-
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px_auto]">
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-                Nombre
-              </span>
-              <input
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
-                type="text"
-                name="name"
-                placeholder="Ej. Grande"
-                required
-              />
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-                Δ precio (€)
-              </span>
-              <input
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
-                type="number"
-                name="priceDeltaEur"
-                step="0.01"
-                value="0.00"
-                required
-              />
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-sky-100/80">
-                Orden
-              </span>
-              <input
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-sky-300/40 focus:outline-none"
-                type="number"
-                name="sortOrder"
-                step="1"
-                value={variants.length}
-              />
-            </label>
-
-            <div class="flex items-end">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-[24px] bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                type="submit"
-              >
-                Añadir variante
-              </button>
-            </div>
-          </div>
-
-          <label class="mt-4 block rounded-[26px] border border-white/10 bg-slate-950/40 p-4">
-            <div class="flex items-start gap-3">
-              <input
-                class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                type="checkbox"
-                name="active"
-                checked
-              />
-              <div>
-                <div class="text-sm font-semibold text-white">Activa</div>
-                <p class="mt-1 text-sm leading-6 text-slate-300">
-                  La variante quedará disponible al crearla.
-                </p>
-              </div>
-            </div>
-          </label>
-        </form>
-
-        <div class="mt-6 space-y-4">
-          {variants.length === 0 ? (
-            <div class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene variantes.
-            </div>
-          ) : (
-            variants.map((variant) => (
-              <article class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5">
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/variants`}
-                  class="grid gap-4"
-                >
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="variantId" value={variant.id} />
-
-                  <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px]">
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Nombre
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                        type="text"
-                        name="name"
-                        value={variant.name}
-                        required
-                      />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Δ precio (€)
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                        type="number"
-                        name="priceDeltaEur"
-                        step="0.01"
-                        value={(Number(variant.priceDeltaCents) / 100).toFixed(2)}
-                        required
-                      />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Orden
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-sky-400/40 focus:outline-none"
-                        type="number"
-                        name="sortOrder"
-                        step="1"
-                        value={variant.sortOrder}
-                      />
-                    </label>
-                  </div>
-
-                  <div class="flex flex-wrap items-center justify-between gap-3">
-                    <label class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                      <div class="flex items-start gap-3">
-                        <input
-                          class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400"
-                          type="checkbox"
-                          name="active"
-                          checked={variant.active}
-                        />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Activa</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-400">
-                            Disponible para el configurador
-                          </p>
-                        </div>
-                      </div>
-                    </label>
-
-                    <button
-                      class="inline-flex items-center justify-center rounded-[24px] bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                      type="submit"
-                    >
-                      Guardar variante
-                    </button>
-                  </div>
-                </form>
-
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/variants`}
-                  class="mt-3"
-                >
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="variantId" value={variant.id} />
-                  <button
-                    class="inline-flex items-center justify-center rounded-[24px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                    type="submit"
-                  >
-                    Eliminar variante
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-
-      <section
-        id="grupos"
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:p-7"
-      >
-        <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-300">
-              Modifier groups
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Vincular groups al producto
-            </h2>
-          </div>
-
-          <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
-            Vinculados: {linkedModifierGroups.length}
-          </div>
-        </div>
-
-        <form
-          method="post"
-          action={`/api/admin/products/${product.id}/modifier-groups`}
-          class="mt-6 rounded-[28px] border border-violet-400/20 bg-violet-400/10 p-5"
-        >
-          <input type="hidden" name="intent" value="create" />
-
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_140px_auto]">
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80">
-                Group
-              </span>
-              <select
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
-                name="groupId"
-                required
-              >
-                {availableModifierGroups.length === 0 ? (
-                  <option value="">No quedan groups disponibles</option>
-                ) : (
-                  availableModifierGroups.map((group) => (
-                    <option value={group.id}>
-                      {group.name} · min {group.minSelect} · max {group.maxSelect}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-
-            <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-violet-100/80">
-                Orden
-              </span>
-              <input
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-violet-300/40 focus:outline-none"
-                type="number"
-                name="sortOrder"
-                step="1"
-                value={linkedModifierGroups.length}
-              />
-            </label>
-
-            <div class="flex items-end">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-[24px] bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300 disabled:cursor-not-allowed disabled:opacity-50"
-                type="submit"
-                disabled={availableModifierGroups.length === 0}
-              >
-                Añadir group
-              </button>
-            </div>
-          </div>
-        </form>
-
-        <div class="mt-4 rounded-[26px] border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100/90">
-          Las opciones de cada group son compartidas entre todos los productos que usen ese group.
-        </div>
-
-        <div class="mt-6 space-y-5">
-          {linkedModifierGroups.length === 0 ? (
-            <div class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-400">
-              Este producto no tiene modifier groups vinculados.
-            </div>
-          ) : (
-            linkedModifierGroups.map((group) => (
-              <article class="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/modifier-groups`}
-                  class="grid gap-5"
-                >
-                  <input type="hidden" name="intent" value="update" />
-                  <input type="hidden" name="productModifierGroupId" value={group.linkId} />
-
-                  <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-center gap-2.5">
-                        <div class="text-base font-semibold text-white">{group.name}</div>
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            group.required
-                              ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-                              : "border-white/10 bg-white/[0.03] text-slate-300",
-                          ]}
-                        >
-                          {group.required ? "Obligatorio" : "Opcional"}
-                        </span>
-
-                        <span
-                          class:list={[
-                            "inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                            group.active
-                              ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                              : "border-amber-400/20 bg-amber-400/10 text-amber-300",
-                          ]}
-                        >
-                          {group.active ? "Group activo" : "Group inactivo"}
-                        </span>
-
-                        <span class="inline-flex items-center rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-300">
-                          min {group.minSelect} · max {group.maxSelect}
-                        </span>
-                      </div>
-
-                      <div class="mt-2 text-xs text-slate-500">
-                        {group.optionCount} opciones activas · orden global {group.groupSortOrder}
-                      </div>
-                    </div>
-
-                    <label class="block w-full max-w-[160px]">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Orden en producto
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-violet-400/40 focus:outline-none"
-                        type="number"
-                        name="sortOrder"
-                        step="1"
-                        value={group.productSortOrder}
-                      />
-                    </label>
-                  </div>
-
-                  <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Opciones del group
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                      {group.options.length === 0 ? (
-                        <span class="text-sm text-slate-500">Sin opciones</span>
-                      ) : (
-                        group.options.map((option) => (
-                          <span
-                            class:list={[
-                              "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
-                              option.active
-                                ? "border-white/10 bg-slate-950/60 text-slate-300"
-                                : "border-white/10 bg-white/[0.03] text-slate-500",
-                            ]}
+                      </td>
+                      <td class="text-admin-muted">
+                        {row.addPriceDeltaCents > 0 ? `+${money(row.addPriceDeltaCents)}` : "—"}
+                      </td>
+                      <td>{row.defaultIncluded ? <Badge tone="success">Sí</Badge> : <span class="text-admin-muted">No</span>}</td>
+                      <td>{row.removable ? <Badge tone="cyan">Sí</Badge> : <span class="text-admin-muted">No</span>}</td>
+                      <td class="text-admin-muted">{row.sortOrder}</td>
+                      <td>
+                        <div class="flex justify-end">
+                          <Modal
+                            id={`ingredient-edit-${row.id}`}
+                            title={row.name}
+                            triggerLabel="Editar"
+                            triggerClass={ghostBtnClass}
                           >
-                            {option.name} · {money(option.priceDeltaCents)}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                            <form method="post" action={`/api/admin/products/${product.id}/ingredients`} class="grid gap-4">
+                              <input type="hidden" name="intent" value="update" />
+                              <input type="hidden" name="productIngredientId" value={row.id} />
 
-                  <div class="flex flex-wrap gap-3 border-t border-white/[0.08] pt-4">
-                    <button
-                      class="inline-flex items-center justify-center rounded-[24px] bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300"
-                      type="submit"
-                    >
-                      Guardar group
-                    </button>
-                  </div>
-                </form>
+                              <label class="block">
+                                <span class={labelClass}>Orden</span>
+                                <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={row.sortOrder} />
+                              </label>
 
-                <section class="mt-4 rounded-[28px] border border-fuchsia-400/20 bg-fuchsia-400/10 p-5">
-                  <div class="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                      <div class="text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
-                        Opciones
-                      </div>
-                      <div class="mt-2 text-sm font-semibold text-white">
-                        Crear y editar opciones del group
-                      </div>
-                    </div>
-                  </div>
+                              <div class="flex flex-wrap gap-6">
+                                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                  <input class={checkboxClass} type="checkbox" name="defaultIncluded" checked={row.defaultIncluded} />
+                                  Incluido por defecto
+                                </label>
+                                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                  <input class={checkboxClass} type="checkbox" name="removable" checked={row.removable} />
+                                  Se puede quitar
+                                </label>
+                              </div>
 
-                  <form
-                    method="post"
-                    action={`/api/admin/modifier-groups/${group.groupId}/options`}
-                    class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px_auto]"
-                  >
-                    <input type="hidden" name="intent" value="create" />
-                    <input
-                      type="hidden"
-                      name="redirectTo"
-                      value={`/admin/catalogo/productos/${product.id}#grupos`}
-                    />
+                              <button type="submit" class={primaryBtnClass}>Guardar</button>
+                            </form>
 
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
-                        Nombre
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
-                        type="text"
-                        name="name"
-                        placeholder="Ej. Extra queso"
-                        required
-                      />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
-                        Δ precio (€)
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
-                        type="number"
-                        name="priceDeltaEur"
-                        step="0.01"
-                        value="0.00"
-                        required
-                      />
-                    </label>
-
-                    <label class="block">
-                      <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-fuchsia-100/80">
-                        Orden
-                      </span>
-                      <input
-                        class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-fuchsia-300/40 focus:outline-none"
-                        type="number"
-                        name="sortOrder"
-                        step="1"
-                        value={group.options.length}
-                      />
-                    </label>
-
-                    <div class="flex items-end">
-                      <button
-                        class="inline-flex w-full items-center justify-center rounded-[24px] bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300"
-                        type="submit"
-                      >
-                        Añadir opción
-                      </button>
-                    </div>
-
-                    <label class="block rounded-[26px] border border-white/10 bg-slate-950/40 p-4 lg:col-span-4">
-                      <div class="flex items-start gap-3">
-                        <input
-                          class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400"
-                          type="checkbox"
-                          name="active"
-                          checked
-                        />
-                        <div>
-                          <div class="text-sm font-semibold text-white">Activa por defecto</div>
-                          <p class="mt-1 text-sm leading-6 text-slate-300">
-                            La opción quedará disponible para todos los productos que usen este group.
-                          </p>
+                            <form
+                              method="post"
+                              action={`/api/admin/products/${product.id}/ingredients`}
+                              class="mt-3 border-t border-admin-border pt-3"
+                            >
+                              <input type="hidden" name="intent" value="delete" />
+                              <input type="hidden" name="productIngredientId" value={row.id} />
+                              <button type="submit" class={dangerBtnClass}>Quitar del producto</button>
+                            </form>
+                          </Modal>
                         </div>
-                      </div>
-                    </label>
-                  </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
 
-                  <div class="mt-4 space-y-4">
-                    {group.options.length === 0 ? (
-                      <div class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5 text-sm text-slate-300">
-                        Este group todavía no tiene opciones.
-                      </div>
-                    ) : (
-                      group.options.map((option) => (
-                        <article class="rounded-[26px] border border-white/10 bg-slate-950/40 p-5">
-                          <form
-                            method="post"
-                            action={`/api/admin/modifier-groups/${group.groupId}/options`}
-                            class="grid gap-4"
-                          >
+    {/* ---------------- Variantes ---------------- */}
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Variantes</h2>
+          <p class="mt-1 text-xs text-admin-muted">El precio de la variante se suma al precio base.</p>
+        </div>
+
+        <Modal id="variant-create" title="Nueva variante" description="Nombre, diferencia de precio y orden." triggerLabel="+ Nueva variante">
+          <form method="post" action={`/api/admin/products/${product.id}/variants`} class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
+
+            <label class="block">
+              <span class={labelClass}>Nombre</span>
+              <input class={inputClass} type="text" name="name" placeholder="Ej. Familiar" required />
+            </label>
+
+            <div class="grid grid-cols-2 gap-4">
+              <label class="block">
+                <span class={labelClass}>Δ Precio (€)</span>
+                <input class={inputClass} type="number" name="priceDeltaEur" step="0.01" value="0.00" />
+              </label>
+              <label class="block">
+                <span class={labelClass}>Orden</span>
+                <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={variants.length} />
+              </label>
+            </div>
+
+            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+              <input class={checkboxClass} type="checkbox" name="active" checked />
+              Activa
+            </label>
+
+            <button type="submit" class={`${primaryBtnClass} mt-1`}>Crear variante</button>
+          </form>
+        </Modal>
+      </div>
+
+      {
+        variants.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin variantes" description="El producto se vende solo con su precio base." />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Variante</th>
+                  <th>Δ Precio</th>
+                  <th>Precio final</th>
+                  <th>Orden</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {variants.map((variant) => (
+                  <tr>
+                    <td class="font-semibold text-white">{variant.name}</td>
+                    <td class="text-admin-muted">
+                      {variant.priceDeltaCents === 0
+                        ? "—"
+                        : `${variant.priceDeltaCents > 0 ? "+" : "−"}${money(Math.abs(variant.priceDeltaCents))}`}
+                    </td>
+                    <td class="text-admin-muted">{money(product.priceCents + variant.priceDeltaCents)}</td>
+                    <td class="text-admin-muted">{variant.sortOrder}</td>
+                    <td><Badge tone={variant.active ? "success" : "neutral"}>{variant.active ? "Activa" : "Inactiva"}</Badge></td>
+                    <td>
+                      <div class="flex justify-end">
+                        <Modal id={`variant-edit-${variant.id}`} title={variant.name} triggerLabel="Editar" triggerClass={ghostBtnClass}>
+                          <form method="post" action={`/api/admin/products/${product.id}/variants`} class="grid gap-4">
                             <input type="hidden" name="intent" value="update" />
-                            <input type="hidden" name="optionId" value={option.id} />
-                            <input
-                              type="hidden"
-                              name="redirectTo"
-                              value={`/admin/catalogo/productos/${product.id}#grupos`}
-                            />
+                            <input type="hidden" name="variantId" value={variant.id} />
 
-                            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_140px]">
+                            <label class="block">
+                              <span class={labelClass}>Nombre</span>
+                              <input class={inputClass} type="text" name="name" value={variant.name} required />
+                            </label>
+
+                            <div class="grid grid-cols-2 gap-4">
                               <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Nombre
-                                </span>
-                                <input
-                                  class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
-                                  type="text"
-                                  name="name"
-                                  value={option.name}
-                                  required
-                                />
+                                <span class={labelClass}>Δ Precio (€)</span>
+                                <input class={inputClass} type="number" name="priceDeltaEur" step="0.01" value={(variant.priceDeltaCents / 100).toFixed(2)} />
                               </label>
-
                               <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Δ precio (€)
-                                </span>
-                                <input
-                                  class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
-                                  type="number"
-                                  name="priceDeltaEur"
-                                  step="0.01"
-                                  value={(Number(option.priceDeltaCents) / 100).toFixed(2)}
-                                  required
-                                />
-                              </label>
-
-                              <label class="block">
-                                <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                  Orden
-                                </span>
-                                <input
-                                  class="w-full rounded-[24px] border border-white/10 bg-[#0b1120] px-4 py-3 text-sm text-white focus:border-fuchsia-400/40 focus:outline-none"
-                                  type="number"
-                                  name="sortOrder"
-                                  step="1"
-                                  value={option.sortOrder}
-                                />
+                                <span class={labelClass}>Orden</span>
+                                <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={variant.sortOrder} />
                               </label>
                             </div>
 
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                              <label class="block rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                                <div class="flex items-start gap-3">
-                                  <input
-                                    class="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-fuchsia-400"
-                                    type="checkbox"
-                                    name="active"
-                                    checked={option.active}
-                                  />
-                                  <div>
-                                    <div class="text-sm font-semibold text-white">Activa</div>
-                                    <p class="mt-1 text-sm leading-6 text-slate-400">
-                                      Disponible en todos los productos que usan este group.
-                                    </p>
-                                  </div>
-                                </div>
-                              </label>
+                            <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                              <input class={checkboxClass} type="checkbox" name="active" checked={variant.active} />
+                              Activa
+                            </label>
 
-                              <button
-                                class="inline-flex items-center justify-center rounded-[24px] bg-fuchsia-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-fuchsia-300"
-                                type="submit"
-                              >
-                                Guardar opción
-                              </button>
-                            </div>
+                            <button type="submit" class={primaryBtnClass}>Guardar</button>
                           </form>
 
                           <form
                             method="post"
-                            action={`/api/admin/modifier-groups/${group.groupId}/options`}
-                            class="mt-3"
+                            action={`/api/admin/products/${product.id}/variants`}
+                            class="mt-3 border-t border-admin-border pt-3"
                           >
                             <input type="hidden" name="intent" value="delete" />
-                            <input type="hidden" name="optionId" value={option.id} />
-                            <input
-                              type="hidden"
-                              name="redirectTo"
-                              value={`/admin/catalogo/productos/${product.id}#grupos`}
-                            />
-                            <button
-                              class="inline-flex items-center justify-center rounded-[24px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                              type="submit"
-                            >
-                              Eliminar opción
-                            </button>
+                            <input type="hidden" name="variantId" value={variant.id} />
+                            <button type="submit" class={dangerBtnClass}>Borrar variante</button>
                           </form>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </section>
-
-                <form
-                  method="post"
-                  action={`/api/admin/products/${product.id}/modifier-groups`}
-                  class="mt-4"
-                >
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="productModifierGroupId" value={group.linkId} />
-                  <button
-                    class="inline-flex items-center justify-center rounded-[24px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                    type="submit"
-                  >
-                    Quitar group
-                  </button>
-                </form>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-    </div>
-
-    <aside class="space-y-6 xl:sticky xl:top-28 xl:h-fit">
-      <article class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7">
-        <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Snapshot
-        </div>
-        <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-          Estado del producto
-        </h2>
-
-        <div class="mt-6 space-y-4">
-          <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-            <div class="text-sm font-semibold text-white">{product.name}</div>
-            <div class="mt-2 text-sm text-slate-400">{product.categoryName}</div>
-            <div class="mt-2">
-              <code class="rounded-xl border border-white/10 bg-[#07101f] px-3 py-1.5 text-xs text-slate-300">
-                {product.slug}
-              </code>
-            </div>
+                        </Modal>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )
+      }
+    </Card>
 
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-              <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Creado
-              </div>
-              <div class="mt-2 text-sm font-semibold text-white">
-                {formatDate(product.createdAt)}
-              </div>
-            </div>
-
-            <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-              <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Actualizado
-              </div>
-              <div class="mt-2 text-sm font-semibold text-white">
-                {formatDate(product.updatedAt)}
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-            <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Canales
-            </div>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <span
-                class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                  product.deliveryEnabled
-                    ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-300"
-                    : "border-white/10 bg-white/[0.03] text-slate-500",
-                ]}
-              >
-                Delivery
-              </span>
-
-              <span
-                class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                  product.pickupEnabled
-                    ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
-                    : "border-white/10 bg-white/[0.03] text-slate-500",
-                ]}
-              >
-                Pickup
-              </span>
-
-              <span
-                class:list={[
-                  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]",
-                  product.dineInEnabled
-                    ? "border-violet-400/20 bg-violet-400/10 text-violet-300"
-                    : "border-white/10 bg-white/[0.03] text-slate-500",
-                ]}
-              >
-                Sala
-              </span>
-            </div>
-          </div>
-        </div>
-      </article>
-
-      <section
-        id="alergenos"
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] lg:p-7"
-      >
-        <div class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
-          <div>
-            <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-300">
-              Alérgenos
-            </div>
-            <h2 class="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
-              Vincular alérgenos
-            </h2>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            {allergenRows.length === 0 ? (
-              <div class="text-sm text-slate-400">Sin alérgenos asociados</div>
-            ) : (
-              <div class="flex items-center -space-x-2">
-                {allergenRows.slice(0, 6).map((allergen) =>
-                  allergen.iconUrl ? (
-                    <img
-                      src={allergen.iconUrl}
-                      alt={allergen.name}
-                      title={allergen.name}
-                      class="h-9 w-9 rounded-full object-cover ring-2 ring-[#0f172a]"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div
-                      title={allergen.name}
-                      class="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-900 text-[10px] font-bold uppercase text-slate-200 ring-2 ring-[#0f172a]"
-                    >
-                      {allergen.name.slice(0, 1)}
-                    </div>
-                  ),
-                )}
-              </div>
-            )}
-          </div>
+    {/* ---------------- Modifier groups ---------------- */}
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Grupos de modificadores</h2>
+          <p class="mt-1 text-xs text-admin-muted">
+            Los grupos son globales; aquí se decide cuáles aplican a este producto y en qué orden.
+          </p>
         </div>
 
-        <form
-          method="post"
-          action={`/api/admin/products/${product.id}/allergens`}
-          class="mt-6 rounded-[28px] border border-amber-400/20 bg-amber-400/10 p-5"
-        >
-          <input type="hidden" name="intent" value="create" />
+        <Modal id="group-link" title="Vincular grupo" description="Solo se listan grupos activos que aún no están enlazados." triggerLabel="+ Vincular grupo">
+          <form method="post" action={`/api/admin/products/${product.id}/modifier-groups`} class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
 
-          <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
             <label class="block">
-              <span class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-amber-100/80">
-                Alérgeno
-              </span>
-              <select
-                class="w-full rounded-[24px] border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white focus:border-amber-300/40 focus:outline-none"
-                name="allergenId"
-                required
-              >
-                {availableAllergens.length === 0 ? (
-                  <option value="">No quedan alérgenos disponibles</option>
-                ) : (
-                  availableAllergens.map((allergen) => (
-                    <option value={allergen.id}>
-                      {allergen.name}{allergen.slug ? ` · ${allergen.slug}` : ""}
-                    </option>
-                  ))
-                )}
+              <span class={labelClass}>Grupo</span>
+              <select class={inputClass} name="groupId" required>
+                {availableModifierGroups.map((group) => (
+                  <option value={group.id}>
+                    {group.name} · {group.minSelect}–{group.maxSelect}
+                  </option>
+                ))}
               </select>
             </label>
 
-            <div class="flex items-end">
-              <button
-                class="inline-flex w-full items-center justify-center rounded-[24px] bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
-                type="submit"
-                disabled={availableAllergens.length === 0}
-              >
-                Añadir alérgeno
-              </button>
-            </div>
+            <label class="block">
+              <span class={labelClass}>Orden</span>
+              <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={linkedModifierGroups.length} />
+            </label>
+
+            <button
+              type="submit"
+              disabled={availableModifierGroups.length === 0}
+              class:list={[
+                "mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                availableModifierGroups.length > 0
+                  ? "border border-sky-400/20 bg-sky-400/10 text-sky-100 hover:border-sky-400/30 hover:bg-sky-400/15"
+                  : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-slate-500",
+              ]}
+            >
+              {availableModifierGroups.length > 0 ? "Vincular grupo" : "No hay grupos disponibles"}
+            </button>
+          </form>
+        </Modal>
+      </div>
+
+      {
+        linkedModifierGroups.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Sin grupos vinculados" description="Vincula uno para ofrecer opciones configurables." />
           </div>
-        </form>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Grupo</th>
+                  <th>Selección</th>
+                  <th>Opciones</th>
+                  <th>Orden</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linkedModifierGroups.map((group) => (
+                  <tr>
+                    <td>
+                      <div class="font-semibold text-white">{group.name}</div>
+                      {group.required ? <div class="text-xs text-amber-300">Obligatorio</div> : null}
+                    </td>
+                    <td class="text-admin-muted">{group.minSelect}–{group.maxSelect}</td>
+                    <td class="text-admin-muted">{group.optionCount}</td>
+                    <td class="text-admin-muted">{group.productSortOrder}</td>
+                    <td><Badge tone={group.active ? "success" : "danger"}>{group.active ? "Activo" : "Inactivo"}</Badge></td>
+                    <td>
+                      <div class="flex items-center justify-end gap-2">
+                        <Modal
+                          id={`group-options-${group.linkId}`}
+                          title={`Opciones · ${group.name}`}
+                          description="Estas opciones son del grupo global: afectan a todos los productos que lo usen."
+                          triggerLabel="Opciones"
+                          triggerClass={ghostBtnClass}
+                          size="lg"
+                        >
+                          <form method="post" action={`/api/admin/modifier-groups/${group.groupId}/options`} class="grid gap-4">
+                            <input type="hidden" name="intent" value="create" />
+                            <input type="hidden" name="redirectTo" value={optionsRedirect} />
 
-        <div class="mt-6 space-y-4">
-          {allergenRows.length === 0 ? (
-            <div class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
-              Sin alérgenos asociados.
-            </div>
-          ) : (
-            allergenRows.map((allergen) => (
-              <article class="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-3">
-                    {allergen.iconUrl ? (
-                      <img
-                        src={allergen.iconUrl}
-                        alt={allergen.name}
-                        class="h-10 w-10 rounded-2xl object-cover ring-1 ring-white/10"
-                      />
-                    ) : (
-                      <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/60 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                        ALG
+                            <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_140px_120px]">
+                              <label class="block">
+                                <span class={labelClass}>Nombre</span>
+                                <input class={inputClass} type="text" name="name" placeholder="Ej. Extra queso" required />
+                              </label>
+                              <label class="block">
+                                <span class={labelClass}>Δ Precio (€)</span>
+                                <input class={inputClass} type="number" name="priceDeltaEur" step="0.01" value="0.00" />
+                              </label>
+                              <label class="block">
+                                <span class={labelClass}>Orden</span>
+                                <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={group.options.length} />
+                              </label>
+                            </div>
+
+                            <button type="submit" class={`${primaryBtnClass} justify-self-start`}>Añadir opción</button>
+                          </form>
+
+                          <div class="mt-4 border-t border-admin-border pt-4">
+                            {group.options.length === 0 ? (
+                              <p class="text-sm text-admin-muted">Este grupo todavía no tiene opciones.</p>
+                            ) : (
+                              <div class="space-y-2">
+                                {group.options.map((option) => (
+                                  <form
+                                    method="post"
+                                    action={`/api/admin/modifier-groups/${group.groupId}/options`}
+                                    class="grid gap-2 rounded-admin-lg border border-admin-border bg-white/[0.02] p-3 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto] sm:items-end"
+                                  >
+                                    {/* Sin `intent` oculto: cada botón envía el suyo, así
+                                        guardar y borrar caben en la misma fila. */}
+                                    <input type="hidden" name="optionId" value={option.id} />
+                                    <input type="hidden" name="redirectTo" value={optionsRedirect} />
+
+                                    <label class="block">
+                                      <span class={labelClass}>Nombre</span>
+                                      <input class={inputClass} type="text" name="name" value={option.name} required />
+                                    </label>
+                                    <label class="block">
+                                      <span class={labelClass}>Δ €</span>
+                                      <input class={inputClass} type="number" name="priceDeltaEur" step="0.01" value={(option.priceDeltaCents / 100).toFixed(2)} />
+                                    </label>
+                                    <label class="block">
+                                      <span class={labelClass}>Orden</span>
+                                      <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={option.sortOrder} />
+                                    </label>
+
+                                    <div class="flex items-center gap-2">
+                                      <label class="inline-flex items-center gap-2 text-xs text-slate-300">
+                                        <input class={checkboxClass} type="checkbox" name="active" checked={option.active} />
+                                        Activa
+                                      </label>
+                                      <button type="submit" name="intent" value="update" class={ghostBtnClass}>
+                                        Guardar
+                                      </button>
+                                      <button
+                                        type="submit"
+                                        name="intent"
+                                        value="delete"
+                                        title={`Borrar ${option.name}`}
+                                        class="rounded-xl border border-admin-border bg-white/[0.03] px-2.5 py-1.5 text-xs font-semibold text-rose-300/80 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-300"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  </form>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </Modal>
+
+                        <Modal id={`group-edit-${group.linkId}`} title={group.name} triggerLabel="Editar" triggerClass={ghostBtnClass}>
+                          <form method="post" action={`/api/admin/products/${product.id}/modifier-groups`} class="grid gap-4">
+                            <input type="hidden" name="intent" value="update" />
+                            <input type="hidden" name="productModifierGroupId" value={group.linkId} />
+
+                            <label class="block">
+                              <span class={labelClass}>Orden en este producto</span>
+                              <input class={inputClass} type="number" name="sortOrder" min="0" step="1" value={group.productSortOrder} />
+                            </label>
+
+                            <button type="submit" class={primaryBtnClass}>Guardar</button>
+                          </form>
+
+                          <form
+                            method="post"
+                            action={`/api/admin/products/${product.id}/modifier-groups`}
+                            class="mt-3 border-t border-admin-border pt-3"
+                          >
+                            <input type="hidden" name="intent" value="delete" />
+                            <input type="hidden" name="productModifierGroupId" value={group.linkId} />
+                            <button type="submit" class={dangerBtnClass}>Desvincular grupo</button>
+                          </form>
+                        </Modal>
                       </div>
-                    )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
 
-                    <div class="min-w-0">
-                      <div class="text-sm font-semibold text-white">{allergen.name}</div>
-                      <div class="mt-1 text-xs text-slate-500">{allergen.slug}</div>
-                    </div>
-                  </div>
-
-                  <form method="post" action={`/api/admin/products/${product.id}/allergens`}>
-                    <input type="hidden" name="intent" value="delete" />
-                    <input type="hidden" name="productAllergenId" value={allergen.id} />
-                    <button
-                      class="inline-flex items-center justify-center rounded-[24px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15"
-                      type="submit"
-                    >
-                      Quitar
-                    </button>
-                  </form>
-                </div>
-              </article>
-            ))
-          )}
+    {/* ---------------- Alérgenos ---------------- */}
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Alérgenos</h2>
+          <p class="mt-1 text-xs text-admin-muted">Se muestran en la carta pública y en la ficha del producto.</p>
         </div>
-      </section>
-    </aside>
-  </section>
+
+        <Modal id="allergen-link" title="Añadir alérgeno" triggerLabel="+ Añadir alérgeno">
+          <form method="post" action={`/api/admin/products/${product.id}/allergens`} class="grid gap-4">
+            <input type="hidden" name="intent" value="create" />
+
+            <label class="block">
+              <span class={labelClass}>Alérgeno</span>
+              <select class={inputClass} name="allergenId" required>
+                {availableAllergens.map((allergen) => (
+                  <option value={allergen.id}>{allergen.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="submit"
+              disabled={availableAllergens.length === 0}
+              class:list={[
+                "mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                availableAllergens.length > 0
+                  ? "border border-sky-400/20 bg-sky-400/10 text-sky-100 hover:border-sky-400/30 hover:bg-sky-400/15"
+                  : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-slate-500",
+              ]}
+            >
+              {availableAllergens.length > 0 ? "Añadir alérgeno" : "Ya están todos añadidos"}
+            </button>
+          </form>
+        </Modal>
+      </div>
+
+      <div class="px-5 py-4 lg:px-6">
+        {
+          allergenRows.length === 0 ? (
+            <EmptyState title="Sin alérgenos declarados" />
+          ) : (
+            <div class="flex flex-wrap gap-2">
+              {allergenRows.map((row) => (
+                <form method="post" action={`/api/admin/products/${product.id}/allergens`}>
+                  <input type="hidden" name="intent" value="delete" />
+                  <input type="hidden" name="productAllergenId" value={row.id} />
+                  <button
+                    type="submit"
+                    title={`Quitar ${row.name}`}
+                    class="group inline-flex items-center gap-2 rounded-full border border-admin-border bg-white/[0.03] py-1.5 pl-2 pr-3 text-sm text-slate-200 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200"
+                  >
+                    {row.iconUrl ? (
+                      <img src={row.iconUrl} alt="" class="h-5 w-5 object-contain" loading="lazy" />
+                    ) : null}
+                    {row.name}
+                    <span class="text-admin-faint transition group-hover:text-rose-300">✕</span>
+                  </button>
+                </form>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </Card>
+  </div>
 </AdminLayout>
