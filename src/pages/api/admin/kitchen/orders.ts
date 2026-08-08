@@ -14,6 +14,8 @@ type AddressSnapshot = {
     detail?: string;
     by?: string | null;
     at?: string | null;
+    fromStatus?: string | null;
+    toStatus?: string | null;
   }>;
   address?: {
     line1?: string;
@@ -67,6 +69,32 @@ function readLastAdminEvent(snapshot: AddressSnapshot) {
     by: typeof top.by === "string" ? top.by : null,
     at: typeof top.at === "string" ? top.at : null,
   };
+}
+
+/**
+ * Momento en que el pedido entró en su estado actual, para medir el tiempo
+ * que lleva en la fase (distinto de la antigüedad total del pedido).
+ *
+ * Se apoya en los eventos STATUS del snapshot. Los eventos nuevos guardan
+ * `toStatus`; los antiguos solo tienen el texto "ANTERIOR → SIGUIENTE", así que
+ * se cae a leerlo de ahí. Si no hay ninguno, el pedido nunca cambió de estado
+ * y la fase arrancó al crearse.
+ */
+function readCurrentStatusSince(snapshot: AddressSnapshot, status: string, createdAt: Date | string) {
+  const list = Array.isArray(snapshot.adminEvents) ? snapshot.adminEvents : [];
+
+  const matching = list
+    .filter((event) => {
+      if (event?.kind !== "STATUS" || !event.at) return false;
+      if (typeof event.toStatus === "string" && event.toStatus) return event.toStatus === status;
+      const arrow = String(event.detail ?? "").match(/→\s*([A-Z_]+)/);
+      return arrow ? arrow[1] === status : false;
+    })
+    .map((event) => new Date(String(event.at)).getTime())
+    .filter((time) => Number.isFinite(time));
+
+  if (!matching.length) return new Date(createdAt).toISOString();
+  return new Date(Math.max(...matching)).toISOString();
 }
 
 export const GET: APIRoute = async (context) => {
@@ -131,6 +159,7 @@ export const GET: APIRoute = async (context) => {
       adminInternalNote:
         typeof meta.adminInternalNote === "string" ? meta.adminInternalNote : null,
       lastAdminEvent: readLastAdminEvent(meta),
+      currentStatusSince: readCurrentStatusSince(meta, order.status, order.createdAt),
       address: meta.address ?? null,
       items: itemRows.map((item) => {
         const modifiers = (item.modifiers ?? {}) as Record<string, unknown>;

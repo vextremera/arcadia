@@ -77,7 +77,7 @@ function statusTone(status: string) {
     case "CANCELLED":
       return "border-rose-400/20 bg-rose-400/10 text-rose-300";
     default:
-      return "border-white/10 bg-white/[0.03] text-slate-300";
+      return "border-admin-border bg-white/[0.03] text-slate-300";
   }
 }
 
@@ -95,7 +95,7 @@ function paymentStatusTone(status: string) {
     case "PARTIALLY_REFUNDED":
       return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
     default:
-      return "border-white/10 bg-white/[0.03] text-slate-300";
+      return "border-admin-border bg-white/[0.03] text-slate-300";
   }
 }
 
@@ -110,7 +110,7 @@ function refundTone(status: string) {
     return "border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-300";
   if (status === "FAILED")
     return "border-rose-400/20 bg-rose-400/10 text-rose-300";
-  return "border-white/10 bg-white/[0.03] text-slate-300";
+  return "border-admin-border bg-white/[0.03] text-slate-300";
 }
 
 function adminEventTone(kind: string) {
@@ -311,7 +311,7 @@ for (const payment of decoratedPayments) {
           ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
           : payment.status === "FAILED"
             ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-            : "border-white/10 bg-white/[0.03] text-slate-300",
+            : "border-admin-border bg-white/[0.03] text-slate-300",
   });
 
   for (const refund of payment.refunds) {
@@ -341,7 +341,7 @@ timeline.push({
   title: "Última actualización",
   detail: `Estado actual ${order.status}`,
   at: order.updatedAt,
-  tone: "border-white/10 bg-white/[0.03] text-slate-300",
+  tone: "border-admin-border bg-white/[0.03] text-slate-300",
 });
 
 const fullTimeline = [...timeline, ...adminEvents].sort((a, b) => {
@@ -400,41 +400,31 @@ const isDelivery = order.type === "DELIVERY";
 <AdminLayout
   title={`Pedido ${order.publicId} · Admin · Arcadia`}
   heading={`Pedido ${order.publicId}`}
-  description="Detalle final del pedido con una jerarquía mucho más clara entre workflow, pago, líneas, actividad y refunds."
-  actions={true}
+  description="Workflow, cobro, líneas, actividad y devoluciones del pedido."
 >
-  <Fragment slot="actions">
-    <div class="flex flex-wrap gap-3">
-      <a
-        href="/admin/pedidos"
-        class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Volver a pedidos
-      </a>
+  <div class="mb-6 flex flex-wrap gap-3">
+    <a
+      href={`/admin/pedidos/ticket/${order.publicId}?print=1`}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex min-h-9 items-center justify-center rounded-admin-lg border border-sky-400/20 bg-sky-400/10 px-3.5 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+    >
+      Imprimir ticket
+    </a>
 
-      <a
-        href={`/pedido/${order.publicId}`}
-        target="_blank"
-        rel="noreferrer"
-        class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
-      >
-        Ver página pública
-      </a>
-
-      <a
-        href={`/admin/pedidos/ticket/${order.publicId}?print=1`}
-        target="_blank"
-        rel="noreferrer"
-        class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15"
-      >
-        Imprimir ticket
-      </a>
-    </div>
-  </Fragment>
+    <a
+      href={`/pedido/${order.publicId}`}
+      target="_blank"
+      rel="noreferrer"
+      class="inline-flex min-h-9 items-center justify-center rounded-admin-lg border border-admin-border bg-white/[0.03] px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+    >
+      Ver página pública
+    </a>
+  </div>
 
   {
     successMessage ? (
-      <section class="mb-6 rounded-[26px] border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
+      <section class="mb-6 rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-4 text-sm text-emerald-200">
         {successMessage}
       </section>
     ) : null
@@ -442,7 +432,7 @@ const isDelivery = order.type === "DELIVERY";
 
   {
     errorMessage ? (
-      <section class="mb-6 rounded-[26px] border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
+      <section class="mb-6 rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-4 text-sm text-rose-200">
         {errorMessage}
       </section>
     ) : null
@@ -450,10 +440,10 @@ const isDelivery = order.type === "DELIVERY";
 
   <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-6">
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Workflow
       </div>
@@ -473,10 +463,10 @@ const isDelivery = order.type === "DELIVERY";
     </article>
 
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Pago
       </div>
@@ -491,7 +481,7 @@ const isDelivery = order.type === "DELIVERY";
         </span>
         {
           paymentMethod ? (
-            <span class="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+            <span class="inline-flex items-center rounded-full border border-admin-border bg-white/[0.04] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
               {paymentMethod}
             </span>
           ) : null
@@ -501,10 +491,10 @@ const isDelivery = order.type === "DELIVERY";
     </article>
 
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Canal
       </div>
@@ -524,10 +514,10 @@ const isDelivery = order.type === "DELIVERY";
     </article>
 
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Líneas
       </div>
@@ -540,10 +530,10 @@ const isDelivery = order.type === "DELIVERY";
     </article>
 
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Cobro real
       </div>
@@ -554,10 +544,10 @@ const isDelivery = order.type === "DELIVERY";
     </article>
 
     <article
-      class="rounded-[28px] border border-white/10 bg-white/[0.03] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.28)]"
+      class="rounded-admin-xl border border-admin-border bg-white/[0.03] p-6"
     >
       <div
-        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+        class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
       >
         Total
       </div>
@@ -573,14 +563,14 @@ const isDelivery = order.type === "DELIVERY";
   <section class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
     <div class="space-y-6">
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6 lg:p-7"
       >
         <div
-          class="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.08] pb-5"
+          class="flex flex-wrap items-start justify-between gap-4 border-b border-admin-border pb-5"
         >
           <div>
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
             >
               Pedido
             </div>
@@ -592,10 +582,10 @@ const isDelivery = order.type === "DELIVERY";
           </div>
 
           <div
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-right"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-right"
           >
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
             >
               Actualizado
             </div>
@@ -607,10 +597,10 @@ const isDelivery = order.type === "DELIVERY";
 
         <div class="mt-6 grid gap-4 md:grid-cols-2">
           <section
-            class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-5"
           >
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
             >
               Cliente
             </div>
@@ -622,7 +612,7 @@ const isDelivery = order.type === "DELIVERY";
             </div>
             {
               order.customerEmail ? (
-                <div class="mt-1 break-all text-sm text-slate-500">
+                <div class="mt-1 break-all text-sm text-admin-muted">
                   {order.customerEmail}
                 </div>
               ) : null
@@ -630,10 +620,10 @@ const isDelivery = order.type === "DELIVERY";
           </section>
 
           <section
-            class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-5"
           >
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
             >
               Resumen
             </div>
@@ -673,7 +663,7 @@ const isDelivery = order.type === "DELIVERY";
 
         {
           isDelivery && address ? (
-            <div class="mt-4 rounded-[26px] border border-cyan-400/20 bg-cyan-400/10 p-5">
+            <div class="mt-4 rounded-admin-lg border border-cyan-400/20 bg-cyan-400/10 p-5">
               <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
                 Dirección de entrega
               </div>
@@ -702,7 +692,7 @@ const isDelivery = order.type === "DELIVERY";
 
         {
           forcedPickup ? (
-            <div class="mt-4 rounded-[26px] border border-amber-400/20 bg-amber-400/10 p-5">
+            <div class="mt-4 rounded-admin-lg border border-amber-400/20 bg-amber-400/10 p-5">
               <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200">
                 Force pickup
               </div>
@@ -716,8 +706,8 @@ const isDelivery = order.type === "DELIVERY";
 
         {
           deliveryResolutionSource || deliveryResolutionNote ? (
-            <div class="mt-4 rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-              <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div class="mt-4 rounded-admin-lg border border-admin-border bg-white/[0.03] p-5">
+              <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">
                 Resolución delivery
               </div>
               <div class="mt-3 space-y-2 text-sm text-slate-300">
@@ -744,7 +734,7 @@ const isDelivery = order.type === "DELIVERY";
 
         {
           order.notes ? (
-            <div class="mt-4 rounded-[26px] border border-amber-400/20 bg-amber-400/10 p-5">
+            <div class="mt-4 rounded-admin-lg border border-amber-400/20 bg-amber-400/10 p-5">
               <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200">
                 Comentarios del cliente
               </div>
@@ -756,14 +746,14 @@ const isDelivery = order.type === "DELIVERY";
         }
 
         <div
-          class="mt-4 rounded-[28px] border border-white/10 bg-[#091121]/80 p-5"
+          class="mt-4 rounded-admin-xl border border-admin-border bg-white/[0.02] p-5"
         >
           <div
-            class="flex items-center justify-between gap-3 border-b border-white/[0.08] pb-5"
+            class="flex items-center justify-between gap-3 border-b border-admin-border pb-5"
           >
             <div>
               <div
-                class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
               >
                 Economía
               </div>
@@ -815,7 +805,7 @@ const isDelivery = order.type === "DELIVERY";
             </div>
 
             <div
-              class="flex items-center justify-between border-t border-white/[0.08] pt-3 text-base"
+              class="flex items-center justify-between border-t border-admin-border pt-3 text-base"
             >
               <span class="font-semibold text-white">Total</span>
               <span class="font-semibold text-white"
@@ -825,7 +815,7 @@ const isDelivery = order.type === "DELIVERY";
 
             {
               couponAppliedMessage ? (
-                <div class="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100/85">
+                <div class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100/85">
                   {couponAppliedMessage}
                 </div>
               ) : null
@@ -835,14 +825,14 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)] lg:p-7"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6 lg:p-7"
       >
         <div
-          class="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] pb-5"
+          class="flex flex-wrap items-center justify-between gap-4 border-b border-admin-border pb-5"
         >
           <div>
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
             >
               Items
             </div>
@@ -854,7 +844,7 @@ const isDelivery = order.type === "DELIVERY";
           </div>
 
           <div
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-slate-300"
           >
             {lineCount} línea{lineCount === 1 ? "" : "s"} · {totalQty} uds
           </div>
@@ -863,7 +853,7 @@ const isDelivery = order.type === "DELIVERY";
         <div class="mt-6 space-y-4">
           {
             decoratedItems.map((it) => (
-              <article class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5">
+              <article class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-5">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                   <div class="min-w-0 flex-1">
                     <div class="text-base font-semibold text-white">
@@ -876,14 +866,14 @@ const isDelivery = order.type === "DELIVERY";
                     ) : null}
                   </div>
 
-                  <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-right">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <div class="rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-right">
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">
                       Unitario
                     </div>
                     <div class="mt-2 text-sm font-semibold text-white">
                       {money(it.unitPriceCents)}
                     </div>
-                    <div class="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <div class="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">
                       Línea
                     </div>
                     <div class="mt-2 text-base font-semibold text-white">
@@ -924,7 +914,7 @@ const isDelivery = order.type === "DELIVERY";
                 ) : null}
 
                 {it.notes ? (
-                  <div class="mt-3 rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100/85">
+                  <div class="mt-3 rounded-admin-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm text-amber-100/85">
                     <span class="font-semibold text-white">Notas línea:</span>{" "}
                     {it.notes}
                   </div>
@@ -938,10 +928,10 @@ const isDelivery = order.type === "DELIVERY";
 
     <aside class="space-y-6 xl:sticky xl:top-28 xl:h-fit">
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
         >
           Workflow
         </div>
@@ -959,11 +949,11 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Nuevo estado</span
             >
             <select
-              class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
+              class="w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
               name="status"
             >
               {
@@ -978,18 +968,18 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Nota de actividad</span
             >
             <textarea
-              class="min-h-24 w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
+              class="min-h-24 w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-sky-400/30 focus:outline-none"
               name="note"
               placeholder="Opcional: detalle operativo del cambio"></textarea>
           </label>
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+            class="inline-flex min-h-10 items-center justify-center rounded-admin-lg border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
           >
             Guardar estado
           </button>
@@ -997,10 +987,10 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
         >
           Pago
         </div>
@@ -1009,7 +999,7 @@ const isDelivery = order.type === "DELIVERY";
         </h2>
 
         <div
-          class="mt-4 rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100/85"
+          class="mt-4 rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100/85"
         >
           <div class="font-semibold text-emerald-200">Criterio actual</div>
           <p class="mt-2">
@@ -1032,11 +1022,11 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Nuevo payment status</span
             >
             <select
-              class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-emerald-400/30 focus:outline-none"
+              class="w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-emerald-400/30 focus:outline-none"
               name="paymentStatus"
             >
               {
@@ -1051,18 +1041,18 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Nota de actividad</span
             >
             <textarea
-              class="min-h-24 w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-emerald-400/30 focus:outline-none"
+              class="min-h-24 w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-emerald-400/30 focus:outline-none"
               name="note"
               placeholder="Opcional: detalle del cambio de pago"></textarea>
           </label>
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/30 hover:bg-emerald-400/15"
+            class="inline-flex min-h-10 items-center justify-center rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/30 hover:bg-emerald-400/15"
           >
             Guardar pago
           </button>
@@ -1070,10 +1060,10 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
         >
           Staff
         </div>
@@ -1083,7 +1073,7 @@ const isDelivery = order.type === "DELIVERY";
 
         {
           adminInternalNote ? (
-            <div class="mt-4 rounded-[24px] border border-amber-400/20 bg-amber-400/10 p-4">
+            <div class="mt-4 rounded-admin-lg border border-amber-400/20 bg-amber-400/10 p-4">
               <div class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200">
                 Actual
               </div>
@@ -1104,11 +1094,11 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Nota interna persistente</span
             >
             <textarea
-              class="min-h-28 w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-amber-400/30 focus:outline-none"
+              class="min-h-28 w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-amber-400/30 focus:outline-none"
               name="adminInternalNote"
               placeholder="Indicaciones internas de staff, incidencias, llamadas, seguimiento..."
               >{adminInternalNote}</textarea
@@ -1117,7 +1107,7 @@ const isDelivery = order.type === "DELIVERY";
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:border-amber-400/30 hover:bg-amber-400/15"
+            class="inline-flex min-h-10 items-center justify-center rounded-admin-lg border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:border-amber-400/30 hover:bg-amber-400/15"
           >
             Guardar nota interna
           </button>
@@ -1125,10 +1115,10 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
         >
           Actividad
         </div>
@@ -1146,11 +1136,11 @@ const isDelivery = order.type === "DELIVERY";
 
           <label class="block">
             <span
-              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500"
+              class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted"
               >Anotación al timeline</span
             >
             <textarea
-              class="min-h-24 w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-violet-400/30 focus:outline-none"
+              class="min-h-24 w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-violet-400/30 focus:outline-none"
               name="note"
               placeholder="Llamado al cliente, incidencia con entrega, ajuste acordado..."
             ></textarea>
@@ -1158,7 +1148,7 @@ const isDelivery = order.type === "DELIVERY";
 
           <button
             type="submit"
-            class="inline-flex min-h-10 items-center justify-center rounded-[24px] border border-violet-400/20 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-400/30 hover:bg-violet-400/15"
+            class="inline-flex min-h-10 items-center justify-center rounded-admin-lg border border-violet-400/20 bg-violet-400/10 px-4 py-3 text-sm font-semibold text-violet-100 transition hover:border-violet-400/30 hover:bg-violet-400/15"
           >
             Añadir al timeline
           </button>
@@ -1166,10 +1156,10 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+          class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
         >
           Actividad
         </div>
@@ -1180,7 +1170,7 @@ const isDelivery = order.type === "DELIVERY";
         <div class="mt-6 space-y-3">
           {
             fullTimeline.map((entry) => (
-              <article class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <article class="rounded-admin-lg border border-admin-border bg-white/[0.03] p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0 flex-1">
                     <div class="text-sm font-semibold text-white">
@@ -1190,7 +1180,7 @@ const isDelivery = order.type === "DELIVERY";
                       {entry.detail}
                     </p>
                     {entry.by ? (
-                      <div class="mt-2 text-xs text-slate-500">
+                      <div class="mt-2 text-xs text-admin-muted">
                         Por {entry.by}
                       </div>
                     ) : null}
@@ -1212,14 +1202,14 @@ const isDelivery = order.type === "DELIVERY";
       </article>
 
       <article
-        class="rounded-[32px] border border-white/10 bg-[#0f172a]/82 p-6 shadow-[0_24px_80px_rgba(2,6,23,0.34)]"
+        class="rounded-admin-xl border border-admin-border bg-admin-surface/82 p-6"
       >
         <div
-          class="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5"
+          class="flex flex-wrap items-end justify-between gap-4 border-b border-admin-border pb-5"
         >
           <div>
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.22em] text-admin-muted"
             >
               Cobro real
             </div>
@@ -1231,7 +1221,7 @@ const isDelivery = order.type === "DELIVERY";
           </div>
 
           <div
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-slate-300"
           >
             {paymentsCount} payment{paymentsCount === 1 ? "" : "s"}
           </div>
@@ -1239,10 +1229,10 @@ const isDelivery = order.type === "DELIVERY";
 
         <div class="mt-6 grid gap-4 md:grid-cols-3">
           <div
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.03] p-4"
           >
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
             >
               Payments
             </div>
@@ -1255,7 +1245,7 @@ const isDelivery = order.type === "DELIVERY";
           </div>
 
           <div
-            class="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/10 p-4"
+            class="rounded-admin-lg border border-fuchsia-400/20 bg-fuchsia-400/10 p-4"
           >
             <div
               class="text-[11px] font-semibold uppercase tracking-[0.16em] text-fuchsia-200"
@@ -1271,10 +1261,10 @@ const isDelivery = order.type === "DELIVERY";
           </div>
 
           <div
-            class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4"
+            class="rounded-admin-lg border border-admin-border bg-white/[0.03] p-4"
           >
             <div
-              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted"
             >
               Pendientes / fallidos
             </div>
@@ -1290,7 +1280,7 @@ const isDelivery = order.type === "DELIVERY";
         <div class="mt-6 space-y-4">
           {
             decoratedPayments.length === 0 ? (
-              <div class="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
+              <div class="rounded-admin-lg border border-admin-border bg-white/[0.03] p-4 text-sm text-slate-400">
                 {paymentMethod === "CARD"
                   ? "No hay registros en Payment para este pedido. Si es un pedido antiguo, guarda primero el payment status en PAID/AUTH para materializar el rastro interno y después ya podrás registrar refunds."
                   : "No hay registros en Payment para este pedido."}
@@ -1316,13 +1306,13 @@ const isDelivery = order.type === "DELIVERY";
                   refundableCents > 0;
 
                 return (
-                  <article class="rounded-[26px] border border-white/10 bg-[#091121]/80 p-5">
+                  <article class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div class="text-sm font-semibold text-white">
                           Payment #{payment.id}
                         </div>
-                        <div class="mt-1 text-xs text-slate-500">
+                        <div class="mt-1 text-xs text-admin-muted">
                           {payment.provider} ·{" "}
                           {payment.providerIntentId ?? "sin intent"}
                         </div>
@@ -1337,7 +1327,7 @@ const isDelivery = order.type === "DELIVERY";
                               ? "border-sky-400/20 bg-sky-400/10 text-sky-300"
                               : payment.status === "FAILED"
                                 ? "border-rose-400/20 bg-rose-400/10 text-rose-300"
-                                : "border-white/10 bg-white/[0.03] text-slate-300",
+                                : "border-admin-border bg-white/[0.03] text-slate-300",
                         ]}
                       >
                         {payment.status}
@@ -1380,10 +1370,10 @@ const isDelivery = order.type === "DELIVERY";
                       </div>
                     ) : null}
 
-                    <div class="mt-4 rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+                    <div class="mt-4 rounded-admin-lg border border-admin-border bg-white/[0.03] p-4">
                       <div class="flex flex-wrap items-end justify-between gap-3">
                         <div>
-                          <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted">
                             Registrar refund
                           </div>
                           <div class="mt-1 text-sm text-slate-300">
@@ -1397,7 +1387,7 @@ const isDelivery = order.type === "DELIVERY";
                           </div>
                         </div>
 
-                        <div class="rounded-[24px] border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-slate-300">
+                        <div class="rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-2 text-sm text-slate-300">
                           Pendientes: {pendingCount} · Fallidos: {failedCount}
                         </div>
                       </div>
@@ -1425,11 +1415,11 @@ const isDelivery = order.type === "DELIVERY";
 
                         <div class="grid gap-4 lg:grid-cols-[180px_180px_minmax(0,1fr)]">
                           <label class="block">
-                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted">
                               Importe €
                             </span>
                             <input
-                              class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
+                              class="w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
                               type="number"
                               name="refundAmountEur"
                               min="0.01"
@@ -1440,11 +1430,11 @@ const isDelivery = order.type === "DELIVERY";
                           </label>
 
                           <label class="block">
-                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted">
                               Estado refund
                             </span>
                             <select
-                              class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
+                              class="w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
                               name="refundStatus"
                             >
                               <option value="SUCCEEDED">SUCCEEDED</option>
@@ -1454,11 +1444,11 @@ const isDelivery = order.type === "DELIVERY";
                           </label>
 
                           <label class="block">
-                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span class="mb-2 block text-[11px] font-semibold uppercase tracking-[0.18em] text-admin-muted">
                               Nota
                             </span>
                             <input
-                              class="w-full rounded-[24px] border border-white/10 bg-[#07101f] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
+                              class="w-full rounded-admin-lg border border-admin-border bg-white/[0.03] px-4 py-3 text-sm text-white focus:border-fuchsia-400/30 focus:outline-none"
                               type="text"
                               name="note"
                               placeholder="Motivo, incidencia o referencia externa"
@@ -1469,10 +1459,10 @@ const isDelivery = order.type === "DELIVERY";
                         <button
                           type="submit"
                           class:list={[
-                            "inline-flex min-h-10 items-center justify-center rounded-[24px] px-4 py-3 text-sm font-semibold transition",
+                            "inline-flex min-h-10 items-center justify-center rounded-admin-lg px-4 py-3 text-sm font-semibold transition",
                             paymentMethod === "CARD" && refundableCents > 0
                               ? "border border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-100 hover:border-fuchsia-400/30 hover:bg-fuchsia-400/15"
-                              : "cursor-not-allowed border border-white/10 bg-white/[0.03] text-slate-500",
+                              : "cursor-not-allowed border border-admin-border bg-white/[0.03] text-admin-muted",
                           ]}
                           disabled={
                             paymentMethod !== "CARD" || refundableCents <= 0
@@ -1486,7 +1476,7 @@ const isDelivery = order.type === "DELIVERY";
                     {payment.refunds.length ? (
                       <div class="mt-4 space-y-3">
                         {payment.refunds.map((refund) => (
-                          <div class="rounded-[24px] border border-fuchsia-400/20 bg-fuchsia-400/10 p-4">
+                          <div class="rounded-admin-lg border border-fuchsia-400/20 bg-fuchsia-400/10 p-4">
                             <div class="flex flex-wrap items-center justify-between gap-3">
                               <div class="text-sm font-semibold text-white">
                                 Refund #{refund.id}

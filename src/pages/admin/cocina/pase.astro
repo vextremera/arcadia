@@ -1,0 +1,34 @@
+---
+/**
+ * Modo pase: pantalla dedicada de cocina para un monitor en el pase.
+ *
+ * No usa AdminLayout a propósito — sin sidebar, sin topbar y sin scroll de
+ * página, para que el board ocupe el 100% del alto. Sigue protegida por el
+ * middleware como cualquier ruta /admin/**.
+ */
+import "@/styles/global.css";
+import KitchenBoard from "@/islands/admin/KitchenBoard.tsx";
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/ARCADIA_LOGO.svg" />
+    <title>Pase de cocina · Arcadia</title>
+  </head>
+
+  <body data-admin-ui="true" class="h-dvh overflow-hidden bg-admin-bg text-admin-text antialiased">
+    <!-- Sin AdminLayout no hay shell, así que el acento de In-Live se declara
+         aquí para que el pase no se quede con el azul por defecto. -->
+    <main
+      id="admin-shell"
+      data-admin-accent="rose"
+      class="flex h-dvh min-h-0 flex-col gap-3 p-3"
+    >
+      <KitchenBoard client:load pase={true} />
+    </main>
+  </body>
+</html>

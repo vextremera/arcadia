@@ -13,6 +13,8 @@ import {
 } from "astro:db";
 import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 import { reverseRemainingOrderPointsOnce } from "@/server/loyalty/engine";
+import { invalidateSalesDay } from "@/server/analytics/rollup";
+import { getMadridDateInfo } from "@/server/time/madrid";
 
 type OrderStatus =
   | "PENDING"
@@ -41,6 +43,13 @@ type StoredAdminEvent = {
   detail: string;
   by?: string | null;
   at: string;
+  /**
+   * Estados de origen/destino en los eventos STATUS. Se guardan aparte del
+   * `detail` para que quien los consuma (el board de cocina calcula con ellos
+   * el tiempo en fase) no dependa de parsear el texto mostrado.
+   */
+  fromStatus?: string | null;
+  toStatus?: string | null;
 };
 
 const ALLOWED_STATUS = new Set<OrderStatus>([
@@ -136,6 +145,8 @@ function readAdminEvents(snapshot: Record<string, unknown>) {
         detail: String(obj.detail ?? ""),
         by: typeof obj.by === "string" ? obj.by : null,
         at: typeof obj.at === "string" ? obj.at : new Date().toISOString(),
+        fromStatus: typeof obj.fromStatus === "string" ? obj.fromStatus : null,
+        toStatus: typeof obj.toStatus === "string" ? obj.toStatus : null,
       } satisfies StoredAdminEvent;
     });
 }
@@ -553,6 +564,7 @@ export const POST: APIRoute = async (context) => {
       currency: Order.currency,
       addressSnapshot: Order.addressSnapshot,
       updatedAt: Order.updatedAt,
+      createdAt: Order.createdAt,
     })
     .from(Order)
     .where(eq(Order.publicId, publicId))
@@ -638,6 +650,8 @@ export const POST: APIRoute = async (context) => {
         title: "Cambio de estado",
         detail: note ? `${previous} → ${requested}. ${note}` : `${previous} → ${requested}`,
         by: actor,
+        fromStatus: previous,
+        toStatus: requested,
       });
       snapshotChanged = true;
     }
@@ -893,6 +907,15 @@ export const POST: APIRoute = async (context) => {
   patch.updatedAt = new Date();
 
   await db.update(Order).set(patch).where(eq(Order.id, order.id));
+
+  if (patch.status || patch.paymentStatus || auditAction === "ORDER_REFUND_CREATED") {
+    try {
+      const orderDateISO = getMadridDateInfo(new Date(order.createdAt)).dateISO;
+      await invalidateSalesDay(orderDateISO);
+    } catch (error) {
+      console.error("[analytics] rollup invalidation failed", error);
+    }
+  }
 
   try {
     if (method === "CARD") {
