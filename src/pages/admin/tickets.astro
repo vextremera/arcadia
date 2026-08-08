@@ -1,0 +1,419 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import StatCard from "@/components/admin/ui/StatCard.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import EmptyState from "@/components/admin/ui/EmptyState.astro";
+import Modal from "@/components/admin/ui/Modal.astro";
+import { db, TicketTemplate } from "astro:db";
+import type { TicketLayout } from "@/pages/api/admin/tickets";
+
+type TicketKind = "TICKET" | "KITCHEN";
+
+type TemplateRow = {
+  id: number;
+  name: string;
+  kind: TicketKind;
+  paperWidth: number;
+  layout: TicketLayout;
+  active: boolean;
+};
+
+const DEFAULT_LAYOUT: TicketLayout = {
+  showLogo: true,
+  headerText: "",
+  showModifiers: true,
+  showAllergens: false,
+  showQR: false,
+  footerText: "",
+};
+
+function kindLabel(kind: TicketKind) {
+  return kind === "TICKET" ? "Ticket cliente" : "Comanda cocina";
+}
+
+const rows = (await db.select().from(TicketTemplate)) as unknown as TemplateRow[];
+const templates = [...rows].sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+const totalTemplates = templates.length;
+const activeTemplates = templates.filter((t) => t.active).length;
+const ticketCount = templates.filter((t) => t.kind === "TICKET").length;
+const kitchenCount = templates.filter((t) => t.kind === "KITCHEN").length;
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const errorParam = url.searchParams.get("error") ?? "";
+
+const successMessage = saved === "1" ? "Plantilla guardada correctamente." : "";
+const errorMessage =
+  errorParam === "missing-name" ? "El nombre es obligatorio." :
+  errorParam === "invalid-kind" ? "El tipo de plantilla no es válido." :
+  errorParam === "invalid-width" ? "El ancho de papel debe ser 58 o 80 mm." :
+  errorParam === "not-found" ? "La plantilla ya no existe." :
+  errorParam === "invalid-template" ? "Plantilla no válida." :
+  errorParam === "invalid-intent" ? "Acción no válida." :
+  "";
+---
+
+<AdminLayout title="Tickets · Admin · Arcadia" heading="Tickets" description="Editor de plantillas de impresión con vista previa en vivo a ancho de papel.">
+  <div class="space-y-6">
+    {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+      <StatCard icon="ticket" label="Plantillas" value={String(totalTemplates)} helper={`${activeTemplates} activas`} />
+      <StatCard label="Ticket cliente / Cocina" value={`${ticketCount} / ${kitchenCount}`} helper="Por tipo" />
+    </section>
+
+    <Card padded={false}>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">
+        <h2 class="text-base font-semibold text-white">Plantillas de ticket</h2>
+
+        <Modal id="ticket-create" title="Nueva plantilla" description="Diseña la plantilla y revisa la vista previa a ancho de papel." triggerLabel="+ Nueva plantilla" size="xl">
+          <div class="grid gap-6 lg:grid-cols-[1fr_240px]">
+            <form method="post" action="/api/admin/tickets" class="grid gap-4" data-ticket-form>
+              <input type="hidden" name="intent" value="create" />
+
+              <label class="block">
+                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" placeholder="Ticket cliente 80mm" required />
+              </label>
+
+              <div class="grid grid-cols-2 gap-4">
+                <label class="block">
+                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Tipo</span>
+                  <select name="kind" class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none">
+                    <option value="TICKET">Ticket cliente</option>
+                    <option value="KITCHEN">Comanda cocina</option>
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Ancho papel</span>
+                  <select name="paperWidth" class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none">
+                    <option value="80" selected>80 mm</option>
+                    <option value="58">58 mm</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="block">
+                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Texto de cabecera</span>
+                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="headerText" placeholder="Ticket operativo" />
+              </label>
+
+              <label class="block">
+                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Texto de pie</span>
+                <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="footerText" placeholder="Gracias por tu visita" />
+              </label>
+
+              <div class="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                  <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showLogo" checked />
+                  Logo
+                </label>
+                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                  <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showModifiers" checked />
+                  Modificadores
+                </label>
+                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                  <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showAllergens" />
+                  Alérgenos
+                </label>
+                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                  <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showQR" />
+                  QR seguimiento
+                </label>
+              </div>
+
+              <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked />
+                Activa
+              </label>
+
+              <button type="submit" class="mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+                Crear plantilla
+              </button>
+            </form>
+
+            <div class="ticket-preview-shell" data-ticket-preview>
+              <div class="ticket-preview-paper" data-preview-paper>
+                <div class="ticket-preview-logo" data-preview-logo>ARCADIA</div>
+                <div class="ticket-preview-line ticket-preview-center" data-preview-header>Ticket operativo</div>
+                <div class="ticket-preview-sep"></div>
+                <div class="ticket-preview-line"><span>2 × Pizza Margarita</span><span>9.00 €</span></div>
+                <div class="ticket-preview-muted" data-preview-modifiers>Añadidos: Extra queso (+1.20 €)</div>
+                <div class="ticket-preview-line"><span>1 × Ensalada César</span><span>7.50 €</span></div>
+                <div class="ticket-preview-muted" data-preview-allergens>Alérgenos: Gluten, Lácteos</div>
+                <div class="ticket-preview-sep"></div>
+                <div class="ticket-preview-line ticket-preview-bold"><span>TOTAL</span><span>17.50 €</span></div>
+                <div class="ticket-preview-qr" data-preview-qr>QR</div>
+                <div class="ticket-preview-muted ticket-preview-center" data-preview-footer></div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      </div>
+
+      {
+        templates.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState title="Todavía no hay plantillas" description="Crea la primera con el botón de arriba." />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Tipo</th>
+                  <th>Ancho</th>
+                  <th>Estado</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {templates.map((template) => {
+                  const layout = { ...DEFAULT_LAYOUT, ...(template.layout ?? {}) };
+                  return (
+                    <tr>
+                      <td class="font-semibold text-white">{template.name}</td>
+                      <td class="text-admin-muted">{kindLabel(template.kind)}</td>
+                      <td class="text-admin-muted">{template.paperWidth} mm</td>
+                      <td><Badge tone={template.active ? "success" : "danger"}>{template.active ? "Activa" : "Inactiva"}</Badge></td>
+                      <td>
+                        <div class="flex items-center justify-end gap-2">
+                          <form method="post" action="/api/admin/tickets">
+                            <input type="hidden" name="intent" value="toggle-active" />
+                            <input type="hidden" name="templateId" value={template.id} />
+                            <button type="submit" class="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]">
+                              {template.active ? "Desactivar" : "Activar"}
+                            </button>
+                          </form>
+
+                          <Modal
+                            id={`ticket-edit-${template.id}`}
+                            title={template.name}
+                            description="Diseña la plantilla y revisa la vista previa a ancho de papel."
+                            triggerLabel="Editar"
+                            triggerClass="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]"
+                            size="xl"
+                          >
+                            <div class="grid gap-6 lg:grid-cols-[1fr_240px]">
+                              <form method="post" action="/api/admin/tickets" class="grid gap-4" data-ticket-form>
+                                <input type="hidden" name="intent" value="update" />
+                                <input type="hidden" name="templateId" value={template.id} />
+
+                                <label class="block">
+                                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
+                                  <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" value={template.name} required />
+                                </label>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                  <label class="block">
+                                    <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Tipo</span>
+                                    <select name="kind" class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none">
+                                      <option value="TICKET" selected={template.kind === "TICKET"}>Ticket cliente</option>
+                                      <option value="KITCHEN" selected={template.kind === "KITCHEN"}>Comanda cocina</option>
+                                    </select>
+                                  </label>
+                                  <label class="block">
+                                    <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Ancho papel</span>
+                                    <select name="paperWidth" class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none">
+                                      <option value="80" selected={template.paperWidth === 80}>80 mm</option>
+                                      <option value="58" selected={template.paperWidth === 58}>58 mm</option>
+                                    </select>
+                                  </label>
+                                </div>
+
+                                <label class="block">
+                                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Texto de cabecera</span>
+                                  <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="headerText" value={layout.headerText} placeholder="Ticket operativo" />
+                                </label>
+
+                                <label class="block">
+                                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Texto de pie</span>
+                                  <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="footerText" value={layout.footerText} placeholder="Gracias por tu visita" />
+                                </label>
+
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                                  <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                    <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showLogo" checked={layout.showLogo} />
+                                    Logo
+                                  </label>
+                                  <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                    <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showModifiers" checked={layout.showModifiers} />
+                                    Modificadores
+                                  </label>
+                                  <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                    <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showAllergens" checked={layout.showAllergens} />
+                                    Alérgenos
+                                  </label>
+                                  <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                    <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="showQR" checked={layout.showQR} />
+                                    QR seguimiento
+                                  </label>
+                                </div>
+
+                                <label class="inline-flex items-center gap-2.5 text-sm text-slate-300">
+                                  <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked={template.active} />
+                                  Activa
+                                </label>
+
+                                <button type="submit" class="mt-1 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
+                                  Guardar cambios
+                                </button>
+                              </form>
+
+                              <div class="ticket-preview-shell" data-ticket-preview>
+                                <div class="ticket-preview-paper" data-preview-paper>
+                                  <div class="ticket-preview-logo" data-preview-logo>ARCADIA</div>
+                                  <div class="ticket-preview-line ticket-preview-center" data-preview-header>Ticket operativo</div>
+                                  <div class="ticket-preview-sep"></div>
+                                  <div class="ticket-preview-line"><span>2 × Pizza Margarita</span><span>9.00 €</span></div>
+                                  <div class="ticket-preview-muted" data-preview-modifiers>Añadidos: Extra queso (+1.20 €)</div>
+                                  <div class="ticket-preview-line"><span>1 × Ensalada César</span><span>7.50 €</span></div>
+                                  <div class="ticket-preview-muted" data-preview-allergens>Alérgenos: Gluten, Lácteos</div>
+                                  <div class="ticket-preview-sep"></div>
+                                  <div class="ticket-preview-line ticket-preview-bold"><span>TOTAL</span><span>17.50 €</span></div>
+                                  <div class="ticket-preview-qr" data-preview-qr>QR</div>
+                                  <div class="ticket-preview-muted ticket-preview-center" data-preview-footer></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <form method="post" action="/api/admin/tickets" class="mt-3 border-t border-admin-border pt-3">
+                              <input type="hidden" name="intent" value="delete" />
+                              <input type="hidden" name="templateId" value={template.id} />
+                              <button type="submit" class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15">
+                                Borrar plantilla
+                              </button>
+                            </form>
+                          </Modal>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </Card>
+  </div>
+
+  <style>
+    .ticket-preview-shell {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      border-radius: var(--radius-admin-lg);
+      border: 1px dashed var(--color-admin-border);
+      background: rgba(255, 255, 255, 0.02);
+      padding: 1.25rem 0.75rem;
+    }
+
+    .ticket-preview-paper {
+      width: 210px;
+      border-radius: 10px;
+      background: #f7f7f5;
+      color: #111;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10.5px;
+      line-height: 1.5;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      transition: width 0.15s ease;
+    }
+
+    .ticket-preview-logo {
+      text-align: center;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+
+    .ticket-preview-center {
+      text-align: center;
+    }
+
+    .ticket-preview-sep {
+      margin: 6px 0;
+      border-top: 1px dashed #000;
+    }
+
+    .ticket-preview-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .ticket-preview-bold {
+      font-weight: 800;
+    }
+
+    .ticket-preview-muted {
+      color: #52525b;
+      font-size: 9.5px;
+      margin-top: 1px;
+    }
+
+    .ticket-preview-qr {
+      margin: 8px auto 2px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #000;
+      border-radius: 6px;
+      font-size: 9px;
+      font-weight: 700;
+    }
+  </style>
+
+  <script is:inline>
+    document.addEventListener("DOMContentLoaded", () => {
+      function renderTicketPreview(form) {
+        const shell = form.closest(".admin-modal-body")?.querySelector("[data-ticket-preview]");
+        if (!shell) return;
+
+        const paper = shell.querySelector("[data-preview-paper]");
+        const widthField = form.querySelector('[name="paperWidth"]');
+        if (paper && widthField) {
+          paper.style.width = widthField.value === "58" ? "150px" : "210px";
+        }
+
+        const toggle = (fieldName, selector) => {
+          const field = form.querySelector(`[name="${fieldName}"]`);
+          const el = shell.querySelector(selector);
+          if (field && el) el.style.display = field.checked ? "" : "none";
+        };
+
+        toggle("showLogo", "[data-preview-logo]");
+        toggle("showModifiers", "[data-preview-modifiers]");
+        toggle("showAllergens", "[data-preview-allergens]");
+        toggle("showQR", "[data-preview-qr]");
+
+        const headerField = form.querySelector('[name="headerText"]');
+        const headerEl = shell.querySelector("[data-preview-header]");
+        if (headerField && headerEl) headerEl.textContent = headerField.value.trim() || "Ticket operativo";
+
+        const footerField = form.querySelector('[name="footerText"]');
+        const footerEl = shell.querySelector("[data-preview-footer]");
+        if (footerField && footerEl) {
+          const footerText = footerField.value.trim();
+          footerEl.textContent = footerText;
+          footerEl.style.display = footerText ? "" : "none";
+        }
+      }
+
+      document.querySelectorAll("[data-ticket-form]").forEach((form) => {
+        renderTicketPreview(form);
+        form.addEventListener("input", () => renderTicketPreview(form));
+        form.addEventListener("change", () => renderTicketPreview(form));
+      });
+    });
+  </script>
+</AdminLayout>
