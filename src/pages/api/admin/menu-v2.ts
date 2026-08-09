@@ -255,6 +255,7 @@ export const POST: APIRoute = async (context) => {
       id: nextId,
       name,
       slug,
+      description: String(form.get("description") ?? "").trim() || null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -299,6 +300,7 @@ export const POST: APIRoute = async (context) => {
       .set({
         name,
         slug,
+        description: String(form.get("description") ?? "").trim() || null,
         updatedAt: new Date(),
       })
       .where(eq(MenuDish.id, dishId));
@@ -377,13 +379,76 @@ export const POST: APIRoute = async (context) => {
 
     const nextId = await nextAssignmentId();
 
+    // Al final de su plato, para que añadir no reordene lo que ya estaba.
+    const siblings = await db
+      .select({ sortOrder: MenuDishAssignment.sortOrder, kind: MenuDishAssignment.kind, course: MenuDishAssignment.course })
+      .from(MenuDishAssignment);
+    const nextSort =
+      siblings
+        .filter((row) => row.kind === kind && row.course === course)
+        .reduce((max, row) => Math.max(max, Number(row.sortOrder ?? 0)), -1) + 1;
+
     await db.insert(MenuDishAssignment).values({
       id: nextId,
       kind,
       course,
       dishId,
+      sortOrder: nextSort,
       createdAt: new Date(),
     });
+
+    return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
+  }
+
+  if (intent === "reorder-assignment") {
+    const assignmentId = parseId(form.get("assignmentId"));
+    const direction = String(form.get("direction") ?? "").trim();
+
+    if (!assignmentId) {
+      return context.redirect(withQuery(redirectBase, { error: "invalid-assignment" }));
+    }
+    if (direction !== "up" && direction !== "down") {
+      return context.redirect(withQuery(redirectBase, { error: "invalid-direction" }));
+    }
+
+    const rows = (await db
+      .select({
+        id: MenuDishAssignment.id,
+        kind: MenuDishAssignment.kind,
+        course: MenuDishAssignment.course,
+        sortOrder: MenuDishAssignment.sortOrder,
+      })
+      .from(MenuDishAssignment)) as Array<{ id: number; kind: string; course: string; sortOrder: number | null }>;
+
+    const current = rows.find((row) => row.id === assignmentId);
+    if (!current) {
+      return context.redirect(withQuery(redirectBase, { error: "assignment-not-found" }));
+    }
+
+    // Se reasigna 0..n-1 sobre el grupo antes de intercambiar: los datos
+    // migrados pueden traer posiciones repetidas o con huecos, y sin
+    // normalizar primero el intercambio no se notaría.
+    const group = rows
+      .filter((row) => row.kind === current.kind && row.course === current.course)
+      .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0) || a.id - b.id);
+
+    const index = group.findIndex((row) => row.id === assignmentId);
+    const target = direction === "up" ? index - 1 : index + 1;
+
+    if (index < 0 || target < 0 || target >= group.length) {
+      return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
+    }
+
+    const reordered = [...group];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+
+    for (let position = 0; position < reordered.length; position += 1) {
+      if (Number(reordered[position].sortOrder ?? 0) === position) continue;
+      await db
+        .update(MenuDishAssignment)
+        .set({ sortOrder: position })
+        .where(eq(MenuDishAssignment.id, reordered[position].id));
+    }
 
     return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
@@ -458,192 +523,6 @@ export const POST: APIRoute = async (context) => {
     return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
 
-  if (intent === "import-legacy") {
-    const currentDishes = await db.select({ id: MenuDish.id }).from(MenuDish);
-    const currentAssignments = await db
-      .select({ id: MenuDishAssignment.id })
-      .from(MenuDishAssignment);
-
-    if (currentDishes.length > 0 || currentAssignments.length > 0) {
-      return context.redirect(withQuery(redirectBase, { error: "already-v2-data" }));
-    }
-
-    const legacyMenus = await db
-      .select({
-        id: LegacyMenu.id,
-        title: LegacyMenu.title,
-        kind: LegacyMenu.kind,
-        active: LegacyMenu.active,
-        validFrom: LegacyMenu.validFrom,
-        validTo: LegacyMenu.validTo,
-      })
-      .from(LegacyMenu);
-
-    const menus = legacyMenus as Array<{
-      id: number;
-      title: string;
-      kind: MenuKind;
-      active: boolean;
-      validFrom: Date | null;
-      validTo: Date | null;
-    }>;
-
-    const now = new Date();
-    const diario = pickBestLegacy("DIARIO", menus, now);
-    const festivo = pickBestLegacy("FESTIVO", menus, now);
-
-    const selectedMenus = [diario, festivo].filter(Boolean) as Array<{
-      id: number;
-      title: string;
-      kind: MenuKind;
-      active: boolean;
-      validFrom: Date | null;
-      validTo: Date | null;
-    }>;
-
-    if (selectedMenus.length === 0) {
-      return context.redirect(withQuery(redirectBase, { error: "import-failed" }));
-    }
-
-    const selectedMenuIds = selectedMenus.map((menu) => menu.id);
-
-    const legacyItems = await db
-      .select({
-        id: LegacyMenuItem.id,
-        menuId: LegacyMenuItem.menuId,
-        productId: LegacyMenuItem.productId,
-        course: LegacyMenuItem.course,
-        sortOrder: LegacyMenuItem.sortOrder,
-      })
-      .from(LegacyMenuItem)
-      .where(inArray(LegacyMenuItem.menuId, selectedMenuIds));
-
-    const productIds = [...new Set(legacyItems.map((item) => item.productId))];
-
-    const products = productIds.length
-      ? await db
-        .select({
-          id: Product.id,
-          name: Product.name,
-        })
-        .from(Product)
-        .where(inArray(Product.id, productIds))
-      : [];
-
-    const productById = new Map(products.map((product) => [product.id, product]));
-    const menuById = new Map(selectedMenus.map((menu) => [menu.id, menu]));
-
-    const nextConfig: MenuConfig = {
-      DIARIO: diario
-        ? {
-          active: diario.active,
-          priceCents: extractPriceFromTitle(
-            diario.title,
-            DEFAULT_MENU_CONFIG.DIARIO.priceCents,
-          ),
-        }
-        : DEFAULT_MENU_CONFIG.DIARIO,
-      FESTIVO: festivo
-        ? {
-          active: festivo.active,
-          priceCents: extractPriceFromTitle(
-            festivo.title,
-            DEFAULT_MENU_CONFIG.FESTIVO.priceCents,
-          ),
-        }
-        : DEFAULT_MENU_CONFIG.FESTIVO,
-    };
-
-    let nextDishId = 1;
-    let nextAssignmentId = 1;
-
-    const dishesToInsert: Array<{
-      id: number;
-      name: string;
-      slug: string;
-      createdAt: Date;
-      updatedAt: Date;
-    }> = [];
-
-    const assignmentsToInsert: Array<{
-      id: number;
-      kind: MenuKind;
-      course: MenuCourse;
-      dishId: number;
-      createdAt: Date;
-    }> = [];
-
-    const productIdToDishId = new Map<number, number>();
-    const usedSlugs = new Set<string>();
-    const assignedDishByKind = new Set<string>();
-
-    function uniqueSlug(name: string) {
-      const base = slugify(name) || "menu-dish";
-      if (!usedSlugs.has(base)) {
-        usedSlugs.add(base);
-        return base;
-      }
-
-      let i = 2;
-      while (usedSlugs.has(`${base}-${i}`)) i += 1;
-      const slug = `${base}-${i}`;
-      usedSlugs.add(slug);
-      return slug;
-    }
-
-    const sortedItems = [...legacyItems].sort((a, b) => {
-      if (a.menuId !== b.menuId) return a.menuId - b.menuId;
-      if (a.course !== b.course) return a.course.localeCompare(b.course, "es");
-      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-    });
-
-    for (const item of sortedItems) {
-      const menu = menuById.get(item.menuId);
-      const product = productById.get(item.productId);
-
-      if (!menu || !product) continue;
-      if (!isCourse(item.course)) continue;
-
-      let dishId = productIdToDishId.get(product.id) ?? null;
-      if (!dishId) {
-        dishId = nextDishId++;
-        productIdToDishId.set(product.id, dishId);
-
-        dishesToInsert.push({
-          id: dishId,
-          name: product.name,
-          slug: uniqueSlug(product.name),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-      }
-
-      const kindDishKey = `${menu.kind}:${dishId}`;
-      if (assignedDishByKind.has(kindDishKey)) {
-        continue;
-      }
-
-      assignedDishByKind.add(kindDishKey);
-
-      assignmentsToInsert.push({
-        id: nextAssignmentId++,
-        kind: menu.kind,
-        course: item.course,
-        dishId,
-        createdAt: new Date(),
-      });
-    }
-
-    if (!dishesToInsert.length || !assignmentsToInsert.length) {
-      return context.redirect(withQuery(redirectBase, { error: "import-failed" }));
-    }
-
-    await saveMenuConfig(nextConfig);
-    await db.insert(MenuDish).values(dishesToInsert);
-    await db.insert(MenuDishAssignment).values(assignmentsToInsert);
-
-    return context.redirect(withQuery(redirectBase, { saved: "import" }));
-  }
 
   return context.redirect(withQuery(redirectBase, { error: "invalid-intent" }));
 };

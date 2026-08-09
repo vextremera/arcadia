@@ -426,6 +426,13 @@ const MenuDish = defineTable({
     id: column.number({ primaryKey: true }),
     name: column.text(),
     slug: column.text({ unique: true }),
+    /**
+     * Descripción del plato tal y como se lee en la web.
+     * Sin esta columna el sistema V2 no podía sustituir al legacy: la carta
+     * pública mostraba descripciones que V2 era incapaz de guardar, así que
+     * publicar desde el admin habría vaciado los textos.
+     */
+    description: column.text({ optional: true }),
     createdAt: column.date({ default: NOW }),
     updatedAt: column.date({ default: NOW })
   }
@@ -437,6 +444,12 @@ const MenuDishAssignment = defineTable({
     kind: column.text({ enum: ["DIARIO", "FESTIVO"] }),
     course: column.text({ enum: ["PRIMERO", "SEGUNDO", "POSTRE"] }),
     dishId: column.number({ references: () => MenuDish.columns.id }),
+    /**
+     * Orden dentro del plato. El sistema legacy lo tenía en MenuItem; sin él,
+     * V2 sólo podía ordenar por fecha de creación y el orden de la carta
+     * quedaba fuera del control del admin.
+     */
+    sortOrder: column.number({ default: 0 }),
     createdAt: column.date({ default: NOW })
   },
   indexes: [

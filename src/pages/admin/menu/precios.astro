@@ -3,34 +3,31 @@ import AdminLayout from "@/layouts/AdminLayout.astro";
 import Card from "@/components/admin/ui/Card.astro";
 import StatCard from "@/components/admin/ui/StatCard.astro";
 import Badge from "@/components/admin/ui/Badge.astro";
-import {
-  db,
-  AppSetting,
-  MenuDish,
-  MenuDishAssignment,
-  Menu as LegacyMenu,
-  MenuItem as LegacyMenuItem,
-  eq,
-} from "astro:db";
-import { getPublicMenuState } from "@/server/menu/public";
+import { db, AppSetting, MenuDishAssignment, eq } from "astro:db";
+
+/**
+ * Precio y publicación de los menús.
+ *
+ * Esta pantalla decide literalmente lo que se ve en la web: ya no hay respaldo
+ * legacy ni precios por defecto en el código. Un menú sale publicado sólo si
+ * está marcado como publicado, tiene precio y tiene platos asignados; si falta
+ * algo, la web no muestra ese menú y aquí se explica cuál de las tres cosas
+ * falta, en vez de fallar en silencio.
+ */
 
 const PAGE_PATH = "/admin/menu/precios";
 
 type MenuKind = "DIARIO" | "FESTIVO";
-type MenuConfig = Record<MenuKind, { active: boolean; priceCents: number }>;
+type MenuConfigEntry = { active: boolean; priceCents: number };
+type MenuConfig = Record<MenuKind, MenuConfigEntry>;
 
-const DEFAULT_MENU_CONFIG: MenuConfig = {
-  DIARIO: { active: true, priceCents: 1350 },
-  FESTIVO: { active: true, priceCents: 1590 },
-};
-
-const KINDS: Array<{ key: MenuKind; label: string; tone: "primary" | "violet" }> = [
-  { key: "DIARIO", label: "Diario", tone: "primary" },
-  { key: "FESTIVO", label: "Festivo", tone: "violet" },
+const KINDS: Array<{ key: MenuKind; label: string; tone: "primary" | "violet"; managePath: string }> = [
+  { key: "DIARIO", label: "Diario", tone: "primary", managePath: "/admin/menu/diario" },
+  { key: "FESTIVO", label: "Festivo", tone: "violet", managePath: "/admin/menu/festivo" },
 ];
 
 function money(cents: number) {
-  return `${(Number(cents ?? 0) / 100).toFixed(2)} €`;
+  return `${(Number(cents ?? 0) / 100).toFixed(2).replace(".", ",")} €`;
 }
 
 function moneyInput(cents: number) {
@@ -43,131 +40,109 @@ const [configRow] = await db
   .where(eq(AppSetting.key, "menuConfigV2"))
   .limit(1);
 
-const configValue = configRow?.value as Partial<MenuConfig> | undefined;
+const configValue = (configRow?.value ?? {}) as Partial<Record<MenuKind, Partial<MenuConfigEntry>>>;
 
+// Sin configuración no se asume nada publicable: el criterio es el mismo que
+// aplica src/server/menu/public.ts, para que admin y web no puedan discrepar.
 const config: MenuConfig = {
   DIARIO: {
-    active: configValue?.DIARIO?.active ?? DEFAULT_MENU_CONFIG.DIARIO.active,
-    priceCents: configValue?.DIARIO?.priceCents ?? DEFAULT_MENU_CONFIG.DIARIO.priceCents,
+    active: configValue.DIARIO?.active === true,
+    priceCents: typeof configValue.DIARIO?.priceCents === "number" ? configValue.DIARIO.priceCents : 0,
   },
   FESTIVO: {
-    active: configValue?.FESTIVO?.active ?? DEFAULT_MENU_CONFIG.FESTIVO.active,
-    priceCents: configValue?.FESTIVO?.priceCents ?? DEFAULT_MENU_CONFIG.FESTIVO.priceCents,
+    active: configValue.FESTIVO?.active === true,
+    priceCents: typeof configValue.FESTIVO?.priceCents === "number" ? configValue.FESTIVO.priceCents : 0,
   },
 };
 
-const publicState = await getPublicMenuState();
+const assignments = await db
+  .select({ id: MenuDishAssignment.id, kind: MenuDishAssignment.kind })
+  .from(MenuDishAssignment);
 
-const dishes = await db.select({ id: MenuDish.id }).from(MenuDish);
-const assignments = await db.select({ id: MenuDishAssignment.id, kind: MenuDishAssignment.kind }).from(MenuDishAssignment);
-
-const assignmentCountByKind: Record<MenuKind, number> = {
+const countByKind: Record<MenuKind, number> = {
   DIARIO: assignments.filter((row) => row.kind === "DIARIO").length,
   FESTIVO: assignments.filter((row) => row.kind === "FESTIVO").length,
 };
 
-const hasV2Data = dishes.length > 0 || assignments.length > 0;
+type Status = { published: boolean; tone: "success" | "warning" | "neutral"; label: string; reason: string | null };
 
-const legacyMenus = await db.select({ id: LegacyMenu.id }).from(LegacyMenu);
-const legacyMenuItems = await db.select({ id: LegacyMenuItem.id }).from(LegacyMenuItem);
-const hasUsableLegacyData = legacyMenus.length > 0 && legacyMenuItems.length > 0;
+function resolveStatus(kind: MenuKind): Status {
+  const entry = config[kind];
+  const dishes = countByKind[kind];
 
-const canImportLegacy = dishes.length === 0 && assignments.length === 0 && hasUsableLegacyData;
+  if (!entry.active) {
+    return { published: false, tone: "neutral", label: "No publicado", reason: "Está desmarcado como publicado." };
+  }
+  if (!entry.priceCents) {
+    return { published: false, tone: "warning", label: "Incompleto", reason: "Falta el precio." };
+  }
+  if (!dishes) {
+    return { published: false, tone: "warning", label: "Incompleto", reason: "No tiene ningún plato asignado." };
+  }
+  return { published: true, tone: "success", label: "Publicado", reason: null };
+}
 
-const publishedKinds = KINDS.filter(
-  (kind) => config[kind.key].active && assignmentCountByKind[kind.key] > 0,
-);
-const hasPublishedV2Data = publishedKinds.length > 0;
-const hasBlockedV2Transition = hasV2Data && !hasPublishedV2Data && hasUsableLegacyData;
+const statuses: Record<MenuKind, Status> = {
+  DIARIO: resolveStatus("DIARIO"),
+  FESTIVO: resolveStatus("FESTIVO"),
+};
 
-const publicSourceLabel =
-  publicState.source === "V2" ? "V2 canónico" : publicState.source === "LEGACY" ? "Fallback legacy activo" : "Sin datos publicados";
-
-const legacyStatusLabel = canImportLegacy
-  ? "Importable"
-  : hasBlockedV2Transition
-    ? "Bloqueado por V2 incompleto"
-    : hasUsableLegacyData
-      ? "Solo respaldo"
-      : "Vacío";
-
-const publicationStateLabel = hasPublishedV2Data
-  ? publishedKinds.map((kind) => kind.label).join(" + ")
-  : hasV2Data
-    ? "Datos sin publicar"
-    : "Vacío";
+const incomplete = KINDS.filter((kind) => statuses[kind.key].tone === "warning");
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") ?? "";
 const error = url.searchParams.get("error") ?? "";
 
-const successMessage =
-  saved === "config"
-    ? "Configuración guardada correctamente."
-    : saved === "import"
-      ? "Menú legacy importado correctamente al sistema nuevo."
-      : "";
-
+const successMessage = saved === "config" ? "Configuración guardada correctamente." : "";
 const errorMessage =
-  error === "invalid-price"
-    ? "El precio del menú no es válido."
-    : error === "already-v2-data"
-      ? "Ya existe información en el sistema nuevo y no se puede importar encima."
-      : error === "import-failed"
-        ? "No se ha podido importar el menú legacy."
-        : error === "invalid-intent"
-          ? "Acción no válida."
-          : "";
+  error === "invalid-price" ? "El precio del menú no es válido." :
+  error === "invalid-intent" ? "Acción no válida." : "";
 ---
 
-<AdminLayout title="Precios del menú · Admin · Arcadia" heading="Precios del menú" description="Precio y publicación de los menús diario y festivo.">
+<AdminLayout
+  title="Precios del menú · Admin · Arcadia"
+  heading="Precios del menú"
+  description="Precio y publicación de los menús diario y festivo. Lo que se configure aquí es exactamente lo que ve el cliente."
+>
   <div class="space-y-6">
     {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
     {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
     {
-      hasBlockedV2Transition ? (
-        <section class="rounded-admin-lg border border-amber-400/20 bg-amber-400/10 px-5 py-3 text-sm text-amber-100">
-          Hay datos en V2 pero ninguna variante publicable todavía; la pública sigue leyendo el menú legacy.
+      incomplete.length > 0 ? (
+        <section class="rounded-admin-lg border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+          <p class="font-semibold">
+            {incomplete.length === 1
+              ? `El menú ${incomplete[0].label.toLowerCase()} está marcado como publicado pero no sale en la web.`
+              : "Hay menús marcados como publicados que no salen en la web."}
+          </p>
+          <ul class="mt-1.5 space-y-0.5 text-amber-200/85">
+            {incomplete.map((kind) => (
+              <li>· {kind.label}: {statuses[kind.key].reason}</li>
+            ))}
+          </ul>
         </section>
       ) : null
     }
 
     <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
-      <StatCard label="Diario" value={String(assignmentCountByKind.DIARIO)} helper="Platos asignados" />
-      <StatCard label="Festivo" value={String(assignmentCountByKind.FESTIVO)} helper="Platos asignados" />
+      {
+        KINDS.map((kind) => (
+          <StatCard
+            label={kind.label}
+            value={String(countByKind[kind.key])}
+            helper={statuses[kind.key].published ? `Publicado · ${money(config[kind.key].priceCents)}` : "Platos asignados"}
+          />
+        ))
+      }
     </section>
-
-    <Card>
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div class="admin-eyebrow">Estado</div>
-          <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Publicación</h2>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <Badge tone={publicState.source === "V2" ? "success" : publicState.source === "LEGACY" ? "warning" : "neutral"}>
-            Pública: {publicSourceLabel}
-          </Badge>
-          <Badge tone="neutral">Legacy: {legacyStatusLabel}</Badge>
-          <Badge tone={hasPublishedV2Data ? "success" : "neutral"}>{publicationStateLabel}</Badge>
-          {
-            canImportLegacy ? (
-              <form method="post" action="/api/admin/menu-v2">
-                <input type="hidden" name="intent" value="import-legacy" />
-                <input type="hidden" name="redirectTo" value={PAGE_PATH} />
-                <button type="submit" class="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:border-amber-400/30 hover:bg-amber-400/15">
-                  Importar legacy
-                </button>
-              </form>
-            ) : null
-          }
-        </div>
-      </div>
-    </Card>
 
     <Card>
       <div class="admin-eyebrow">Configuración</div>
       <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">Precio y visibilidad</h2>
+      <p class="mt-1 text-sm text-admin-muted">
+        Un menú aparece en la web sólo si está publicado, tiene precio y tiene platos.
+      </p>
 
       <form method="post" action="/api/admin/menu-v2" class="mt-5">
         <input type="hidden" name="intent" value="save-config" />
@@ -179,7 +154,7 @@ const errorMessage =
               <div class="rounded-admin-lg border border-admin-border bg-white/[0.02] p-4">
                 <div class="flex items-center justify-between gap-3">
                   <Badge tone={kind.tone}>{kind.label}</Badge>
-                  <div class="text-sm font-semibold text-white">{money(config[kind.key].priceCents)}</div>
+                  <Badge tone={statuses[kind.key].tone}>{statuses[kind.key].label}</Badge>
                 </div>
 
                 <div class="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
@@ -200,6 +175,11 @@ const errorMessage =
                     Publicado
                   </label>
                 </div>
+
+                <p class="mt-3 text-xs text-admin-muted">
+                  {countByKind[kind.key]} platos asignados ·{" "}
+                  <a class="font-semibold text-sky-300 hover:underline" href={kind.managePath}>Gestionar</a>
+                </p>
               </div>
             ))
           }

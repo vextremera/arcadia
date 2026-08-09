@@ -18,7 +18,7 @@ const COURSES: Array<{ key: MenuCourse; label: string }> = [
 ];
 
 const dishRows = await db
-  .select({ id: MenuDish.id, name: MenuDish.name, slug: MenuDish.slug })
+  .select({ id: MenuDish.id, name: MenuDish.name, slug: MenuDish.slug, description: MenuDish.description })
   .from(MenuDish);
 
 const dishes = [...dishRows].sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -95,6 +95,16 @@ function kindTriggerClass(active: boolean, kind: MenuKind) {
               <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
               <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" placeholder="Canelones de carne gratinados" required />
             </label>
+            <label class="block">
+              <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Descripción</span>
+              <textarea
+                class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                name="description"
+                rows="2"
+                placeholder="Canelones caseros gratinados con bechamel."
+              ></textarea>
+              <span class="mt-1.5 block text-xs text-admin-muted">Es el texto que lee el cliente bajo el nombre del plato.</span>
+            </label>
             <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
               Crear plato
             </button>
@@ -128,7 +138,13 @@ function kindTriggerClass(active: boolean, kind: MenuKind) {
                     <tr>
                       <td>
                         <div class="font-semibold text-white">{dish.name}</div>
-                        <div class="text-xs text-admin-muted">{dish.slug}</div>
+                        {
+                          dish.description ? (
+                            <div class="mt-0.5 max-w-md text-xs text-admin-muted">{dish.description}</div>
+                          ) : (
+                            <div class="mt-0.5 text-xs text-amber-300/80">Sin descripción</div>
+                          )
+                        }
                       </td>
 
                       {(["DIARIO", "FESTIVO"] as MenuKind[]).map((kind) => {
@@ -180,6 +196,15 @@ function kindTriggerClass(active: boolean, kind: MenuKind) {
                               <label class="block">
                                 <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nombre</span>
                                 <input class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none" type="text" name="name" value={dish.name} required />
+                              </label>
+                              <label class="block">
+                                <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Descripción</span>
+                                <textarea
+                                  class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                                  name="description"
+                                  rows="2"
+                                >{dish.description ?? ""}</textarea>
+                                <span class="mt-1.5 block text-xs text-admin-muted">Es el texto que lee el cliente bajo el nombre del plato.</span>
                               </label>
                               <button type="submit" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">
                                 Guardar
