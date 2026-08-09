@@ -140,33 +140,48 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
         </div>
       </div>
 
-      {/* Los tres pases en columnas: se abarca el menú entero de un vistazo en
-          vez de tener que recorrer una lista larga. */}
-      <div class="grid gap-5 lg:grid-cols-3">
-        {(["ENTRANTES", "PRINCIPALES", "POSTRES"] as Course[]).map((course) => {
-          const list = current.courses[course] ?? [];
+      {/* Vertical y a ancho de lectura, como una carta impresa. En tres
+          columnas cada pase se quedaba en 285px: los nombres largos se partían
+          en tres líneas y las descripciones no había quien las leyera. */}
+      <div class="rounded-[2rem] border border-zinc-200 bg-white px-5 py-8 sm:px-10 sm:py-12">
+        <div class="mx-auto max-w-2xl space-y-10 sm:space-y-12">
+          {(["ENTRANTES", "PRINCIPALES", "POSTRES"] as Course[]).map((course) => {
+            const list = current.courses[course] ?? [];
 
-          return (
-            <section key={course} class="rounded-3xl border border-zinc-200 bg-white p-5 sm:p-6">
-              <h2 class="sigmar-regular border-b border-zinc-200 pb-3 text-center text-base font-medium tracking-widest sm:text-lg">
-                {COURSE_LABEL[course]}
-              </h2>
+            return (
+              <section key={course}>
+                {/* Rótulo centrado entre filetes, que es como se separan los
+                    pases en una carta de verdad. */}
+                <h2 class="flex items-center gap-4 text-center">
+                  <span class="h-px flex-1 bg-zinc-200" aria-hidden="true" />
+                  <span class="sigmar-regular shrink-0 text-sm font-medium uppercase tracking-[0.25em] text-zinc-500 sm:text-base">
+                    {COURSE_LABEL[course]}
+                  </span>
+                  <span class="h-px flex-1 bg-zinc-200" aria-hidden="true" />
+                </h2>
 
-              {list.length === 0 ? (
-                <p class="mt-4 text-center text-sm text-zinc-500">Pendiente de publicar.</p>
-              ) : (
-                <ul class="mt-4 space-y-4">
-                  {list.map((dish, index) => (
-                    <li key={`${dish.name}-${index}`}>
-                      <p class="font-semibold text-zinc-900">{dish.name}</p>
-                      {dish.desc ? <p class="mt-0.5 text-sm text-zinc-600">{dish.desc}</p> : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
+                {list.length === 0 ? (
+                  <p class="mt-6 text-center text-sm text-zinc-500">Pendiente de publicar.</p>
+                ) : (
+                  <ul class="mt-6 space-y-5 sm:space-y-6">
+                    {list.map((dish, index) => (
+                      <li key={`${dish.name}-${index}`} class="text-center">
+                        <p class="text-lg font-semibold leading-snug text-zinc-900 sm:text-xl">
+                          {dish.name}
+                        </p>
+                        {dish.desc ? (
+                          <p class="mx-auto mt-1.5 max-w-xl text-sm leading-relaxed text-zinc-600">
+                            {dish.desc}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
       </div>
 
       {current.note ? (
