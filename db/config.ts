@@ -529,6 +529,71 @@ const TicketTemplate = defineTable({
   indexes: [{ on: "kind" }, { on: "active" }]
 });
 
+/**
+ * Impresora física del local.
+ *
+ * `host`/`port` son la dirección en la LAN del restaurante (ESC/POS crudo sobre
+ * TCP, puerto 9100 por defecto). Vercel no puede abrir ese socket: quien lo hace
+ * es el bridge que corre en un equipo del local (tools/print-bridge). Por eso
+ * aquí sólo se guarda la configuración, y `lastSeenAt` lo actualiza el bridge
+ * cada vez que reporta — es la única fuente real de "está conectada".
+ */
+const Printer = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    name: column.text(),
+    location: column.text({ default: "" }),
+    kind: column.text({ enum: ["TICKET", "KITCHEN"], default: "TICKET" }),
+
+    host: column.text(),
+    port: column.number({ default: 9100 }),
+    paperWidth: column.number({ default: 80 }),
+
+    templateId: column.number({ optional: true, references: () => TicketTemplate.columns.id }),
+
+    /** Encola automáticamente al confirmarse un pedido. */
+    autoPrint: column.boolean({ default: true }),
+    enabled: column.boolean({ default: true }),
+
+    /** Última vez que el bridge consiguió hablar con esta impresora. */
+    lastSeenAt: column.date({ optional: true }),
+    lastError: column.text({ optional: true }),
+
+    createdAt: column.date({ default: NOW }),
+    updatedAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "kind" }, { on: "enabled" }]
+});
+
+/**
+ * Cola de impresión.
+ *
+ * `document` guarda el ticket ya resuelto como modelo de documento (líneas +
+ * alineación + énfasis), no bytes ESC/POS: así el job es un snapshot estable del
+ * pedido, pero un fallo de codificación o de comando de corte se arregla sin
+ * tener que reencolar nada — los bytes se generan al servirlo.
+ */
+const PrintJob = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    printerId: column.number({ references: () => Printer.columns.id }),
+    orderId: column.number({ optional: true, references: () => Order.columns.id }),
+
+    kind: column.text({ enum: ["TICKET", "KITCHEN", "TEST"], default: "TICKET" }),
+    title: column.text(),
+    document: column.json(),
+
+    status: column.text({ enum: ["PENDING", "SENT", "DONE", "ERROR"], default: "PENDING" }),
+    attempts: column.number({ default: 0 }),
+    lastError: column.text({ optional: true }),
+
+    createdAt: column.date({ default: NOW }),
+    claimedAt: column.date({ optional: true }),
+    doneAt: column.date({ optional: true })
+  },
+  indexes: [{ on: "status" }, { on: "printerId" }, { on: "createdAt" }, { on: "orderId" }]
+});
+
 const UpsellItem = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -590,6 +655,8 @@ export default defineDb({
     AuditLog,
 
     TicketTemplate,
+    Printer,
+    PrintJob,
 
     UpsellItem,
 
