@@ -1,0 +1,116 @@
+---
+/**
+ * Selector de idioma, compartido por cabecera y pie.
+ *
+ * Dos presentaciones sobre la misma lista, para no tenerla duplicada:
+ *
+ * - `compact`: desplegable pequeño para la cabecera, junto al carrito.
+ * - `inline`: las cuatro opciones a la vista, para el pie.
+ *
+ * El pie usaba un desplegable que ocultaba el idioma activo y listaba sólo los
+ * otros tres. Costaba entender qué estaba seleccionado y cuántas opciones
+ * había; en un sitio con cuatro idiomas caben todas de golpe.
+ *
+ * El cambio es una navegación normal a /api/preferences/language, que fija la
+ * cookie y devuelve a la misma página. Sin JavaScript.
+ */
+import { DEFAULT_LANG, SUPPORTED_LANGS } from "@/lib/i18n";
+
+type Props = {
+  variant?: "compact" | "inline";
+  class?: string;
+};
+
+const { variant = "compact", class: className = "" } = Astro.props;
+
+const lang = Astro.locals.lang ?? DEFAULT_LANG;
+const currentPath = `${Astro.url.pathname}${Astro.url.search}`;
+
+type LangOption = {
+  code: (typeof SUPPORTED_LANGS)[number];
+  short: string;
+  label: string;
+  flagClass: string;
+};
+
+const langOptions: LangOption[] = [
+  { code: "es", short: "ES", label: "Español", flagClass: "fi fi-es" },
+  { code: "ca", short: "CA", label: "Català", flagClass: "fi fi-es-ct" },
+  { code: "en", short: "EN", label: "English", flagClass: "fi fi-gb" },
+  { code: "fr", short: "FR", label: "Français", flagClass: "fi fi-fr" },
+];
+
+const activeLang = langOptions.find((option) => option.code === lang) ?? langOptions[0];
+
+function hrefFor(code: string) {
+  return `/api/preferences/language?lang=${code}&redirectTo=${encodeURIComponent(currentPath)}`;
+}
+---
+
+{
+  variant === "inline" ? (
+    <div class={`flex flex-wrap gap-2 ${className}`}>
+      {langOptions.map((option) => {
+        const active = option.code === activeLang.code;
+        return (
+          <a
+            href={hrefFor(option.code)}
+            aria-current={active ? "true" : undefined}
+            class:list={[
+              "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-semibold transition",
+              active
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-300 bg-white text-zinc-800 hover:border-zinc-900",
+            ]}
+          >
+            <span class:list={["lang-flag", option.flagClass]} aria-hidden="true" />
+            <span>{option.label}</span>
+          </a>
+        );
+      })}
+    </div>
+  ) : (
+    <details class={`group relative ${className}`} data-language-switcher>
+      <summary
+        class="flex h-10 cursor-pointer list-none items-center gap-1.5 rounded-full px-2.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-100 [&::-webkit-details-marker]:hidden"
+        aria-label={`Idioma: ${activeLang.label}`}
+        title={activeLang.label}
+      >
+        <span class:list={["lang-flag", activeLang.flagClass]} aria-hidden="true" />
+        <span>{activeLang.short}</span>
+        <svg
+          class="h-3.5 w-3.5 text-zinc-500 transition group-open:rotate-180"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+            clip-rule="evenodd"
+          />
+        </svg>
+      </summary>
+
+      <div class="absolute right-0 top-[calc(100%+0.35rem)] z-50 w-48 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(0,0,0,0.14)]">
+        {langOptions.map((option) => {
+          const active = option.code === activeLang.code;
+          return (
+            <a
+              href={hrefFor(option.code)}
+              aria-current={active ? "true" : undefined}
+              class:list={[
+                "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition",
+                active ? "bg-zinc-100 font-semibold text-zinc-900" : "text-zinc-800 hover:bg-zinc-50",
+              ]}
+            >
+              <span class:list={["lang-flag", option.flagClass]} aria-hidden="true" />
+              <span>{option.label}</span>
+              {active ? <span class="ml-auto text-xs text-zinc-500">✓</span> : null}
+            </a>
+          );
+        })}
+      </div>
+    </details>
+  )
+}

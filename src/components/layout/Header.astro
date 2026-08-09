@@ -1,5 +1,6 @@
 ---
 import CartBadge from "@/islands/cart/CartBadge";
+import LanguageSwitcher from "@/components/layout/LanguageSwitcher.astro";
 import NegativeLogo from "public/ARCADIA_LOGO.svg";
 import { DEFAULT_LANG, getSiteCopy } from "@/lib/i18n";
 
@@ -7,6 +8,10 @@ const user = Astro.locals.user;
 const pathname = Astro.url.pathname;
 const lang = Astro.locals.lang ?? DEFAULT_LANG;
 const t = getSiteCopy(lang).header;
+
+// El rótulo de idioma vive en la copia del pie; se reutiliza para no añadir
+// una clave nueva a los cuatro idiomas por una sola palabra.
+const languageTitle = getSiteCopy(lang).footer.languageTitle;
 
 const next = encodeURIComponent(pathname === "/" ? "/cuenta" : pathname);
 
@@ -45,50 +50,32 @@ const navLinks = [
     </nav>
 
     <div class="flex items-center gap-2 sm:gap-3">
-      <details class="xl:hidden" data-mobile-nav>
-        <summary
-          class="grid h-10 w-10 cursor-pointer list-none place-items-center rounded-full transition-transform hover:-translate-y-0.5 active:translate-y-0 [&::-webkit-details-marker]:hidden"
-          aria-label={t.aria.openMenu}
-          title={t.aria.openMenu}
+      <button
+        type="button"
+        class="grid h-10 w-10 cursor-pointer place-items-center rounded-full transition-transform hover:-translate-y-0.5 active:translate-y-0 xl:hidden"
+        aria-label={t.aria.openMenu}
+        title={t.aria.openMenu}
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        data-open-menu
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          height="24px"
+          viewBox="0 -960 960 960"
+          width="24px"
+          fill="#1f1f1f"
+          aria-hidden="true"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            height="24px"
-            viewBox="0 -960 960 960"
-            width="24px"
-            fill="#1f1f1f"
-            aria-hidden="true"
-          >
-            <path
-              d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"
-            ></path>
-          </svg>
-        </summary>
+          <path
+            d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"
+          ></path>
+        </svg>
+      </button>
 
-        <div class="fixed inset-x-0 bottom-0 top-19 z-50 sm:top-21">
-          <button
-            type="button"
-            class="absolute inset-0 h-full w-full bg-black/35"
-            aria-label="Cerrar menú"></button>
-
-          <div
-            class="fixed left-3 right-3 top-19 max-h-[calc(100dvh-5.5rem)] overflow-auto rounded-4xl border border-zinc-200 bg-white p-2 shadow-[0_18px_40px_rgba(0,0,0,0.14)] sm:left-5 sm:right-5 sm:top-21"
-          >
-            <nav class="grid gap-1" aria-label={t.aria.mobileNav}>
-              {
-                navLinks.map((link) => (
-                  <a
-                    class="rounded-2xl px-4 py-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-                    href={link.href}
-                  >
-                    {link.label}
-                  </a>
-                ))
-              }
-            </nav>
-          </div>
-        </div>
-      </details>
+      {/* En móvil el idioma vive dentro del menú a pantalla completa: aquí
+          arriba competiría por sitio con el carrito y la cuenta. */}
+      <LanguageSwitcher variant="compact" class="hidden xl:block" />
 
       <CartBadge client:load />
 
@@ -137,35 +124,112 @@ const navLinks = [
   </div>
 </header>
 
+{/* Fuera del <header> a propósito: el header lleva backdrop-blur, y un
+    backdrop-filter convierte al elemento en bloque contenedor de sus
+    descendientes position:fixed. Dentro, el panel se recortaba al tamaño
+    de la barra en vez de ocupar la pantalla. */}
+<div
+  id="mobile-menu"
+  class="fixed inset-0 z-50 hidden flex-col overflow-y-auto bg-bg xl:hidden"
+  data-mobile-menu
+>
+      <div class="flex items-center justify-between px-4 py-3 sm:py-4">
+        <img src={NegativeLogo.src} alt="" class="h-7 sm:h-8" aria-hidden="true" />
+        <button
+          type="button"
+          class="grid h-10 w-10 place-items-center rounded-full transition hover:bg-zinc-100"
+          aria-label="Cerrar menú"
+          data-close-menu
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            height="26px"
+            viewBox="0 -960 960 960"
+            width="26px"
+            fill="#1f1f1f"
+            aria-hidden="true"
+          >
+            <path
+              d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+            ></path>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="flex flex-1 flex-col gap-1 px-4 pt-4" aria-label={t.aria.mobileNav}>
+        {
+          navLinks.map((link) => (
+            <a
+              class="border-b border-zinc-200/70 py-4 text-2xl font-semibold text-zinc-900"
+              href={link.href}
+            >
+              {link.label}
+            </a>
+          ))
+        }
+      </nav>
+
+      <div class="px-4 pb-8 pt-8">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          {languageTitle}
+        </p>
+        <LanguageSwitcher variant="inline" />
+      </div>
+</div>
+
 <script is:inline>
   (() => {
-    const header = document.getElementById("site-header");
-    if (!header) return;
+    const menu = document.querySelector("[data-mobile-menu]");
+    const openButton = document.querySelector("[data-open-menu]");
+    if (!menu || !openButton) return;
 
-    const details = header.querySelector("details[data-mobile-nav]");
-    if (!(details instanceof HTMLDetailsElement)) return;
-
-    const closeMenu = () => {
-      details.open = false;
+    const setOpen = (open) => {
+      // `hidden` y `flex` chocan en Tailwind, así que se alternan a mano.
+      menu.classList.toggle("hidden", !open);
+      menu.classList.toggle("flex", open);
+      openButton.setAttribute("aria-expanded", open ? "true" : "false");
+      // El menú cubre la pantalla: sin bloquear el documento, la página de
+      // detrás se desplaza al arrastrar sobre él.
+      document.body.style.overflow = open ? "hidden" : "";
     };
 
-    header.querySelectorAll("details[data-mobile-nav] a").forEach((link) => {
-      link.addEventListener("click", closeMenu);
+    const closeMenu = () => setOpen(false);
+
+    openButton.addEventListener("click", () => setOpen(menu.classList.contains("hidden")));
+
+    menu.querySelectorAll("a, [data-close-menu]").forEach((element) => {
+      element.addEventListener("click", closeMenu);
+    });
+
+    const languageSwitchers = Array.from(
+      document.querySelectorAll("details[data-language-switcher]"),
+    );
+
+    const closeLanguage = () => {
+      for (const item of languageSwitchers) item.open = false;
+    };
+
+    // Un desplegable abierto que no se cierra al pulsar fuera se queda colgando
+    // sobre la página mientras navegas.
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (languageSwitchers.some((item) => item.contains(target))) return;
+      closeLanguage();
     });
 
     window.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeMenu();
+      if (event.key !== "Escape") return;
+      closeMenu();
+      closeLanguage();
     });
 
     window.addEventListener("resize", () => {
       if (window.innerWidth >= 1280) closeMenu();
     });
 
-    const overlayButton = header.querySelector(
-      "details[data-mobile-nav] > div > button",
-    );
-    if (overlayButton instanceof HTMLButtonElement) {
-      overlayButton.addEventListener("click", closeMenu);
-    }
+    // Al volver por el historial la página se restaura tal cual: sin esto, el
+    // bloqueo de scroll podría quedarse puesto sin menú abierto.
+    window.addEventListener("pageshow", closeMenu);
   })();
 </script>
