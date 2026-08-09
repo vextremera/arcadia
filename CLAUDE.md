@@ -85,6 +85,13 @@ Note: the README and seed comments reference a legacy menu system being migrated
 ### Time/availability logic
 `src/server/time/madrid.ts` is the source of truth for "is the restaurant open / is delivery available right now," resolving in priority order: pause-orders app setting → special dates (closures/exceptions) → weekly `OpeningHour` per channel (`DINE_IN`/`DELIVERY`/`PICKUP`). Its output (`getArcadiaAvailability`) drives both public-facing messaging (`src/server/time/publicMessages.ts`) and hard checkout validation — don't duplicate availability logic elsewhere.
 
+### Thermal printing (ESC/POS)
+`src/server/printing/**` covers ticket/comanda printing on the restaurant's thermal printers: `escpos.ts` (document model → ESC/POS bytes, CP858 encoding), `render.ts` (order → document, `TICKET` vs `KITCHEN` formats), `queue.ts` (enqueue/claim/ack against the `Printer`/`PrintJob` tables).
+
+Key constraint: **Vercel cannot reach a LAN printer**, so the model is pull-based — a small Node process (`tools/print-bridge/`) runs on a machine inside the restaurant and polls `POST /api/print/poll`. That route sits **outside** the `/admin` middleware guard, so a shared `PRINT_BRIDGE_TOKEN` is its only protection and it fails closed when unset. Never expose port 9100 to the internet: raw ESC/POS has no authentication at all.
+
+Orders auto-enqueue at two points depending on when the order becomes real — `checkout/submit.ts` for cash, `payments/test/confirm.ts` for card. `enqueueOrderPrints` is idempotent per (order, printer). Setup guide: `docs/impresoras-puesta-en-marcha.md`.
+
 ### i18n
 `src/lib/i18n.ts` holds `SUPPORTED_LANGS` (`es`, `ca`, `en`, `fr`) and all static public copy (footer, header nav, FAQ, contact, legal, privacy) per language as a big nested object (`siteCopy`). Language is resolved from the `arcadia_lang` cookie in middleware into `locals.lang`; there's no route-based i18n (`/en/...`), it's cookie-driven single-path.
 
