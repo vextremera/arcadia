@@ -23,6 +23,7 @@ import { normalizePaymentMethod } from "@/server/payments/settings";
 import { randomUUID } from "node:crypto";
 import { validateDeliveryAddressByArea } from "@/server/delivery/area";
 import { awardOrderPointsOnce } from "@/server/loyalty/engine";
+import { enqueueOrderPrints } from "@/server/printing/queue";
 
 type CartItemSession = {
   lineId: string;
@@ -703,6 +704,15 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   if (pm !== "CARD") {
     await session.delete("cart");
+
+    // Sólo en efectivo: con tarjeta el pedido aún no está pagado y la comanda
+    // se encola al confirmar la pasarela. Nunca debe romper el checkout, así
+    // que un fallo aquí se registra y se sigue — el admin puede reimprimir.
+    try {
+      await enqueueOrderPrints(created.id);
+    } catch (error) {
+      console.error("[print] enqueue on checkout failed", error);
+    }
   }
 
   return json({

@@ -15,6 +15,7 @@ import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 import { reverseRemainingOrderPointsOnce } from "@/server/loyalty/engine";
 import { invalidateSalesDay } from "@/server/analytics/rollup";
 import { getMadridDateInfo } from "@/server/time/madrid";
+import { enqueueOrderPrintForPrinter } from "@/server/printing/queue";
 
 type OrderStatus =
   | "PENDING"
@@ -619,6 +620,27 @@ export const POST: APIRoute = async (context) => {
         : "Se ha vaciado la nota interna del staff.",
       by: actor,
     });
+  }
+
+  if (intent === "reprint") {
+    // Reimpresión manual: se salta el filtro de autoPrint porque aquí el staff
+    // está pidiendo el papel a propósito (se atascó, se perdió, hace falta otra
+    // copia). Queda en la actividad del pedido para que conste quién lo pidió.
+    const printerId = Number(safeText(form.get("printerId")));
+    if (!Number.isFinite(printerId)) {
+      return new Response("Invalid printer", { status: 400 });
+    }
+
+    const queued = await enqueueOrderPrintForPrinter(order.id, printerId);
+    if (!queued) return new Response("Printer not found", { status: 404 });
+
+    appendAdminEvent(snapshot, {
+      kind: "NOTE",
+      title: "Reimpresión solicitada",
+      detail: "Se ha vuelto a encolar el ticket para esta impresora.",
+      by: actor,
+    });
+    snapshotChanged = true;
   }
 
   if (intent === "add-activity-note") {

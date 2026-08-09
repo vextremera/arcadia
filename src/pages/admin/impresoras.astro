@@ -4,98 +4,329 @@ import Card from "@/components/admin/ui/Card.astro";
 import StatCard from "@/components/admin/ui/StatCard.astro";
 import Badge from "@/components/admin/ui/Badge.astro";
 import EmptyState from "@/components/admin/ui/EmptyState.astro";
-import { getPrinters, getPrinterJobs } from "@/server/printing/mock";
+import Modal from "@/components/admin/ui/Modal.astro";
+import { db, TicketTemplate } from "astro:db";
+import { getPrinters, getRecentJobs } from "@/server/printing/queue";
+
+/**
+ * "Conectada" no es un flag que se pueda pulsar: es el reflejo de si el bridge
+ * del local consiguió abrir el socket contra la impresora hace poco. Por eso ya
+ * no existe el botón de marcar estado que tenía la versión simulada.
+ */
+const ONLINE_WINDOW_MS = 3 * 60 * 1000;
 
 function kindLabel(kind: "TICKET" | "KITCHEN") {
   return kind === "TICKET" ? "Ticket cliente" : "Comanda cocina";
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "medium", timeZone: "Europe/Madrid" }).format(new Date(value));
+function formatDateTime(value: Date | string | null) {
+  if (!value) return "Nunca";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Nunca";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Madrid" }).format(date);
 }
 
-const [printers, jobs] = await Promise.all([getPrinters(), getPrinterJobs(12)]);
+function isOnline(lastSeenAt: Date | null) {
+  if (!lastSeenAt) return false;
+  const date = lastSeenAt instanceof Date ? lastSeenAt : new Date(lastSeenAt);
+  return Date.now() - date.getTime() < ONLINE_WINDOW_MS;
+}
 
-const onlineCount = printers.filter((p) => p.status === "ONLINE").length;
+const [printers, jobs, templates] = await Promise.all([
+  getPrinters(),
+  getRecentJobs(15),
+  db.select({ id: TicketTemplate.id, name: TicketTemplate.name, kind: TicketTemplate.kind }).from(TicketTemplate),
+]);
+
+const onlineCount = printers.filter((printer) => isOnline(printer.lastSeenAt)).length;
+const pendingJobs = jobs.filter((job) => job.status === "PENDING" || job.status === "SENT").length;
+const erroredJobs = jobs.filter((job) => job.status === "ERROR").length;
+
+const bridgeConfigured = printers.some((printer) => printer.lastSeenAt);
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") ?? "";
 const errorParam = url.searchParams.get("error") ?? "";
 
-const successMessage = saved === "print" ? "Prueba de impresión enviada." : saved === "status" ? "Estado actualizado." : "";
-const errorMessage = errorParam === "not-found" ? "La impresora ya no existe." : errorParam === "invalid-printer" ? "Impresora no válida." : "";
+const successMessage =
+  saved === "print" ? "Prueba encolada. Saldrá por la impresora en unos segundos." :
+  saved === "created" ? "Impresora añadida." :
+  saved === "updated" ? "Impresora actualizada." :
+  saved === "deleted" ? "Impresora eliminada." : "";
+
+const errorMessage =
+  errorParam === "not-found" ? "La impresora ya no existe." :
+  errorParam === "invalid-printer" ? "Impresora no válida." :
+  errorParam === "missing-name" ? "El nombre es obligatorio." :
+  errorParam === "invalid-host" ? "La dirección IP o el nombre de host no es válido." :
+  errorParam === "invalid-port" ? "El puerto debe estar entre 1 y 65535." :
+  errorParam === "invalid-width" ? "El ancho de papel debe ser 58 u 80 mm." :
+  errorParam === "invalid-intent" ? "Acción no válida." : "";
+
+const inputClass = "w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none";
+const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-admin-muted";
+const ghostBtnClass = "rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]";
+const primaryBtnClass = "rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-xs font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15";
+
+function jobTone(status: string) {
+  if (status === "DONE") return "success";
+  if (status === "ERROR") return "danger";
+  if (status === "SENT") return "warning";
+  return "neutral";
+}
+
+function jobLabel(status: string) {
+  return status === "DONE" ? "Impreso" : status === "ERROR" ? "Error" : status === "SENT" ? "Enviado" : "En cola";
+}
 ---
 
-<AdminLayout title="Impresoras · Admin · Arcadia" heading="Impresoras" description="Estado simulado de las impresoras del local y su cola de impresión.">
+<AdminLayout title="Impresoras · Admin · Arcadia" heading="Impresoras" description="Impresoras del local, cola de impresión y estado del puente ESC/POS.">
   <div class="space-y-6">
     {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
     {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
 
-    <section class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-8">
+    {
+      printers.length > 0 && !bridgeConfigured ? (
+        <section class="rounded-admin-lg border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
+          <p class="font-semibold">El puente de impresión todavía no ha contactado.</p>
+          <p class="mt-1 text-amber-200/80">
+            Los pedidos se encolan igualmente, pero no saldrá papel hasta que el bridge corra en un equipo del local.
+            Ver <code class="rounded bg-black/30 px-1.5 py-0.5">tools/print-bridge/README.md</code>.
+          </p>
+        </section>
+      ) : null
+    }
+
+    <section class="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-8">
       <StatCard icon="printer" label="Impresoras" value={String(printers.length)} helper={`${onlineCount} conectadas`} />
-      <StatCard label="Cola de impresión" value={String(jobs.length)} helper="Últimos trabajos (mock)" />
+      <StatCard label="En cola" value={String(pendingJobs)} helper="Pendientes de imprimir" />
+      <StatCard label="Con error" value={String(erroredJobs)} helper="Requieren revisión" />
     </section>
 
     <Card padded={false}>
-      <div class="border-b border-admin-border px-5 py-4 lg:px-6">
-        <h2 class="text-base font-semibold text-white">Estado de impresoras</h2>
-        <p class="mt-1 text-xs text-admin-muted">Simulado — sin hardware conectado todavía.</p>
+      <div class="flex items-center justify-between gap-4 border-b border-admin-border px-5 py-4 lg:px-6">
+        <div>
+          <h2 class="text-base font-semibold text-white">Impresoras configuradas</h2>
+          <p class="mt-1 text-xs text-admin-muted">ESC/POS sobre TCP, normalmente puerto 9100.</p>
+        </div>
+        <Modal
+          id="printer-create"
+          title="Añadir impresora"
+          description="ESC/POS sobre TCP. Necesita IP fija en la red del local."
+          triggerLabel="+ Añadir impresora"
+        >
+          <form method="post" action="/api/admin/printers" class="space-y-4">
+            <input type="hidden" name="intent" value="create" />
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label class={labelClass} for="create-name">Nombre</label>
+                <input class={inputClass} id="create-name" type="text" name="name" placeholder="Cocina" required />
+              </div>
+              <div>
+                <label class={labelClass} for="create-location">Ubicación</label>
+                <input class={inputClass} id="create-location" type="text" name="location" placeholder="Pase de cocina" />
+              </div>
+              <div>
+                <label class={labelClass} for="create-host">Dirección IP</label>
+                <input class={inputClass} id="create-host" type="text" name="host" placeholder="192.168.1.50" required />
+              </div>
+              <div>
+                <label class={labelClass} for="create-port">Puerto</label>
+                <input class={inputClass} id="create-port" type="number" name="port" value="9100" min="1" max="65535" />
+              </div>
+              <div>
+                <label class={labelClass} for="create-kind">Tipo</label>
+                <select class={inputClass} id="create-kind" name="kind">
+                  <option value="TICKET">Ticket cliente</option>
+                  <option value="KITCHEN">Comanda cocina</option>
+                </select>
+              </div>
+              <div>
+                <label class={labelClass} for="create-width">Ancho de papel</label>
+                <select class={inputClass} id="create-width" name="paperWidth">
+                  <option value="80">80 mm</option>
+                  <option value="58">58 mm</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class={labelClass} for="create-template">Plantilla</label>
+                <select class={inputClass} id="create-template" name="templateId">
+                  <option value="">Por defecto</option>
+                  {templates.map((template) => <option value={template.id}>{template.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-4">
+              <label class="flex items-center gap-2 text-sm text-slate-200">
+                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="autoPrint" checked />
+                Imprimir pedidos automáticamente
+              </label>
+              <label class="flex items-center gap-2 text-sm text-slate-200">
+                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="enabled" checked />
+                Habilitada
+              </label>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" class={ghostBtnClass} data-modal-close>Cancelar</button>
+              <button type="submit" class={primaryBtnClass}>Guardar</button>
+            </div>
+          </form>
+        </Modal>
       </div>
 
-      <div class="overflow-x-auto">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Ubicación</th>
-              <th>Tipo</th>
-              <th>Estado</th>
-              <th>Última señal</th>
-              <th class="text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {printers.map((printer) => (
-              <tr>
-                <td class="font-semibold text-white">{printer.name}</td>
-                <td class="text-admin-muted">{printer.location}</td>
-                <td class="text-admin-muted">{kindLabel(printer.kind)}</td>
-                <td><Badge tone={printer.status === "ONLINE" ? "success" : "danger"}>{printer.status === "ONLINE" ? "Conectada" : "Desconectada"}</Badge></td>
-                <td class="text-admin-muted">{formatDateTime(printer.lastSeenAt)}</td>
-                <td>
-                  <div class="flex items-center justify-end gap-2">
-                    <form method="post" action="/api/admin/printers">
-                      <input type="hidden" name="intent" value="toggle-status" />
-                      <input type="hidden" name="printerId" value={printer.id} />
-                      <button type="submit" class="rounded-xl border border-admin-border bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]">
-                        {printer.status === "ONLINE" ? "Marcar desconectada" : "Marcar conectada"}
-                      </button>
-                    </form>
-                    <form method="post" action="/api/admin/printers">
-                      <input type="hidden" name="intent" value="test-print" />
-                      <input type="hidden" name="printerId" value={printer.id} />
-                      <button type="submit" class="rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-xs font-semibold text-sky-200 transition hover:border-sky-400/30 hover:bg-sky-400/15">
-                        Imprimir prueba
-                      </button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {
+        printers.length === 0 ? (
+          <div class="px-6 py-14">
+            <EmptyState
+              title="Sin impresoras configuradas"
+              description="Añade la IP fija de cada impresora del local para empezar a encolar tickets y comandas."
+            />
+          </div>
+        ) : (
+          <div class="overflow-x-auto">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Dirección</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Última señal</th>
+                  <th class="text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {printers.map((printer) => (
+                  <tr>
+                    <td>
+                      <span class="font-semibold text-white">{printer.name}</span>
+                      {printer.location ? <span class="block text-xs text-admin-muted">{printer.location}</span> : null}
+                      {!printer.enabled ? <Badge tone="neutral">Deshabilitada</Badge> : null}
+                    </td>
+                    <td class="font-mono text-xs text-admin-muted">{printer.host}:{printer.port}</td>
+                    <td class="text-admin-muted">
+                      {kindLabel(printer.kind)}
+                      <span class="block text-xs">{printer.paperWidth} mm{printer.autoPrint ? " · automática" : ""}</span>
+                    </td>
+                    <td>
+                      <Badge tone={isOnline(printer.lastSeenAt) ? "success" : "danger"}>
+                        {isOnline(printer.lastSeenAt) ? "Conectada" : "Sin señal"}
+                      </Badge>
+                      {printer.lastError ? <span class="mt-1 block text-xs text-rose-300">{printer.lastError}</span> : null}
+                    </td>
+                    <td class="text-admin-muted">{formatDateTime(printer.lastSeenAt)}</td>
+                    <td>
+                      <div class="flex items-center justify-end gap-2">
+                        <Modal
+                          id={`printer-edit-${printer.id}`}
+                          title={`Editar ${printer.name}`}
+                          triggerLabel="Editar"
+                          triggerClass={ghostBtnClass}
+                        >
+                          {/* Sin campo oculto `intent`: lo aporta el botón pulsado. Con
+                              ambos, form.get("intent") devolvería siempre el oculto y
+                              "Eliminar" acabaría guardando. */}
+                          <form method="post" action="/api/admin/printers" class="space-y-4">
+                            <input type="hidden" name="printerId" value={printer.id} />
+
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div>
+                                <label class={labelClass}>Nombre</label>
+                                <input class={inputClass} type="text" name="name" value={printer.name} required />
+                              </div>
+                              <div>
+                                <label class={labelClass}>Ubicación</label>
+                                <input class={inputClass} type="text" name="location" value={printer.location} />
+                              </div>
+                              <div>
+                                <label class={labelClass}>Dirección IP</label>
+                                <input class={inputClass} type="text" name="host" value={printer.host} required />
+                              </div>
+                              <div>
+                                <label class={labelClass}>Puerto</label>
+                                <input class={inputClass} type="number" name="port" value={printer.port} min="1" max="65535" />
+                              </div>
+                              <div>
+                                <label class={labelClass}>Tipo</label>
+                                <select class={inputClass} name="kind">
+                                  <option value="TICKET" selected={printer.kind === "TICKET"}>Ticket cliente</option>
+                                  <option value="KITCHEN" selected={printer.kind === "KITCHEN"}>Comanda cocina</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label class={labelClass}>Ancho de papel</label>
+                                <select class={inputClass} name="paperWidth">
+                                  <option value="80" selected={printer.paperWidth === 80}>80 mm</option>
+                                  <option value="58" selected={printer.paperWidth === 58}>58 mm</option>
+                                </select>
+                              </div>
+                              <div class="sm:col-span-2">
+                                <label class={labelClass}>Plantilla</label>
+                                <select class={inputClass} name="templateId">
+                                  <option value="">Por defecto</option>
+                                  {templates.map((template) => (
+                                    <option value={template.id} selected={printer.templateId === template.id}>{template.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-4">
+                              <label class="flex items-center gap-2 text-sm text-slate-200">
+                                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="autoPrint" checked={printer.autoPrint} />
+                                Imprimir pedidos automáticamente
+                              </label>
+                              <label class="flex items-center gap-2 text-sm text-slate-200">
+                                <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="enabled" checked={printer.enabled} />
+                                Habilitada
+                              </label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-2 pt-2">
+                              <button
+                                type="submit"
+                                name="intent"
+                                value="delete"
+                                class="rounded-xl border border-rose-400/20 bg-rose-400/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+                              >
+                                Eliminar
+                              </button>
+                              <div class="flex gap-2">
+                                <button type="button" class={ghostBtnClass} data-modal-close>Cancelar</button>
+                                <button type="submit" name="intent" value="update" class={primaryBtnClass}>Guardar</button>
+                              </div>
+                            </div>
+                          </form>
+                        </Modal>
+
+                        <form method="post" action="/api/admin/printers">
+                          <input type="hidden" name="intent" value="test-print" />
+                          <input type="hidden" name="printerId" value={printer.id} />
+                          <button type="submit" class={primaryBtnClass}>Imprimir prueba</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
     </Card>
 
     <Card padded={false}>
       <div class="border-b border-admin-border px-5 py-4 lg:px-6">
         <h2 class="text-base font-semibold text-white">Cola de impresión</h2>
-        <p class="mt-1 text-xs text-admin-muted">Trabajos recientes (mock, no persistente a largo plazo).</p>
+        <p class="mt-1 text-xs text-admin-muted">Últimos trabajos encolados, con su resultado real.</p>
       </div>
       {
         jobs.length === 0 ? (
           <div class="px-6 py-14">
-            <EmptyState title="Sin trabajos de impresión todavía" description="Usa «Imprimir prueba» en una impresora para generar uno." />
+            <EmptyState title="Sin trabajos todavía" description="Los pedidos confirmados se encolan automáticamente en las impresoras marcadas como automáticas." />
           </div>
         ) : (
           <div class="overflow-x-auto">
@@ -104,14 +335,21 @@ const errorMessage = errorParam === "not-found" ? "La impresora ya no existe." :
                 <tr>
                   <th>Trabajo</th>
                   <th>Impresora</th>
+                  <th>Estado</th>
+                  <th>Intentos</th>
                   <th>Fecha</th>
                 </tr>
               </thead>
               <tbody>
                 {jobs.map((job) => (
                   <tr>
-                    <td class="font-semibold text-white">{job.label}</td>
+                    <td>
+                      <span class="font-semibold text-white">{job.title}</span>
+                      {job.lastError ? <span class="block text-xs text-rose-300">{job.lastError}</span> : null}
+                    </td>
                     <td class="text-admin-muted">{job.printerName}</td>
+                    <td><Badge tone={jobTone(job.status)}>{jobLabel(job.status)}</Badge></td>
+                    <td class="text-admin-muted">{job.attempts}</td>
                     <td class="text-admin-muted">{formatDateTime(job.createdAt)}</td>
                   </tr>
                 ))}

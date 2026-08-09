@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { db, Order, Payment, eq } from "astro:db";
 import { randomUUID } from "node:crypto";
+import { enqueueOrderPrints } from "@/server/printing/queue";
 
 function redirect(location: string) {
     return new Response(null, {
@@ -71,6 +72,15 @@ export const POST: APIRoute = async ({ request, session }) => {
                 updatedAt: new Date(),
             })
             .where(eq(Order.id, order.id));
+    }
+
+    // Con tarjeta la comanda sale aquí, no en el checkout: hasta este punto el
+    // pedido no está pagado. enqueueOrderPrints es idempotente por pedido e
+    // impresora, así que volver a esta ruta no duplica tickets.
+    try {
+        await enqueueOrderPrints(order.id);
+    } catch (error) {
+        console.error("[print] enqueue on payment confirm failed", error);
     }
 
     if (session) {

@@ -1,6 +1,7 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
 import { db, Order, OrderItem, Payment, Refund, eq, inArray } from "astro:db";
+import { getPrinters } from "@/server/printing/queue";
 
 type OrderStatus =
   | "PENDING"
@@ -395,6 +396,10 @@ const totalQty = decoratedItems.reduce(
 const paymentsCount = decoratedPayments.length;
 const timelineCount = fullTimeline.length;
 const isDelivery = order.type === "DELIVERY";
+
+// Impresoras térmicas del local, para reimprimir la comanda si se atascó o se
+// perdió. Distinto de "Imprimir ticket", que abre la vista de navegador.
+const thermalPrinters = (await getPrinters()).filter((printer) => printer.enabled);
 ---
 
 <AdminLayout
@@ -420,6 +425,29 @@ const isDelivery = order.type === "DELIVERY";
     >
       Ver página pública
     </a>
+
+    {
+      thermalPrinters.length > 0 ? (
+        <form method="post" action={`/api/admin/orders/${order.publicId}/update`} class="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="intent" value="reprint" />
+          <select
+            name="printerId"
+            aria-label="Impresora térmica"
+            class="min-h-9 rounded-admin-lg border border-admin-border bg-white/[0.03] px-3 py-2 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+          >
+            {thermalPrinters.map((printer) => (
+              <option value={printer.id}>{printer.name}</option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            class="inline-flex min-h-9 items-center justify-center rounded-admin-lg border border-admin-border bg-white/[0.03] px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06] hover:text-white"
+          >
+            Reimprimir comanda
+          </button>
+        </form>
+      ) : null
+    }
   </div>
 
   {
