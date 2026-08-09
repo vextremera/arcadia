@@ -215,7 +215,7 @@ const heroStyle = {
       menu.length > 0 ? (
         <nav
           aria-label="Familias de la carta"
-          class="sticky top-0 z-30 border-b border-zinc-200/80 bg-bg/95 px-4 py-3 backdrop-blur lg:hidden"
+          class="sticky top-16 z-30 border-b border-zinc-200/80 bg-bg/95 px-4 py-3 backdrop-blur lg:hidden"
         >
           <div class="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {menu.map((category) => (
@@ -239,9 +239,11 @@ const heroStyle = {
           ) : (
             <div class="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[15rem_minmax(0,1fr)]">
               <aside class="hidden lg:block">
+                {/* El header del sitio es sticky y mide 72px en escritorio:
+                    sin descontarlo, el índice se metía debajo. */}
                 <nav
                   aria-label="Familias de la carta"
-                  class="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto"
+                  class="sticky top-[5.5rem] max-h-[calc(100vh-7rem)] overflow-y-auto"
                 >
                   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                     Familias
@@ -262,11 +264,12 @@ const heroStyle = {
                 </nav>
               </aside>
 
-              {/* scroll-mt mayor en móvil: ahí la barra de familias es fija y
-                  taparía el título de la categoría al saltar al ancla. */}
+              {/* El margen de scroll descuenta lo que hay fijo encima: en móvil
+                  el header (64px) más la barra de familias (54px); en
+                  escritorio sólo el header (72px). */}
               <div class="min-w-0 space-y-10 sm:space-y-12">
               {menu.map((category) => (
-                <section id={`cat-${category.slug}`} class="scroll-mt-20 lg:scroll-mt-6">
+                <section id={`cat-${category.slug}`} class="scroll-mt-32 lg:scroll-mt-24">
                   <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">
                     {category.name}
                   </h2>
