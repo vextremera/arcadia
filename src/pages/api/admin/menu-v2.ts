@@ -1,15 +1,5 @@
 import type { APIRoute } from "astro";
-import {
-  db,
-  AppSetting,
-  MenuDish,
-  MenuDishAssignment,
-  Menu as LegacyMenu,
-  MenuItem as LegacyMenuItem,
-  Product,
-  eq,
-  inArray,
-} from "astro:db";
+import { db, AppSetting, MenuDish, MenuDishAssignment, eq } from "astro:db";
 
 type MenuKind = "DIARIO" | "FESTIVO";
 type MenuCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
@@ -19,13 +9,11 @@ type MenuConfig = Record<
   {
     active: boolean;
     priceCents: number;
+    serviceFrom: string | null;
+    serviceTo: string | null;
+    note: string | null;
   }
 >;
-
-const DEFAULT_MENU_CONFIG: MenuConfig = {
-  DIARIO: { active: true, priceCents: 1350 },
-  FESTIVO: { active: true, priceCents: 1590 },
-};
 
 const DEFAULT_REDIRECT_PATH = "/admin/menu/diario";
 
@@ -74,75 +62,6 @@ function slugify(value: string) {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
-}
-
-function extractPriceFromTitle(title: string, fallbackCents: number) {
-  const match = String(title).match(/(\d+(?:[.,]\d{1,2})?)\s*€/);
-  if (!match) return fallbackCents;
-  const n = Number(match[1].replace(",", "."));
-  if (!Number.isFinite(n) || n < 0) return fallbackCents;
-  return Math.round(n * 100);
-}
-
-function isWithin(
-  row: { validFrom: Date | null; validTo: Date | null },
-  now: Date,
-) {
-  if (row.validFrom && now < row.validFrom) return false;
-  if (row.validTo && now > row.validTo) return false;
-  return true;
-}
-
-function pickBestLegacy(
-  kind: MenuKind,
-  rows: Array<{
-    id: number;
-    title: string;
-    kind: MenuKind;
-    active: boolean;
-    validFrom: Date | null;
-    validTo: Date | null;
-  }>,
-  now: Date,
-) {
-  const candidates = rows.filter((row) => row.kind === kind && row.active);
-  const within = candidates.filter((row) => isWithin(row, now));
-  const list = within.length ? within : candidates;
-  if (!list.length) return null;
-
-  return [...list].sort((a, b) => {
-    const aTime = a.validFrom ? new Date(a.validFrom).getTime() : 0;
-    const bTime = b.validFrom ? new Date(b.validFrom).getTime() : 0;
-    if (aTime !== bTime) return bTime - aTime;
-    return b.id - a.id;
-  })[0];
-}
-
-async function getMenuConfig(): Promise<MenuConfig> {
-  const [row] = await db
-    .select({ id: AppSetting.id, value: AppSetting.value })
-    .from(AppSetting)
-    .where(eq(AppSetting.key, "menuConfigV2"))
-    .limit(1);
-
-  const value = row?.value as Partial<MenuConfig> | undefined;
-
-  return {
-    DIARIO: {
-      active: value?.DIARIO?.active ?? DEFAULT_MENU_CONFIG.DIARIO.active,
-      priceCents:
-        typeof value?.DIARIO?.priceCents === "number"
-          ? value.DIARIO.priceCents
-          : DEFAULT_MENU_CONFIG.DIARIO.priceCents,
-    },
-    FESTIVO: {
-      active: value?.FESTIVO?.active ?? DEFAULT_MENU_CONFIG.FESTIVO.active,
-      priceCents:
-        typeof value?.FESTIVO?.priceCents === "number"
-          ? value.FESTIVO.priceCents
-          : DEFAULT_MENU_CONFIG.FESTIVO.priceCents,
-    },
-  };
 }
 
 async function saveMenuConfig(nextConfig: MenuConfig) {
@@ -223,14 +142,32 @@ export const POST: APIRoute = async (context) => {
       return context.redirect(withQuery(redirectBase, { error: "invalid-price" }));
     }
 
+    // Horario y nota se guardan aquí en vez de estar escritos en el
+    // componente público, que es donde vivían: el horario del menú no se podía
+    // cambiar sin tocar código.
+    const readTime = (value: FormDataEntryValue | null) => {
+      const match = String(value ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) return null;
+      const hour = Number(match[1]);
+      if (hour > 23 || Number(match[2]) > 59) return null;
+      return `${String(hour).padStart(2, "0")}:${match[2]}`;
+    };
+    const readNote = (value: FormDataEntryValue | null) => String(value ?? "").trim() || null;
+
     await saveMenuConfig({
       DIARIO: {
         active: form.get("DIARIO_active") === "on",
         priceCents: diarioPriceCents,
+        serviceFrom: readTime(form.get("DIARIO_serviceFrom")),
+        serviceTo: readTime(form.get("DIARIO_serviceTo")),
+        note: readNote(form.get("DIARIO_note")),
       },
       FESTIVO: {
         active: form.get("FESTIVO_active") === "on",
         priceCents: festivoPriceCents,
+        serviceFrom: readTime(form.get("FESTIVO_serviceFrom")),
+        serviceTo: readTime(form.get("FESTIVO_serviceTo")),
+        note: readNote(form.get("FESTIVO_note")),
       },
     });
 
@@ -522,7 +459,6 @@ export const POST: APIRoute = async (context) => {
     await db.delete(MenuDishAssignment).where(eq(MenuDishAssignment.id, assignmentId));
     return context.redirect(withQuery(redirectBase, { saved: "assignment" }));
   }
-
 
   return context.redirect(withQuery(redirectBase, { error: "invalid-intent" }));
 };

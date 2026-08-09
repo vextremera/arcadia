@@ -220,21 +220,21 @@ const [configRow] = await db
 
 const existingConfig = (configRow?.value ?? {}) as Record<string, { active?: boolean; priceCents?: number }>;
 
+// Se conserva lo que ya hubiera configurado (horario, nota, y cualquier campo
+// que se añada más adelante): este script sólo debe rellenar lo que falta. Sin
+// el spread, volver a ejecutarlo borraría el horario del menú.
+const mergeKind = (kind: Kind) => ({
+  ...(existingConfig[kind] ?? {}),
+  active: existingConfig[kind]?.active ?? bestByKind.has(kind),
+  priceCents:
+    existingConfig[kind]?.priceCents ??
+    (bestByKind.get(kind) ? priceCentsFromTitle(bestByKind.get(kind)!.title) : null) ??
+    0,
+});
+
 const nextConfig = {
-  DIARIO: {
-    active: existingConfig.DIARIO?.active ?? bestByKind.has("DIARIO"),
-    priceCents:
-      existingConfig.DIARIO?.priceCents ??
-      (bestByKind.get("DIARIO") ? priceCentsFromTitle(bestByKind.get("DIARIO")!.title) : null) ??
-      0,
-  },
-  FESTIVO: {
-    active: existingConfig.FESTIVO?.active ?? bestByKind.has("FESTIVO"),
-    priceCents:
-      existingConfig.FESTIVO?.priceCents ??
-      (bestByKind.get("FESTIVO") ? priceCentsFromTitle(bestByKind.get("FESTIVO")!.title) : null) ??
-      0,
-  },
+  DIARIO: mergeKind("DIARIO"),
+  FESTIVO: mergeKind("FESTIVO"),
 };
 
 if (configRow) {

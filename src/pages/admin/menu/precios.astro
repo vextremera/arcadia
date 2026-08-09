@@ -18,8 +18,24 @@ import { db, AppSetting, MenuDishAssignment, eq } from "astro:db";
 const PAGE_PATH = "/admin/menu/precios";
 
 type MenuKind = "DIARIO" | "FESTIVO";
-type MenuConfigEntry = { active: boolean; priceCents: number };
+type MenuConfigEntry = {
+  active: boolean;
+  priceCents: number;
+  serviceFrom: string | null;
+  serviceTo: string | null;
+  note: string | null;
+};
 type MenuConfig = Record<MenuKind, MenuConfigEntry>;
+
+function readTime(value: unknown): string | null {
+  const match = String(value ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return null;
+  return `${String(Number(match[1])).padStart(2, "0")}:${match[2]}`;
+}
+
+function readNote(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 const KINDS: Array<{ key: MenuKind; label: string; tone: "primary" | "violet"; managePath: string }> = [
   { key: "DIARIO", label: "Diario", tone: "primary", managePath: "/admin/menu/diario" },
@@ -44,16 +60,15 @@ const configValue = (configRow?.value ?? {}) as Partial<Record<MenuKind, Partial
 
 // Sin configuración no se asume nada publicable: el criterio es el mismo que
 // aplica src/server/menu/public.ts, para que admin y web no puedan discrepar.
-const config: MenuConfig = {
-  DIARIO: {
-    active: configValue.DIARIO?.active === true,
-    priceCents: typeof configValue.DIARIO?.priceCents === "number" ? configValue.DIARIO.priceCents : 0,
-  },
-  FESTIVO: {
-    active: configValue.FESTIVO?.active === true,
-    priceCents: typeof configValue.FESTIVO?.priceCents === "number" ? configValue.FESTIVO.priceCents : 0,
-  },
-};
+const readEntry = (kind: MenuKind): MenuConfigEntry => ({
+  active: configValue[kind]?.active === true,
+  priceCents: typeof configValue[kind]?.priceCents === "number" ? configValue[kind]!.priceCents! : 0,
+  serviceFrom: readTime(configValue[kind]?.serviceFrom),
+  serviceTo: readTime(configValue[kind]?.serviceTo),
+  note: readNote(configValue[kind]?.note),
+});
+
+const config: MenuConfig = { DIARIO: readEntry("DIARIO"), FESTIVO: readEntry("FESTIVO") };
 
 const assignments = await db
   .select({ id: MenuDishAssignment.id, kind: MenuDishAssignment.kind })
@@ -175,6 +190,38 @@ const errorMessage =
                     Publicado
                   </label>
                 </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                  <label class="block">
+                    <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Se sirve desde</span>
+                    <input
+                      class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="time"
+                      name={`${kind.key}_serviceFrom`}
+                      value={config[kind.key].serviceFrom ?? ""}
+                    />
+                  </label>
+                  <label class="block">
+                    <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Hasta</span>
+                    <input
+                      class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                      type="time"
+                      name={`${kind.key}_serviceTo`}
+                      value={config[kind.key].serviceTo ?? ""}
+                    />
+                  </label>
+                </div>
+
+                <label class="mt-3 block">
+                  <span class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.16em] text-admin-muted">Nota</span>
+                  <input
+                    class="w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none"
+                    type="text"
+                    name={`${kind.key}_note`}
+                    value={config[kind.key].note ?? ""}
+                    placeholder="Menús personalizados bajo petición."
+                  />
+                </label>
 
                 <p class="mt-3 text-xs text-admin-muted">
                   {countByKind[kind.key]} platos asignados ·{" "}

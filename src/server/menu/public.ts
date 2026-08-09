@@ -17,6 +17,7 @@
  * estado vacío.
  */
 import { db, AppSetting, MenuDish, MenuDishAssignment, eq } from "astro:db";
+import { getMadridClock } from "@/server/time/madrid";
 
 export type MenuKind = "DIARIO" | "FESTIVO";
 type DbCourse = "PRIMERO" | "SEGUNDO" | "POSTRE";
@@ -33,10 +34,22 @@ export type PublicMenuData = {
   title: string;
   priceText: string | null;
   priceCents: number;
+  /** Horario de servicio "13:00"–"15:30", o null si no se ha configurado. */
+  serviceFrom: string | null;
+  serviceTo: string | null;
+  /** true si ahora mismo se está dentro de ese horario (hora de Madrid). */
+  servingNow: boolean;
+  note: string | null;
   courses: Record<Course, PublicMenuDish[]>;
 };
 
-type MenuConfigEntry = { active: boolean; priceCents: number };
+type MenuConfigEntry = {
+  active: boolean;
+  priceCents: number;
+  serviceFrom: string | null;
+  serviceTo: string | null;
+  note: string | null;
+};
 type MenuConfig = Record<MenuKind, MenuConfigEntry>;
 
 export type PublicMenuState = {
@@ -76,15 +89,36 @@ async function getMenuConfig(): Promise<MenuConfig> {
       typeof value[kind]?.priceCents === "number" && value[kind]!.priceCents! > 0
         ? value[kind]!.priceCents!
         : 0,
+    serviceFrom: readTime(value[kind]?.serviceFrom),
+    serviceTo: readTime(value[kind]?.serviceTo),
+    note: typeof value[kind]?.note === "string" && value[kind]!.note!.trim() ? value[kind]!.note!.trim() : null,
   });
 
   return { DIARIO: read("DIARIO"), FESTIVO: read("FESTIVO") };
+}
+
+/** Acepta sólo "H:MM"/"HH:MM"; cualquier otra cosa se trata como no configurado. */
+function readTime(value: unknown): string | null {
+  const match = String(value ?? "").trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+
+  return `${String(hour).padStart(2, "0")}:${match[2]}`;
+}
+
+function timeToMinutes(value: string): number {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
 }
 
 function buildMenuData(
   kind: MenuKind,
   config: MenuConfig,
   rows: Array<{ kind: MenuKind; course: DbCourse; dishName: string; dishDescription: string | null }>,
+  nowMinutes: number,
 ): { data: PublicMenuData | null; incomplete: boolean } {
   const entry = config[kind];
   const dishes = rows.filter((row) => row.kind === kind);
@@ -100,6 +134,14 @@ function buildMenuData(
     grouped[row.course].push({ name: row.dishName, desc: row.dishDescription });
   }
 
+  // El horario no condiciona la publicación: fuera de hora el menú se sigue
+  // enseñando (la gente lo consulta antes de venir), sólo cambia el aviso.
+  const servingNow =
+    entry.serviceFrom !== null &&
+    entry.serviceTo !== null &&
+    nowMinutes >= timeToMinutes(entry.serviceFrom) &&
+    nowMinutes <= timeToMinutes(entry.serviceTo);
+
   return {
     data: {
       id: kind === "DIARIO" ? 1 : 2,
@@ -107,6 +149,10 @@ function buildMenuData(
       title: TITLES[kind],
       priceText: centsToPriceText(entry.priceCents),
       priceCents: entry.priceCents,
+      serviceFrom: entry.serviceFrom,
+      serviceTo: entry.serviceTo,
+      servingNow,
+      note: entry.note,
       courses: {
         ENTRANTES: grouped.PRIMERO,
         PRINCIPALES: grouped.SEGUNDO,
@@ -143,8 +189,10 @@ export async function getPublicMenuState(): Promise<PublicMenuState> {
     return Number(a.assignmentId) - Number(b.assignmentId);
   }) as Array<{ kind: MenuKind; course: DbCourse; dishName: string; dishDescription: string | null }>;
 
-  const diario = buildMenuData("DIARIO", config, sorted);
-  const festivo = buildMenuData("FESTIVO", config, sorted);
+  const nowMinutes = getMadridClock().mins;
+
+  const diario = buildMenuData("DIARIO", config, sorted, nowMinutes);
+  const festivo = buildMenuData("FESTIVO", config, sorted, nowMinutes);
 
   return {
     diarioData: diario.data,
