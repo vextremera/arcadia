@@ -25,7 +25,7 @@ export default function LazyMap({ query, title = "Mapa", className = "" }: Props
 
           <button
             type="button"
-            class="w-full rounded-full bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 sm:w-auto"
+            class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white hover:bg-zinc-800 sm:w-auto"
             onClick={() => setLoaded(true)}
           >
             Ver mapa

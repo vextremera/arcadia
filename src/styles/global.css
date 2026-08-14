@@ -279,3 +279,21 @@ dialog.admin-modal::backdrop {
     display: flex;
   }
 }
+/*
+ * Safari en iOS hace zoom automático al enfocar cualquier campo cuya fuente
+ * baje de 16px, y deja la página ampliada: el usuario tiene que volver a
+ * alejarla a mano después de cada campo. Los formularios del sitio usan
+ * text-sm (14px), así que el checkout entero disparaba el zoom.
+ *
+ * Se corrige aquí y no campo a campo porque son decenas de inputs repartidos
+ * entre páginas .astro e islas, y cualquier campo nuevo volvería a caer en lo
+ * mismo. Sólo aplica por debajo de sm: en escritorio no hay zoom que evitar y
+ * se conserva el tamaño de diseño.
+ */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

@@ -94,10 +94,10 @@ const socialLinks = [
       <div class="min-w-0 text-sm text-zinc-700">
         <div class="font-semibold text-zinc-900">{t.linksTitle}</div>
         <div class="mt-3 flex flex-col gap-2 leading-8">
-          <a class="hover:text-zinc-900" href="/#sobre">{t.links.about}</a>
-          <a class="hover:text-zinc-900" href="/pedir">{t.links.order}</a>
-          <a class="hover:text-zinc-900" href="/#horarios">{t.links.hours}</a>
-          <a class="hover:text-zinc-900" href="/#ubicacion"
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/#sobre">{t.links.about}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/pedir">{t.links.order}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/#horarios">{t.links.hours}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/#ubicacion"
             >{t.links.location}</a
           >
         </div>
@@ -106,10 +106,10 @@ const socialLinks = [
       <div class="min-w-0 text-sm text-zinc-700">
         <div class="font-semibold text-zinc-900">{t.supportTitle}</div>
         <div class="mt-3 flex flex-col gap-2 leading-8">
-          <a class="hover:text-zinc-900" href="/faq">{t.links.faq}</a>
-          <a class="hover:text-zinc-900" href="/contacto">{t.links.contact}</a>
-          <a class="hover:text-zinc-900" href="/legal">{t.links.legal}</a>
-          <a class="hover:text-zinc-900" href="/privacidad">{t.links.privacy}</a
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/faq">{t.links.faq}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/contacto">{t.links.contact}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/legal">{t.links.legal}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/privacidad">{t.links.privacy}</a
           >
         </div>
       </div>
@@ -128,34 +128,13 @@ const socialLinks = [
         <div>© {new Date().getFullYear()} Arcadia</div>
 
         <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <a class="hover:text-zinc-900" href="/faq">{t.links.faq}</a>
-          <a class="hover:text-zinc-900" href="/contacto">{t.links.contact}</a>
-          <a class="hover:text-zinc-900" href="/legal">{t.links.legal}</a>
-          <a class="hover:text-zinc-900" href="/privacidad">{t.links.privacy}</a
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/faq">{t.links.faq}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/contacto">{t.links.contact}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/legal">{t.links.legal}</a>
+          <a class="inline-flex min-h-11 items-center hover:text-zinc-900" href="/privacidad">{t.links.privacy}</a
           >
         </div>
       </div>
     </div>
   </div>
 </footer>
-
-<script is:inline>
-  (() => {
-    const dropdowns = document.querySelectorAll("footer details");
-
-    document.addEventListener("click", (event) => {
-      dropdowns.forEach((details) => {
-        if (!(details instanceof HTMLDetailsElement)) return;
-        if (details.contains(event.target)) return;
-        details.open = false;
-      });
-    });
-
-    window.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      dropdowns.forEach((details) => {
-        if (details instanceof HTMLDetailsElement) details.open = false;
-      });
-    });
-  })();
-</script>

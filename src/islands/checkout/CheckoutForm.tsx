@@ -869,7 +869,7 @@ export default function CheckoutForm() {
           </div>
 
           <button
-            class={`mt-4 w-full rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white ${checkoutBlocked ? "opacity-60 pointer-events-none" : ""
+            class={`mt-4 min-h-12 w-full rounded-xl bg-zinc-900 px-4 py-3 text-base font-semibold text-white ${checkoutBlocked ? "opacity-60 pointer-events-none" : ""
               }`}
             type="button"
             onClick={submit}

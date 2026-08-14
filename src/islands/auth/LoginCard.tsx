@@ -193,8 +193,8 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         </div>
                     </label>
 
-                    <label class="flex items-start gap-3 text-sm text-zinc-600 sm:items-center">
-                        <input name="remember" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-zinc-300 sm:mt-0" />
+                    <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-zinc-600">
+                        <input name="remember" type="checkbox" class="h-5 w-5 shrink-0 rounded border-zinc-300" />
                         {t.remember}
                     </label>
 
@@ -202,14 +202,14 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         {hasRecaptcha ? (
                             <div class="g-recaptcha" data-sitekey={siteKey} />
                         ) : (
-                            <label class="flex items-start gap-3 text-sm text-zinc-700 sm:items-center">
-                                <input type="checkbox" class="mt-0.5 h-5 w-5 rounded border-zinc-300 sm:mt-0" checked={fakeCaptchaOk} onChange={(e) => setFakeCaptchaOk((e.target as HTMLInputElement).checked)} />
+                            <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-zinc-700">
+                                <input type="checkbox" class="h-5 w-5 shrink-0 rounded border-zinc-300" checked={fakeCaptchaOk} onChange={(e) => setFakeCaptchaOk((e.target as HTMLInputElement).checked)} />
                                 {t.robot}
                             </label>
                         )}
                     </div>
 
-                    <a class="w-fit text-sm text-indigo-700 underline" href="#" onClick={(e) => e.preventDefault()}>
+                    <a class="inline-flex min-h-11 w-fit items-center text-sm text-indigo-700 underline" href="#" onClick={(e) => e.preventDefault()}>
                         {t.forgot}
                     </a>
 
@@ -226,7 +226,7 @@ export default function LoginCard({ next = "", error = "", siteKey = "" }: Props
                         </span>
                     </button>
 
-                    <div class="pt-2 text-center text-sm text-zinc-600">{t.noAccount}{" "}<a class="font-semibold text-indigo-700 underline" href={`/registro${next ? `?next=${encodeURIComponent(next)}` : ""}`}>{t.register}</a></div>
+                    <div class="pt-2 text-center text-sm text-zinc-600">{t.noAccount}{" "}<a class="inline-flex min-h-11 items-center font-semibold text-indigo-700 underline" href={`/registro${next ? `?next=${encodeURIComponent(next)}` : ""}`}>{t.register}</a></div>
                 </form>
             </div>
         </div>

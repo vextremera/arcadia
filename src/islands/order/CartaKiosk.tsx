@@ -42,6 +42,14 @@ function allergenIconPath(allergen: ProductAllergen) {
   return allergen.iconUrl ?? `/images/allergens/${allergen.slug}.webp`;
 }
 
+/** Sin acentos y en minúsculas: "champinones" debe encontrar "champiñones". */
+function normalize(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 export default function CartaKiosk() {
   const [menu, setMenu] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -53,6 +61,9 @@ export default function CartaKiosk() {
   const catBarRef = useRef<HTMLDivElement>(null);
 
   const [catMenuOpen, setCatMenuOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [excludedAllergens, setExcludedAllergens] = useState<string[]>([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   function scrollToCategory(slug: string) {
     const id = `cat-${slug}`;
@@ -124,9 +135,58 @@ export default function CartaKiosk() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Búsqueda y filtro de alérgenos, con el mismo criterio que /carta: sin
+  // acentos y entrando también en los ingredientes, porque la gente busca
+  // "queso" o "champiñones" y no el nombre comercial del plato.
+  const filtered = useMemo(() => {
+    const needle = normalize(query.trim());
+    const blocked = new Set(excludedAllergens);
+    if (!needle && !blocked.size) return menu;
+
+    return menu
+      .map((category) => ({
+        ...category,
+        products: (category.products ?? []).filter((product) => {
+          if (blocked.size && product.allergens.some((a) => blocked.has(a.slug))) return false;
+          if (!needle) return true;
+          const haystack = normalize(
+            [product.name, product.description ?? "", (product.ingredients ?? []).join(" ")].join(" "),
+          );
+          return haystack.includes(needle);
+        }),
+      }))
+      .filter((category) => category.products.length > 0);
+  }, [menu, query, excludedAllergens]);
+
+  const isFiltering = query.trim().length > 0 || excludedAllergens.length > 0;
+
+  const resultCount = useMemo(
+    () => filtered.reduce((total, category) => total + (category.products ?? []).length, 0),
+    [filtered],
+  );
+
+  /** Alérgenos presentes en el catálogo, para no ofrecer filtros vacíos. */
+  const allergenFilters = useMemo(() => {
+    const bySlug = new Map<string, ProductAllergen>();
+    for (const category of menu) {
+      for (const product of category.products ?? []) {
+        for (const allergen of product.allergens) {
+          if (!bySlug.has(allergen.slug)) bySlug.set(allergen.slug, allergen);
+        }
+      }
+    }
+    return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  }, [menu]);
+
+  function toggleAllergen(slug: string) {
+    setExcludedAllergens((current) =>
+      current.includes(slug) ? current.filter((item) => item !== slug) : [...current, slug],
+    );
+  }
+
   const navCategories = useMemo(
-    () => menu.filter((category) => (category.products ?? []).length > 0),
-    [menu],
+    () => filtered.filter((category) => (category.products ?? []).length > 0),
+    [filtered],
   );
 
   async function quickAdd(product: MenuProduct) {
@@ -200,22 +260,92 @@ export default function CartaKiosk() {
             </div>
           ) : (
             <>
-              <div class="flex items-center justify-between sm:hidden">
-                <div class="text-sm font-semibold text-zinc-700">
-                  Categorías
+              <div class="flex items-center gap-2">
+                <div class="relative min-w-0 flex-1">
+                  <input
+                    type="search"
+                    value={query}
+                    onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
+                    placeholder="Buscar plato o ingrediente…"
+                    aria-label="Buscar en la carta"
+                    class="min-h-11 w-full rounded-2xl border border-zinc-300 bg-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-zinc-500"
+                  />
+                  <svg
+                    class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
                 </div>
+
+                {allergenFilters.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen((open) => !open)}
+                    aria-expanded={filtersOpen}
+                    class={`inline-flex min-h-11 shrink-0 items-center rounded-2xl border px-3.5 text-sm font-semibold transition ${
+                      excludedAllergens.length
+                        ? "border-zinc-900 bg-zinc-900 text-white"
+                        : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+                    }`}
+                  >
+                    Alérgenos{excludedAllergens.length ? ` (${excludedAllergens.length})` : ""}
+                  </button>
+                ) : null}
 
                 <button
                   type="button"
-                  class="inline-flex items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50"
+                  class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border border-zinc-300 bg-white px-3.5 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 sm:hidden"
                   aria-haspopup="dialog"
                   aria-expanded={catMenuOpen}
                   onClick={() => setCatMenuOpen(true)}
+                  aria-label="Ver categorías"
                 >
-                  <span>Ver</span>
                   <span aria-hidden="true">☰</span>
                 </button>
               </div>
+
+              {filtersOpen && allergenFilters.length > 0 ? (
+                <div class="mt-3 rounded-2xl border border-zinc-200 bg-white p-3">
+                  <p class="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Ocultar platos que contengan
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    {allergenFilters.map((allergen) => {
+                      const active = excludedAllergens.includes(allergen.slug);
+                      return (
+                        <button
+                          key={allergen.slug}
+                          type="button"
+                          onClick={() => toggleAllergen(allergen.slug)}
+                          aria-pressed={active}
+                          class={`inline-flex min-h-10 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${
+                            active
+                              ? "border-zinc-900 bg-zinc-900 text-white"
+                              : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+                          }`}
+                        >
+                          <img src={allergenIconPath(allergen)} alt="" class="h-4 w-4 object-contain" loading="lazy" />
+                          {allergen.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {isFiltering ? (
+                <p class="mt-3 text-xs font-semibold text-zinc-600">
+                  {resultCount === 0
+                    ? "Ningún plato coincide"
+                    : `${resultCount} ${resultCount === 1 ? "plato" : "platos"}`}
+                </p>
+              ) : null}
 
               <nav
                 class="hidden flex-wrap items-center gap-2 sm:flex"
@@ -300,13 +430,27 @@ export default function CartaKiosk() {
         <div class="mx-auto w-full max-w-448">
           {loading && menu.length === 0 ? (
             <div class="text-sm text-zinc-600">Cargando productos…</div>
-          ) : menu.length === 0 ? (
-            <div class="text-sm text-zinc-600">
-              No hay productos disponibles.
+          ) : filtered.length === 0 ? (
+            <div class="rounded-3xl border border-zinc-200 bg-white px-6 py-12 text-center">
+              <p class="font-semibold text-zinc-900">
+                {isFiltering ? "No encontramos nada con esos criterios" : "No hay productos disponibles."}
+              </p>
+              {isFiltering ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setExcludedAllergens([]);
+                  }}
+                  class="mt-4 inline-flex min-h-11 items-center rounded-2xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 transition hover:border-zinc-500"
+                >
+                  Ver la carta completa
+                </button>
+              ) : null}
             </div>
           ) : (
             <div class="space-y-8 sm:space-y-10">
-              {menu.map((category) => (
+              {filtered.map((category) => (
                 <section
                   key={category.id}
                   id={`cat-${category.slug}`}
@@ -316,12 +460,6 @@ export default function CartaKiosk() {
                     <h2 class="sigmar-regular text-xl font-medium tracking-widest sm:text-2xl">
                       {category.name}
                     </h2>
-                    <a
-                      class="text-xs font-semibold text-zinc-500 hover:underline"
-                      href="#top"
-                    >
-                      ↑ arriba
-                    </a>
                   </div>
 
                   {category.products.length === 0 ? (
