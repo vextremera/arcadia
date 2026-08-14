@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
+import { formatEuros as money } from "@/lib/money";
 
 type ProductAllergen = {
   slug: string;
@@ -30,9 +31,6 @@ type MenuCategory = {
   products: MenuProduct[];
 };
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 function openProduct(productId: number) {
   window.dispatchEvent(

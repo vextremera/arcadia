@@ -1,6 +1,7 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, Order, Payment, eq } from "astro:db";
+import { formatEuros as money } from "@/lib/money";
 
 const publicId = String(Astro.params.publicId ?? "").trim();
 if (!publicId) return new Response("Missing publicId", { status: 400 });
@@ -21,9 +22,6 @@ const [payment] = await db
 
 if (!payment) return new Response("Pago no encontrado", { status: 404 });
 
-function money(cents: number) {
-    return `${(cents / 100).toFixed(2)} €`;
-}
 
 const isPaid = String(payment.status) === "PAID";
 const isFailed = String(payment.status) === "FAILED";

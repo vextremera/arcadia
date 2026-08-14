@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { CartResponse } from "./types";
+import { formatEuros as money, formatEurosSigned as moneySigned } from "@/lib/money";
 import {
   clearCart as clearCartServer,
   getCartSnapshot,
@@ -9,9 +10,6 @@ import {
   subscribeCart,
 } from "./cartClient";
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 async function shouldOpenUpsell() {
   const res = await fetch("/api/upsell/open", {
@@ -195,7 +193,7 @@ export default function CartDrawer() {
                             {it.modifiers
                               .map(
                                 (m) =>
-                                  `${m.name} (+${(m.priceDeltaCents / 100).toFixed(2)}€)`,
+                                  `${m.name} (${moneySigned(m.priceDeltaCents)})`,
                               )
                               .join(", ")}
                           </div>
@@ -214,7 +212,7 @@ export default function CartDrawer() {
                             {it.ingredientsAdded
                               .map(
                                 (x) =>
-                                  `${x.name} (+${(x.priceDeltaCents / 100).toFixed(2)}€)`,
+                                  `${x.name} (${moneySigned(x.priceDeltaCents)})`,
                               )
                               .join(", ")}
                           </div>

@@ -1,13 +1,11 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
 import { db, Order, OrderItem, eq, desc, inArray } from "astro:db";
+import { formatEuros as money } from "@/lib/money";
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect("/login?next=/cuenta/pedidos");
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 function fmtDate(d: any) {
   const date = new Date(d);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
+import { formatEuros as money } from "@/lib/money";
 
 type UpsellProduct = {
   id: number;
@@ -13,9 +14,6 @@ type UpsellProduct = {
   pickupEnabled: boolean;
 };
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 function goToCheckout() {
   window.location.href = "/checkout";

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { addToCart } from "@/islands/cart/cartClient";
+import { formatEuros as money } from "@/lib/money";
 
 type Ingredient = {
   id: number;
@@ -96,9 +97,6 @@ function isSauceIngredient(value: { slug?: string | null; name?: string | null }
   ].some((part) => hay.includes(part));
 }
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 function allergenIconPath(allergen: ProductAllergen) {
   return allergen.iconUrl ?? `/images/allergens/${allergen.slug}.webp`;

@@ -8,6 +8,7 @@ import {
     eq,
     inArray,
 } from "astro:db";
+import { formatEuros as money } from "@/lib/money";
 
 type CartItemSession = {
     lineId: string;
@@ -24,10 +25,6 @@ type ModifierDetail = { id: number; name: string; deltaCents: number; groupName?
 type IngredientDetail = { id: number; name: string; deltaCents: number };
 
 const ADDED_COMMON_INGREDIENT_CENTS = 100;
-
-function money(cents: number) {
-    return `${(cents / 100).toFixed(2)} €`;
-}
 
 export async function getCartSummaryFromSession(session: any) {
     const raw = (await session?.get?.("cart")) ?? [];

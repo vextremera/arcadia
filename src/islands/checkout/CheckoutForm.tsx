@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { getClientLang, type ClientSiteLang } from "@/islands/_shared/lang";
+import { formatEuros as money } from "@/lib/money";
 
 type Availability = {
   now: string;
@@ -87,9 +88,6 @@ type CouponPreviewResponse =
     message: string;
   };
 
-function money(cents: number) {
-  return `${(cents / 100).toFixed(2)} €`;
-}
 
 async function safeJson<T>(url: string): Promise<T | null> {
   try {
