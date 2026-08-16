@@ -132,8 +132,12 @@ export default function MenuTabs(props: { diario: MenuData | null; festivo: Menu
                   Sirviéndose ahora
                 </span>
               ) : null}
+              {/* El horario es informativo, no una condición: el menú se
+                  publica igual fuera de esa franja, porque la gente lo consulta
+                  antes de venir. Se etiqueta para que no se lea como un estado
+                  ("cerrado") sino como el dato que es. */}
               <span class="rounded-full bg-white/10 px-3.5 py-1.5 font-semibold text-white/80">
-                {schedule}
+                Se sirve de {current.serviceFrom} a {current.serviceTo}
               </span>
             </div>
           ) : null}
