@@ -5,6 +5,8 @@ import {
   ProductAllergen,
   eq,
 } from "astro:db";
+import { saveCatalogFlags } from "@/server/catalog/settings";
+import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
 function safeText(value: FormDataEntryValue | null) {
   return String(value ?? "").trim();
@@ -53,6 +55,28 @@ export const POST: APIRoute = async (context) => {
 
   const form = await context.request.formData();
   const intent = safeText(form.get("intent"));
+
+  if (intent === "save-visibility") {
+    const showAllergens = safeText(form.get("showAllergens")) === "on";
+    await saveCatalogFlags({ showAllergens });
+
+    try {
+      const { ip, userAgent } = getRequestAuditMeta(context.request);
+      await writeAuditLog({
+        actorUserId: user.id,
+        action: showAllergens ? "ALLERGENS_SHOWN" : "ALLERGENS_HIDDEN",
+        entityType: "catalog_flags",
+        entityId: "showAllergens",
+        diff: { next: { showAllergens } },
+        ip,
+        userAgent,
+      });
+    } catch (error) {
+      console.error("[audit] allergen visibility failed", error);
+    }
+
+    return context.redirect("/admin/catalogo/alergenos?saved=1");
+  }
 
   if (intent === "create") {
     const name = safeText(form.get("name"));

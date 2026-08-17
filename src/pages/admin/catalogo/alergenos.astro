@@ -6,6 +6,9 @@ import Badge from "@/components/admin/ui/Badge.astro";
 import EmptyState from "@/components/admin/ui/EmptyState.astro";
 import Modal from "@/components/admin/ui/Modal.astro";
 import { db, Allergen, ProductAllergen, inArray } from "astro:db";
+import { getCatalogFlags } from "@/server/catalog/settings";
+
+const catalogFlags = await getCatalogFlags();
 
 const url = new URL(Astro.request.url);
 const saved = url.searchParams.get("saved") === "1";
@@ -77,6 +80,39 @@ const stats = [
         <StatCard label={stat.label} value={stat.value} helper={stat.helper} />
       ))}
     </section>
+
+    <Card>
+      <form method="post" action="/api/admin/allergens" class="flex flex-wrap items-center justify-between gap-4">
+        <input type="hidden" name="intent" value="save-visibility" />
+
+        <div class="min-w-0">
+          <div class="admin-eyebrow">Visibilidad</div>
+          <h2 class="mt-1 text-lg font-semibold tracking-[-0.02em] text-white">
+            Mostrar alérgenos en la web
+          </h2>
+          <p class="mt-1 max-w-2xl text-sm text-admin-muted">
+            {catalogFlags.showAllergens
+              ? "Los iconos de alérgenos y el filtro aparecen en la carta y en el pedido a domicilio."
+              : "Los alérgenos están ocultos: no salen sus iconos ni el filtro, y tampoco viajan al navegador del cliente."}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <Badge tone={catalogFlags.showAllergens ? "success" : "neutral"}>
+            {catalogFlags.showAllergens ? "Visibles" : "Ocultos"}
+          </Badge>
+
+          {/* El valor enviado es el contrario al actual: el botón alterna. */}
+          <input type="hidden" name="showAllergens" value={catalogFlags.showAllergens ? "off" : "on"} />
+          <button
+            type="submit"
+            class="inline-flex min-h-10 items-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+          >
+            {catalogFlags.showAllergens ? "Ocultar en la web" : "Mostrar en la web"}
+          </button>
+        </div>
+      </form>
+    </Card>
 
     <Card padded={false}>
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-admin-border px-5 py-4 lg:px-6">

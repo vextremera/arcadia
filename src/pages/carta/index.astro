@@ -16,6 +16,7 @@ import {
 import { DEFAULT_LANG } from "@/lib/i18n";
 import { getPublicCopy } from "@/lib/publicCopy";
 import { formatEuros as money } from "@/lib/money";
+import { getCatalogFlags } from "@/server/catalog/settings";
 
 type RowCategory = {
   id: number;
@@ -39,6 +40,8 @@ type RowAllergen = {
   name: string;
   iconUrl: string | null;
 };
+
+const catalogFlags = await getCatalogFlags();
 
 const lang = Astro.locals.lang ?? DEFAULT_LANG;
 const t = getPublicCopy(lang).pages.carta;
@@ -146,7 +149,9 @@ for (const product of products) {
   const list = productsByCategory.get(product.categoryId) ?? [];
   list.push({
     ...product,
-    allergens: allergensByProduct.get(product.id) ?? [],
+    // Con el ajuste desactivado la lista va vacía desde el servidor, así que
+    // los iconos no llegan ni al HTML.
+    allergens: catalogFlags.showAllergens ? (allergensByProduct.get(product.id) ?? []) : [],
   });
   productsByCategory.set(product.categoryId, list);
 }
@@ -218,7 +223,7 @@ function searchIndex(product: {
 }
 
 // Alérgenos presentes en la carta, para ofrecer sólo los que filtran algo.
-const allergenFilters = (() => {
+const allergenFilters = !catalogFlags.showAllergens ? [] : (() => {
   const bySlug = new Map<string, { slug: string; name: string; iconUrl: string | null }>();
   for (const row of allergenRows) {
     if (!bySlug.has(row.slug)) {

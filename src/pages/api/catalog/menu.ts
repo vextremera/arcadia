@@ -14,6 +14,7 @@ import {
   eq,
   inArray,
 } from "astro:db";
+import { getCatalogFlags } from "@/server/catalog/settings";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -69,6 +70,8 @@ function sortProductsForCategory(categorySlug: string, products: ProductRow[]) {
  * Pensado para /pedir (UX tipo app) evitando N requests por categoría.
  */
 export const GET: APIRoute = async () => {
+  const catalogFlags = await getCatalogFlags();
+
   const categories = (await db
     .select({
       id: Category.id,
@@ -149,14 +152,18 @@ export const GET: APIRoute = async () => {
     Array<{ slug: string; name: string; iconUrl: string | null }>
   >();
 
-  for (const row of allergenRows) {
-    const list = allergensByProduct.get(row.productId) ?? [];
-    list.push({
-      slug: row.slug,
-      name: row.name,
-      iconUrl: row.iconUrl ?? null,
-    });
-    allergensByProduct.set(row.productId, list);
+  // Con el ajuste desactivado no se envían: filtrarlos en el cliente dejaría
+  // los alérgenos igualmente en la respuesta, a la vista de cualquiera.
+  if (catalogFlags.showAllergens) {
+    for (const row of allergenRows) {
+      const list = allergensByProduct.get(row.productId) ?? [];
+      list.push({
+        slug: row.slug,
+        name: row.name,
+        iconUrl: row.iconUrl ?? null,
+      });
+      allergensByProduct.set(row.productId, list);
+    }
   }
 
   const variantRows = await db
