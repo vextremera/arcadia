@@ -97,6 +97,57 @@ function itemModifierLines(item: PrintableOrderItem): string[] {
   return lines;
 }
 
+type ItemBreakdown = {
+  /** Importe del producto sin suplementos, ya multiplicado por la cantidad. */
+  baseCents: number;
+  /** Suplementos con importe, ya multiplicados por la cantidad. */
+  charged: Array<{ label: string; cents: number }>;
+  /** Cambios sin coste: quitados y opciones incluidas. */
+  free: string[];
+};
+
+/**
+ * Separa la línea en base + suplementos.
+ *
+ * El checkout guarda `unitPriceCents` ya con los suplementos dentro
+ * (unitCents = base + opciones + extras), así que la base se deduce restando
+ * los deltas. Se multiplica todo por la cantidad para que las cifras del ticket
+ * sumen exactamente el total de la línea: si se imprimieran los deltas por
+ * unidad junto a un total de línea que sí va multiplicado, las cuentas no
+ * cuadrarían a ojo del cliente.
+ */
+function itemBreakdown(item: PrintableOrderItem): ItemBreakdown {
+  const mods = item.modifiers;
+  const charged: Array<{ label: string; cents: number }> = [];
+  const free: string[] = [];
+
+  let deltaPerUnit = 0;
+
+  for (const removed of mods?.ingredientsRemoved ?? []) {
+    free.push(`  SIN ${removed.name}`);
+  }
+
+  for (const added of mods?.ingredientsAdded ?? []) {
+    const delta = Number(added.priceDeltaCents ?? 0);
+    deltaPerUnit += delta;
+    if (delta) charged.push({ label: `  + ${added.name}`, cents: delta * item.qty });
+    else free.push(`  + ${added.name}`);
+  }
+
+  for (const option of mods?.modifierOptions ?? []) {
+    const delta = Number(option.priceDeltaCents ?? 0);
+    deltaPerUnit += delta;
+    if (delta) charged.push({ label: `  > ${option.name}`, cents: delta * item.qty });
+    else free.push(`  > ${option.name}`);
+  }
+
+  return {
+    baseCents: (item.unitPriceCents - deltaPerUnit) * item.qty,
+    charged,
+    free,
+  };
+}
+
 // --- Ticket de cliente ------------------------------------------------------
 
 function buildTicketNodes(order: PrintableOrder, layout: TicketLayout): DocNode[] {
@@ -132,16 +183,30 @@ function buildTicketNodes(order: PrintableOrder, layout: TicketLayout): DocNode[
   nodes.push({ type: "rule" });
 
   for (const item of order.items) {
+    const breakdown = itemBreakdown(item);
+    const title = `${item.qty}x ${item.nameSnapshot}${item.variantSnapshot ? ` (${item.variantSnapshot})` : ""}`;
+
+    // Sólo se desglosa si los suplementos van a imprimirse: si la plantilla los
+    // oculta, poner la base en la cabecera dejaría un ticket cuyas líneas no
+    // suman el total.
+    const desglosar = layout.showModifiers && breakdown.charged.length > 0;
+
     nodes.push({
       type: "row",
-      left: `${item.qty}x ${item.nameSnapshot}${item.variantSnapshot ? ` (${item.variantSnapshot})` : ""}`,
-      right: money(item.lineTotalCents),
+      left: title,
+      right: money(desglosar ? breakdown.baseCents : item.lineTotalCents),
       bold: true,
     });
 
     if (layout.showModifiers) {
-      for (const line of itemModifierLines(item)) nodes.push({ type: "text", value: line });
+      for (const supplement of breakdown.charged) {
+        nodes.push({ type: "row", left: supplement.label, right: money(supplement.cents) });
+      }
+      for (const line of breakdown.free) {
+        nodes.push({ type: "text", value: line });
+      }
     }
+
     if (item.notes) nodes.push({ type: "text", value: `  Nota: ${item.notes}` });
   }
 
