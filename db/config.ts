@@ -309,6 +309,19 @@ const Order = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
     publicId: column.text({ unique: true }),
+
+    /**
+     * Clave de idempotencia del checkout.
+     *
+     * Dos peticiones simultáneas (doble clic, reintento de red, dos pestañas)
+     * leen el carrito antes de que ninguna lo vacíe, así que cada una insertaba
+     * su pedido. El índice único es lo único atómico disponible: la segunda
+     * inserción falla y el endpoint devuelve el pedido ya creado.
+     *
+     * Opcional porque los pedidos anteriores a este cambio no la tienen.
+     */
+    idempotencyKey: column.text({ optional: true, unique: true }),
+
     userId: column.number({ optional: true, references: () => User.columns.id }),
 
     addressId: column.number({ optional: true, references: () => Address.columns.id }),

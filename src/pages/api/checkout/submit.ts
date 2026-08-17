@@ -61,6 +61,76 @@ function json(data: unknown, status = 200) {
   });
 }
 
+type ExistingOrder = {
+  publicId: string;
+  type: string;
+  couponId: number | null;
+  discountCents: number;
+  addressSnapshot: unknown;
+};
+
+/**
+ * ¿El error es una violación de índice único?
+ *
+ * Drizzle envuelve el error de libSQL en uno propio con el texto de la consulta,
+ * así que el "UNIQUE constraint failed" no está en `message` sino en la cadena
+ * de `cause`. Mirar sólo el mensaje dejaba pasar la colisión y el checkout
+ * respondía 500 en vez de devolver el pedido que sí se creó.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  let current: unknown = error;
+
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    const text = current instanceof Error ? `${current.message} ${String((current as { code?: string }).code ?? "")}` : String(current);
+    if (/UNIQUE constraint failed|SQLITE_CONSTRAINT/i.test(text)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return false;
+}
+
+/** Busca el pedido ya creado para una clave de idempotencia. */
+async function findOrderByIdempotencyKey(key: string): Promise<ExistingOrder | null> {
+  const [row] = (await db
+    .select({
+      publicId: Order.publicId,
+      type: Order.type,
+      couponId: Order.couponId,
+      discountCents: Order.discountCents,
+      addressSnapshot: Order.addressSnapshot,
+    })
+    .from(Order)
+    .where(eq(Order.idempotencyKey, key))
+    .limit(1)) as unknown as ExistingOrder[];
+
+  return row ?? null;
+}
+
+/**
+ * Respuesta para un envío repetido: la misma forma que la de éxito, para que el
+ * cliente siga su curso normal (redirigir al pedido o a la pasarela) en vez de
+ * ver un error por algo que sí salió bien.
+ */
+function duplicateResponse(order: ExistingOrder) {
+  const snapshot = (order.addressSnapshot ?? {}) as { paymentMethod?: string };
+  const wasCard = snapshot.paymentMethod === "CARD";
+
+  return {
+    ok: true,
+    duplicate: true,
+    publicId: order.publicId,
+    type: order.type,
+    forcedPickup: false,
+    forcedReason: null,
+    couponId: order.couponId,
+    couponCode: null,
+    discountCents: order.discountCents,
+    savedAddressId: null,
+    loyalty: null,
+    redirectUrl: wasCard ? `/pasarela/prueba/${order.publicId}` : null,
+  };
+}
+
 function safeStr(v: unknown) {
   return String(v ?? "").trim();
 }
@@ -204,6 +274,18 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: "INVALID_JSON" }, 400);
+
+
+  // Idempotencia: el cliente manda la misma clave en todos los reintentos del
+  // mismo checkout. Si ya existe un pedido con ella, se devuelve ese en vez de
+  // crear otro. Se comprueba antes de nada para no repetir validaciones ni
+  // consultas en el segundo clic.
+  const idempotencyKey = safeStr(body.idempotencyKey).slice(0, 80) || null;
+
+  if (idempotencyKey) {
+    const existing = await findOrderByIdempotencyKey(idempotencyKey);
+    if (existing) return json(duplicateResponse(existing));
+  }
 
   const requestedType = safeStr(body.type).toUpperCase();
   const requestedPaymentMethod = normalizePaymentMethod(body.paymentMethod);
@@ -480,8 +562,10 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const publicId = makePublicId();
 
-  await db.insert(Order).values({
+  try {
+    await db.insert(Order).values({
     publicId,
+    idempotencyKey,
     userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
     couponId,
     type,
@@ -510,7 +594,18 @@ export const POST: APIRoute = async ({ request, session }) => {
       now: availability.now,
       dateISO: availability.todayDateISO ?? null,
     },
-  });
+    });
+  } catch (error) {
+    // La comprobación de arriba no cubre dos peticiones simultáneas: ambas
+    // pueden encontrar la clave libre antes de que ninguna inserte. El índice
+    // único es lo que decide, y aquí se recupera el pedido que sí ganó.
+    if (idempotencyKey && isUniqueViolation(error)) {
+      const existing = await findOrderByIdempotencyKey(idempotencyKey);
+      if (existing) return json(duplicateResponse(existing));
+    }
+
+    throw error;
+  }
 
   const [created] = await db
     .select({ id: Order.id })

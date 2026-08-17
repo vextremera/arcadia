@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { getClientLang, type ClientSiteLang } from "@/islands/_shared/lang";
 import { formatEuros as money } from "@/lib/money";
@@ -118,10 +118,10 @@ const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
 
 
 const checkoutCopy = {
-  es: { loading: "Cargando checkout…", empty: "Tu carrito está vacío.", incompleteArea: "Completa ciudad y código postal para comprobar si entra en la zona de reparto.", outsideArea: "Esta dirección está fuera de la zona de reparto. Solo repartimos en Lloret de Mar (17310).", insideArea: "Dirección dentro de la zona de reparto.", couponError: "No se ha podido validar el cupón.", defaultError: "No se pudo marcar como default.", defaultOk: "Dirección marcada como default.", submitError: "Error al crear el pedido", pickupOnly: "Solo recogida", deliveryUnavailable: "Delivery no disponible ahora", orderType: "Tipo de pedido", delivery: "Delivery", pickup: "Recogida", contact: "Datos de contacto", name: "Nombre", phone: "Teléfono", emailOptional: "Email (opcional)", address: "Dirección", account: "Mi cuenta", savedAddress: "Usar dirección guardada", newAddress: "— Introducir nueva —", makeDefault: "Hacer default", defaultTag: " (default)", savedHint: "Si eliges una guardada, no se volverá a guardar.", floor: "Piso/puerta (opcional)", city: "Ciudad", postalCode: "Código postal", addressNotes: "Notas de dirección (opcional)", deliveryZone: "Zona de reparto", saveAddress: "Guardar esta dirección en mi cuenta", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Trabajo / Suegros…", saveDefault: "Guardar como dirección default", loginToSave: "Inicia sesión para guardar direcciones en tu cuenta.", payment: "Pago", paymentInfo: "Efectivo y tarjeta están disponibles tanto en delivery como en recogida.", cash: "Efectivo", card: "Tarjeta", coupon: "Cupón", apply: "Aplicar", validating: "Validando…", remove: "Quitar", orderComments: "Comentarios del pedido", orderCommentsHelp: "Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).", summary: "Resumen", subtotal: "Subtotal", total: "Total", confirm: "Confirmar pedido" },
-  ca: { loading: "Carregant checkout…", empty: "El teu carret és buit.", incompleteArea: "Completa ciutat i codi postal per comprovar si entra dins la zona de repartiment.", outsideArea: "Aquesta adreça és fora de la zona de repartiment. Només repartim a Lloret de Mar (17310).", insideArea: "Adreça dins la zona de repartiment.", couponError: "No s'ha pogut validar el cupó.", defaultError: "No s'ha pogut marcar com a default.", defaultOk: "Adreça marcada com a default.", submitError: "Error en crear la comanda", pickupOnly: "Només recollida", deliveryUnavailable: "Delivery no disponible ara", orderType: "Tipus de comanda", delivery: "Delivery", pickup: "Recollida", contact: "Dades de contacte", name: "Nom", phone: "Telèfon", emailOptional: "Email (opcional)", address: "Adreça", account: "El meu compte", savedAddress: "Fer servir una adreça guardada", newAddress: "— Introduir-ne una de nova —", makeDefault: "Fer default", defaultTag: " (default)", savedHint: "Si n'esculls una de guardada, no es tornarà a desar.", floor: "Pis/porta (opcional)", city: "Ciutat", postalCode: "Codi postal", addressNotes: "Notes de l'adreça (opcional)", deliveryZone: "Zona de repartiment", saveAddress: "Guardar aquesta adreça al meu compte", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Feina / Família…", saveDefault: "Guardar com a adreça default", loginToSave: "Inicia sessió per guardar adreces al teu compte.", payment: "Pagament", paymentInfo: "Efectiu i targeta estan disponibles tant per delivery com per recollida.", cash: "Efectiu", card: "Targeta", coupon: "Cupó", apply: "Aplicar", validating: "Validant…", remove: "Treure", orderComments: "Comentaris de la comanda", orderCommentsHelp: "Per a coses com “més fet”, “sense sal”, etc. (no ingredients).", summary: "Resum", subtotal: "Subtotal", total: "Total", confirm: "Confirmar comanda" },
-  en: { loading: "Loading checkout…", empty: "Your cart is empty.", incompleteArea: "Complete city and postal code to check whether it is inside the delivery area.", outsideArea: "This address is outside the delivery area. We only deliver in Lloret de Mar (17310).", insideArea: "Address inside the delivery area.", couponError: "The coupon could not be validated.", defaultError: "Could not mark as default.", defaultOk: "Address marked as default.", submitError: "Error creating the order", pickupOnly: "Pickup only", deliveryUnavailable: "Delivery unavailable right now", orderType: "Order type", delivery: "Delivery", pickup: "Pickup", contact: "Contact details", name: "Name", phone: "Phone", emailOptional: "Email (optional)", address: "Address", account: "My account", savedAddress: "Use saved address", newAddress: "— Enter a new one —", makeDefault: "Make default", defaultTag: " (default)", savedHint: "If you choose a saved one, it will not be stored again.", floor: "Flat / door (optional)", city: "City", postalCode: "Postal code", addressNotes: "Address notes (optional)", deliveryZone: "Delivery area", saveAddress: "Save this address to my account", labelOptional: "Label (optional)", labelPlaceholder: "Home / Work / Parents…", saveDefault: "Save as default address", loginToSave: "Sign in to save addresses to your account.", payment: "Payment", paymentInfo: "Cash and card are available for both delivery and pickup.", cash: "Cash", card: "Card", coupon: "Coupon", apply: "Apply", validating: "Validating…", remove: "Remove", orderComments: "Order notes", orderCommentsHelp: "For things like “well done”, “no salt”, etc. (not ingredients).", summary: "Summary", subtotal: "Subtotal", total: "Total", confirm: "Confirm order" },
-  fr: { loading: "Chargement du checkout…", empty: "Votre panier est vide.", incompleteArea: "Complétez la ville et le code postal pour vérifier si l'adresse est dans la zone de livraison.", outsideArea: "Cette adresse est hors de la zone de livraison. Nous livrons uniquement à Lloret de Mar (17310).", insideArea: "Adresse dans la zone de livraison.", couponError: "Le coupon n'a pas pu être validé.", defaultError: "Impossible de définir cette adresse par défaut.", defaultOk: "Adresse définie par défaut.", submitError: "Erreur lors de la création de la commande", pickupOnly: "Retrait uniquement", deliveryUnavailable: "Livraison indisponible pour le moment", orderType: "Type de commande", delivery: "Livraison", pickup: "Retrait", contact: "Coordonnées", name: "Nom", phone: "Téléphone", emailOptional: "Email (optionnel)", address: "Adresse", account: "Mon compte", savedAddress: "Utiliser une adresse enregistrée", newAddress: "— Saisir une nouvelle adresse —", makeDefault: "Définir par défaut", defaultTag: " (défaut)", savedHint: "Si vous en choisissez une enregistrée, elle ne sera pas sauvegardée de nouveau.", floor: "Étage / porte (optionnel)", city: "Ville", postalCode: "Code postal", addressNotes: "Notes d'adresse (optionnel)", deliveryZone: "Zone de livraison", saveAddress: "Enregistrer cette adresse dans mon compte", labelOptional: "Étiquette (optionnel)", labelPlaceholder: "Maison / Travail / Famille…", saveDefault: "Enregistrer comme adresse par défaut", loginToSave: "Connectez-vous pour enregistrer des adresses dans votre compte.", payment: "Paiement", paymentInfo: "Espèces et carte sont disponibles aussi bien en livraison qu'en retrait.", cash: "Espèces", card: "Carte", coupon: "Coupon", apply: "Appliquer", validating: "Validation…", remove: "Retirer", orderComments: "Commentaires de la commande", orderCommentsHelp: "Pour des choses comme “plus cuit”, “sans sel”, etc. (pas des ingrédients).", summary: "Résumé", subtotal: "Sous-total", total: "Total", confirm: "Confirmer la commande" },
+  es: { loading: "Cargando checkout…", empty: "Tu carrito está vacío.", incompleteArea: "Completa ciudad y código postal para comprobar si entra en la zona de reparto.", outsideArea: "Esta dirección está fuera de la zona de reparto. Solo repartimos en Lloret de Mar (17310).", insideArea: "Dirección dentro de la zona de reparto.", couponError: "No se ha podido validar el cupón.", defaultError: "No se pudo marcar como default.", defaultOk: "Dirección marcada como default.", submitError: "Error al crear el pedido", pickupOnly: "Solo recogida", deliveryUnavailable: "Delivery no disponible ahora", orderType: "Tipo de pedido", delivery: "Delivery", pickup: "Recogida", contact: "Datos de contacto", name: "Nombre", phone: "Teléfono", emailOptional: "Email (opcional)", address: "Dirección", account: "Mi cuenta", savedAddress: "Usar dirección guardada", newAddress: "— Introducir nueva —", makeDefault: "Hacer default", defaultTag: " (default)", savedHint: "Si eliges una guardada, no se volverá a guardar.", floor: "Piso/puerta (opcional)", city: "Ciudad", postalCode: "Código postal", addressNotes: "Notas de dirección (opcional)", deliveryZone: "Zona de reparto", saveAddress: "Guardar esta dirección en mi cuenta", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Trabajo / Suegros…", saveDefault: "Guardar como dirección default", loginToSave: "Inicia sesión para guardar direcciones en tu cuenta.", payment: "Pago", paymentInfo: "Efectivo y tarjeta están disponibles tanto en delivery como en recogida.", cash: "Efectivo", card: "Tarjeta", coupon: "Cupón", apply: "Aplicar", validating: "Validando…", remove: "Quitar", orderComments: "Comentarios del pedido", orderCommentsHelp: "Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).", summary: "Resumen", subtotal: "Subtotal", total: "Total", confirm: "Confirmar pedido", submitting: "Enviando pedido…" },
+  ca: { loading: "Carregant checkout…", empty: "El teu carret és buit.", incompleteArea: "Completa ciutat i codi postal per comprovar si entra dins la zona de repartiment.", outsideArea: "Aquesta adreça és fora de la zona de repartiment. Només repartim a Lloret de Mar (17310).", insideArea: "Adreça dins la zona de repartiment.", couponError: "No s'ha pogut validar el cupó.", defaultError: "No s'ha pogut marcar com a default.", defaultOk: "Adreça marcada com a default.", submitError: "Error en crear la comanda", pickupOnly: "Només recollida", deliveryUnavailable: "Delivery no disponible ara", orderType: "Tipus de comanda", delivery: "Delivery", pickup: "Recollida", contact: "Dades de contacte", name: "Nom", phone: "Telèfon", emailOptional: "Email (opcional)", address: "Adreça", account: "El meu compte", savedAddress: "Fer servir una adreça guardada", newAddress: "— Introduir-ne una de nova —", makeDefault: "Fer default", defaultTag: " (default)", savedHint: "Si n'esculls una de guardada, no es tornarà a desar.", floor: "Pis/porta (opcional)", city: "Ciutat", postalCode: "Codi postal", addressNotes: "Notes de l'adreça (opcional)", deliveryZone: "Zona de repartiment", saveAddress: "Guardar aquesta adreça al meu compte", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Feina / Família…", saveDefault: "Guardar com a adreça default", loginToSave: "Inicia sessió per guardar adreces al teu compte.", payment: "Pagament", paymentInfo: "Efectiu i targeta estan disponibles tant per delivery com per recollida.", cash: "Efectiu", card: "Targeta", coupon: "Cupó", apply: "Aplicar", validating: "Validant…", remove: "Treure", orderComments: "Comentaris de la comanda", orderCommentsHelp: "Per a coses com “més fet”, “sense sal”, etc. (no ingredients).", summary: "Resum", subtotal: "Subtotal", total: "Total", confirm: "Confirmar comanda", submitting: "Enviant comanda…" },
+  en: { loading: "Loading checkout…", empty: "Your cart is empty.", incompleteArea: "Complete city and postal code to check whether it is inside the delivery area.", outsideArea: "This address is outside the delivery area. We only deliver in Lloret de Mar (17310).", insideArea: "Address inside the delivery area.", couponError: "The coupon could not be validated.", defaultError: "Could not mark as default.", defaultOk: "Address marked as default.", submitError: "Error creating the order", pickupOnly: "Pickup only", deliveryUnavailable: "Delivery unavailable right now", orderType: "Order type", delivery: "Delivery", pickup: "Pickup", contact: "Contact details", name: "Name", phone: "Phone", emailOptional: "Email (optional)", address: "Address", account: "My account", savedAddress: "Use saved address", newAddress: "— Enter a new one —", makeDefault: "Make default", defaultTag: " (default)", savedHint: "If you choose a saved one, it will not be stored again.", floor: "Flat / door (optional)", city: "City", postalCode: "Postal code", addressNotes: "Address notes (optional)", deliveryZone: "Delivery area", saveAddress: "Save this address to my account", labelOptional: "Label (optional)", labelPlaceholder: "Home / Work / Parents…", saveDefault: "Save as default address", loginToSave: "Sign in to save addresses to your account.", payment: "Payment", paymentInfo: "Cash and card are available for both delivery and pickup.", cash: "Cash", card: "Card", coupon: "Coupon", apply: "Apply", validating: "Validating…", remove: "Remove", orderComments: "Order notes", orderCommentsHelp: "For things like “well done”, “no salt”, etc. (not ingredients).", summary: "Summary", subtotal: "Subtotal", total: "Total", confirm: "Confirm order", submitting: "Sending order…" },
+  fr: { loading: "Chargement du checkout…", empty: "Votre panier est vide.", incompleteArea: "Complétez la ville et le code postal pour vérifier si l'adresse est dans la zone de livraison.", outsideArea: "Cette adresse est hors de la zone de livraison. Nous livrons uniquement à Lloret de Mar (17310).", insideArea: "Adresse dans la zone de livraison.", couponError: "Le coupon n'a pas pu être validé.", defaultError: "Impossible de définir cette adresse par défaut.", defaultOk: "Adresse définie par défaut.", submitError: "Erreur lors de la création de la commande", pickupOnly: "Retrait uniquement", deliveryUnavailable: "Livraison indisponible pour le moment", orderType: "Type de commande", delivery: "Livraison", pickup: "Retrait", contact: "Coordonnées", name: "Nom", phone: "Téléphone", emailOptional: "Email (optionnel)", address: "Adresse", account: "Mon compte", savedAddress: "Utiliser une adresse enregistrée", newAddress: "— Saisir une nouvelle adresse —", makeDefault: "Définir par défaut", defaultTag: " (défaut)", savedHint: "Si vous en choisissez une enregistrée, elle ne sera pas sauvegardée de nouveau.", floor: "Étage / porte (optionnel)", city: "Ville", postalCode: "Code postal", addressNotes: "Notes d'adresse (optionnel)", deliveryZone: "Zone de livraison", saveAddress: "Enregistrer cette adresse dans mon compte", labelOptional: "Étiquette (optionnel)", labelPlaceholder: "Maison / Travail / Famille…", saveDefault: "Enregistrer comme adresse par défaut", loginToSave: "Connectez-vous pour enregistrer des adresses dans votre compte.", payment: "Paiement", paymentInfo: "Espèces et carte sont disponibles aussi bien en livraison qu'en retrait.", cash: "Espèces", card: "Carte", coupon: "Coupon", apply: "Appliquer", validating: "Validation…", remove: "Retirer", orderComments: "Commentaires de la commande", orderCommentsHelp: "Pour des choses comme “plus cuit”, “sans sel”, etc. (pas des ingrédients).", summary: "Résumé", subtotal: "Sous-total", total: "Total", confirm: "Confirmer la commande", submitting: "Envoi de la commande…" },
 } satisfies Record<ClientSiteLang, Record<string, string>>;
 
 
@@ -167,6 +167,22 @@ export default function CheckoutForm() {
     message: string;
   } | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Clave de idempotencia del intento de compra.
+   *
+   * Se genera una sola vez y se reutiliza en cada envío, que es justo lo que
+   * permite al servidor reconocer el segundo clic como el mismo pedido. Si se
+   * generase por clic, dos clics serían dos claves y dos pedidos.
+   */
+  const idempotencyKeyRef = useRef<string>("");
+  if (!idempotencyKeyRef.current) {
+    idempotencyKeyRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `ck-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 
   const lang = useMemo(() => getClientLang(), []);
   const tt = useMemo(() => checkoutCopy[lang], [lang]);
@@ -387,6 +403,12 @@ export default function CheckoutForm() {
   async function submit() {
     if (!cart || cart.items.length === 0) return;
 
+    // Primera barrera contra el doble clic. No basta por sí sola —no sobrevive
+    // a una recarga ni a dos pestañas—, de ahí la clave de idempotencia que
+    // acompaña a la petición.
+    if (submitting) return;
+    setSubmitting(true);
+
     const currentName = customerName.trim();
     const currentPhone = customerPhone.trim();
 
@@ -396,6 +418,7 @@ export default function CheckoutForm() {
         (currentPhone && currentPhone !== initialProfilePhone));
 
     const payload = {
+      idempotencyKey: idempotencyKeyRef.current,
       type,
       paymentMethod,
       orderNotes,
@@ -426,17 +449,26 @@ export default function CheckoutForm() {
           : undefined,
     };
 
-    const res = await fetch("/api/checkout/submit", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/checkout/submit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Sin esto, un corte de red dejaría el botón bloqueado para siempre.
+      setSubmitting(false);
+      alert(tt.submitError);
+      return;
+    }
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (data?.error === "OUTSIDE_DELIVERY_AREA") {
         setType("PICKUP");
       }
+      setSubmitting(false);
       alert(data?.message || data?.error || tt.submitError);
       return;
     }
@@ -869,13 +901,14 @@ export default function CheckoutForm() {
           </div>
 
           <button
-            class={`mt-4 min-h-12 w-full rounded-xl bg-zinc-900 px-4 py-3 text-base font-semibold text-white ${checkoutBlocked ? "opacity-60 pointer-events-none" : ""
+            class={`mt-4 min-h-12 w-full rounded-xl bg-zinc-900 px-4 py-3 text-base font-semibold text-white ${checkoutBlocked || submitting ? "opacity-60 pointer-events-none" : ""
               }`}
             type="button"
             onClick={submit}
-            disabled={checkoutBlocked}
+            disabled={checkoutBlocked || submitting}
+            aria-busy={submitting}
           >
-            {tt.confirm}
+            {submitting ? tt.submitting : tt.confirm}
           </button>
         </div>
       </aside>
