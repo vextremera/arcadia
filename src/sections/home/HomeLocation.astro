@@ -1,6 +1,5 @@
 ---
 import LazyMap from "@/islands/home/LazyMap";
-import TripadvisorLogo from "public/assets/logos/tripadvisor_logo.svg";
 import GoogleLogo from "public/assets/logos/google_logo.svg";
 import { DEFAULT_LANG } from "@/lib/i18n";
 import { getPublicCopy } from "@/lib/publicCopy";
@@ -14,11 +13,9 @@ const addressLines = [
 ];
 
 const phone = "+34 656 56 25 10";
-const email = "info@bararcadia.com";
-const instagram = "@victor_arcadia";
+const email = "victorarcadia@gmail.com";
 
 const ratings = {
-  tripadvisor: { label: "Tripadvisor", rating: 5, count: 0 },
   google: { label: "Google", rating: 5, count: 0 },
 };
 
@@ -45,20 +42,6 @@ const mapQuery =
         </div>
 
         <div class="mt-6 flex flex-wrap gap-3">
-          <div
-            class="flex items-center gap-2 rounded-full border-2 border-emerald-600 px-4 py-2 text-md"
-          >
-            <span class="font-semibold text-emerald-900">
-              <TripadvisorLogo class="inline-block size-8 mr-2" />
-              {ratings.tripadvisor.label}
-            </span>
-            <span class="text-emerald-900 text-[18px] tracking-widest ml-3"
-              >{"★".repeat(5)}</span
-            >
-          </div>
-        </div>
-
-        <div class="mt-2 flex flex-wrap gap-3">
           <div
             class="flex items-center gap-2 rounded-full border-2 border-yellow-400 px-4 py-2 text-md"
           >
@@ -88,12 +71,6 @@ const mapQuery =
             <span class="font-semibold break-all sm:wrap-break-words"
               >{email}</span
             >
-          </div>
-          <div
-            class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-          >
-            <span class="text-zinc-600">{t.instagram}</span>
-            <span class="font-semibold wrap-break-words">{instagram}</span>
           </div>
         </div>
       </div>

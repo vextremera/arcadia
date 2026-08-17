@@ -49,9 +49,7 @@ type PublicCopy = {
         location: {
             title: string;
             phone: string;
-            email: string;
-            instagram: string;
-        };
+            email: string;        };
         newsletter: {
             title: string;
             subtitle: string;
@@ -167,9 +165,7 @@ const publicCopy: Record<SiteLang, PublicCopy> = {
             location: {
                 title: "UBICACIÓN",
                 phone: "Teléfono:",
-                email: "Correo:",
-                instagram: "Instagram:",
-            },
+                email: "Correo:",            },
             newsletter: {
                 title: "¿TE APETECE ARCADIA HOY?",
                 subtitle: "Regístrate a nuestras ofertas y novedades",
@@ -287,9 +283,7 @@ const publicCopy: Record<SiteLang, PublicCopy> = {
             location: {
                 title: "UBICACIÓ",
                 phone: "Telèfon:",
-                email: "Correu:",
-                instagram: "Instagram:",
-            },
+                email: "Correu:",            },
             newsletter: {
                 title: "ET VE DE GUST ARCADIA AVUI?",
                 subtitle: "Registra’t a les nostres ofertes i novetats",
@@ -407,9 +401,7 @@ const publicCopy: Record<SiteLang, PublicCopy> = {
             location: {
                 title: "LOCATION",
                 phone: "Phone:",
-                email: "Email:",
-                instagram: "Instagram:",
-            },
+                email: "Email:",            },
             newsletter: {
                 title: "FEEL LIKE ARCADIA TODAY?",
                 subtitle: "Subscribe to our offers and updates",
@@ -527,9 +519,7 @@ const publicCopy: Record<SiteLang, PublicCopy> = {
             location: {
                 title: "EMPLACEMENT",
                 phone: "Téléphone :",
-                email: "Email :",
-                instagram: "Instagram :",
-            },
+                email: "Email :",            },
             newsletter: {
                 title: "ENVIE D’ARCADIA AUJOURD’HUI ?",
                 subtitle: "Inscrivez-vous à nos offres et nouveautés",

@@ -22,7 +22,7 @@ async function getNextSubscriberId() {
 }
 
 export const POST: APIRoute = async ({ request, locals }) => {
-  let body: { email?: string } | null = null;
+  let body: { email?: string; acceptedTerms?: boolean } | null = null;
 
   try {
     body = await request.json();
@@ -33,6 +33,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const email = normalizeEmail(body?.email);
   if (!email || !isValidEmail(email)) {
     return json({ ok: false, message: "Introduce un correo válido." }, 400);
+  }
+
+  // El consentimiento se comprueba también aquí: comprobarlo sólo en el
+  // navegador no sirve como prueba de nada, y este endpoint es público.
+  if (body?.acceptedTerms !== true) {
+    return json(
+      { ok: false, message: "Debes aceptar los términos y la política de privacidad." },
+      400,
+    );
   }
 
   const [linkedUser] = await db

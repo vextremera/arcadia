@@ -6,6 +6,7 @@ const ARROW = (
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [msg, setMsg] = useState<string>("");
 
@@ -13,13 +14,19 @@ export default function NewsletterForm() {
     const value = email.trim();
     if (!value) return;
 
+    if (!accepted) {
+      setStatus("error");
+      setMsg("Debes aceptar los términos y la política de privacidad.");
+      return;
+    }
+
     setStatus("loading");
     setMsg("");
 
     const res = await fetch("/api/marketing/subscribe", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: value }),
+      body: JSON.stringify({ email: value, acceptedTerms: true }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -32,6 +39,8 @@ export default function NewsletterForm() {
     setStatus("ok");
     setMsg("¡Perfecto! Te avisaremos con ofertas y novedades.");
     setEmail("");
+    // El consentimiento se pide de nuevo para cada alta: no se arrastra.
+    setAccepted(false);
   }
 
   return (
@@ -60,8 +69,28 @@ export default function NewsletterForm() {
         </button>
       </div>
 
+      <label class="mt-4 flex min-h-11 cursor-pointer items-start gap-3 text-sm text-white/80 sm:items-center">
+        <input
+          type="checkbox"
+          checked={accepted}
+          onChange={(event) => setAccepted((event.target as HTMLInputElement).checked)}
+          class="mt-0.5 h-5 w-5 shrink-0 rounded border-white/40 sm:mt-0"
+        />
+        <span>
+          Acepto los{" "}
+          <a class="underline hover:text-white" href="/legal" target="_blank" rel="noreferrer">
+            términos y condiciones
+          </a>{" "}
+          y la{" "}
+          <a class="underline hover:text-white" href="/privacidad" target="_blank" rel="noreferrer">
+            política de privacidad
+          </a>
+          .
+        </span>
+      </label>
+
       {msg ? (
-        <div class={`mt-4 text-sm ${status === "error" ? "text-red-200" : "text-white/80"}`}>
+        <div class={`mt-3 text-sm ${status === "error" ? "text-red-200" : "text-white/80"}`}>
           {msg}
         </div>
       ) : null}

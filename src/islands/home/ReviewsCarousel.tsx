@@ -4,7 +4,7 @@ export type Review = {
   name: string;
   text: string;
   rating: number;
-  source: "Google" | "Tripadvisor";
+  source: "Google";
   totalReviews?: number;
   avatarUrl?: string | null;
 };
