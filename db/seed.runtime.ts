@@ -48,42 +48,37 @@ async function getNextId(table: any, idColumn: any) {
   return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
 }
 
-async function upsertSetting(key: string, value: unknown) {
+/**
+ * Crea el ajuste sólo si no existe.
+ *
+ * Antes esto sobrescribía siempre, y como el bootstrap corre en cada
+ * despliegue, cada deploy devolvía a sus valores por defecto los gastos de
+ * envío, los horarios, el precio y horario del menú y las banderas de
+ * operativa. Es decir: lo que el restaurante configuraba desde el admin se
+ * deshacía solo en la siguiente subida, sin avisar.
+ *
+ * Sembrar es rellenar lo que falta, no imponer valores.
+ */
+async function seedSettingIfMissing(key: string, value: unknown) {
   const [existing] = await db
     .select({ id: AppSetting.id })
     .from(AppSetting)
     .where(eq(AppSetting.key, key))
     .limit(1);
 
-  if (existing) {
-    await db
-      .update(AppSetting)
-      .set({
-        value,
-        updatedAt: new Date(),
-      })
-      .where(eq(AppSetting.id, existing.id));
-
-    return;
-  }
+  if (existing) return;
 
   const nextId = await getNextId(AppSetting, AppSetting.id);
-
-  await db.insert(AppSetting).values({
-    id: nextId,
-    key,
-    value,
-    updatedAt: new Date(),
-  });
+  await db.insert(AppSetting).values({ id: nextId, key, value, updatedAt: new Date() });
 }
 
 async function seedSettings() {
-  await upsertSetting("operatingHours", DEFAULT_OPERATING_HOURS);
-  await upsertSetting("deliveryFee", { cents: 0 });
-  await upsertSetting("fees", { deliveryFeeCents: 0 });
-  await upsertSetting("opsFlags", { pauseOrders: false, forcePickup: false });
-  await upsertSetting("payments", DEFAULT_PAYMENTS);
-  await upsertSetting("menuConfigV2", DEFAULT_MENU_CONFIG_V2);
+  await seedSettingIfMissing("operatingHours", DEFAULT_OPERATING_HOURS);
+  await seedSettingIfMissing("deliveryFee", { cents: 0 });
+  await seedSettingIfMissing("fees", { deliveryFeeCents: 0 });
+  await seedSettingIfMissing("opsFlags", { pauseOrders: false, forcePickup: false });
+  await seedSettingIfMissing("payments", DEFAULT_PAYMENTS);
+  await seedSettingIfMissing("menuConfigV2", DEFAULT_MENU_CONFIG_V2);
 }
 
 async function seedOpeningHoursIfEmpty() {
