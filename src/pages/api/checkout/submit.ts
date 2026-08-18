@@ -4,6 +4,7 @@ import {
   AppSetting,
   Order,
   OrderItem,
+  CheckoutClaim,
   Product,
   ProductVariant,
   ModifierOption,
@@ -89,21 +90,80 @@ function isUniqueViolation(error: unknown): boolean {
   return false;
 }
 
-/** Busca el pedido ya creado para una clave de idempotencia. */
-async function findOrderByIdempotencyKey(key: string): Promise<ExistingOrder | null> {
-  const [row] = (await db
-    .select({
-      publicId: Order.publicId,
-      type: Order.type,
-      couponId: Order.couponId,
-      discountCents: Order.discountCents,
-      addressSnapshot: Order.addressSnapshot,
-    })
-    .from(Order)
-    .where(eq(Order.idempotencyKey, key))
-    .limit(1)) as unknown as ExistingOrder[];
+async function nextCheckoutClaimId() {
+  const rows = await db.select({ id: CheckoutClaim.id }).from(CheckoutClaim);
+  return rows.reduce((max, row) => Math.max(max, Number(row.id ?? 0)), 0) + 1;
+}
 
-  return row ?? null;
+/**
+ * Reserva la clave antes de crear nada.
+ *
+ * Devuelve "claimed" si esta petición es la que debe crear el pedido, o
+ * "duplicate" si otra ya reservó la misma clave. El índice único es lo que
+ * decide: dos peticiones simultáneas intentan insertar y sólo una gana.
+ */
+async function claimIdempotencyKey(key: string): Promise<"claimed" | "duplicate"> {
+  try {
+    await db.insert(CheckoutClaim).values({
+      id: await nextCheckoutClaimId(),
+      key,
+      orderPublicId: null,
+      createdAt: new Date(),
+    });
+    return "claimed";
+  } catch (error) {
+    if (isUniqueViolation(error)) return "duplicate";
+    throw error;
+  }
+}
+
+/** Anota el pedido resultante en la reserva, para poder devolverlo en reintentos. */
+async function completeClaim(key: string, publicId: string) {
+  await db.update(CheckoutClaim).set({ orderPublicId: publicId }).where(eq(CheckoutClaim.key, key));
+}
+
+/** Libera la reserva si el pedido no llegó a crearse, para permitir reintentar. */
+async function releaseClaim(key: string) {
+  await db.delete(CheckoutClaim).where(eq(CheckoutClaim.key, key));
+}
+
+/**
+ * Busca el pedido de una reserva ya existente.
+ *
+ * La reserva puede existir sin pedido todavía: es la ventana en la que la otra
+ * petición aún lo está creando. Se reintenta un poco antes de rendirse, porque
+ * en la práctica dura milisegundos.
+ */
+async function findOrderByClaim(key: string): Promise<ExistingOrder | null> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const [claim] = await db
+      .select({ orderPublicId: CheckoutClaim.orderPublicId })
+      .from(CheckoutClaim)
+      .where(eq(CheckoutClaim.key, key))
+      .limit(1);
+
+    if (!claim) return null;
+
+    if (claim.orderPublicId) {
+      const [row] = (await db
+        .select({
+          publicId: Order.publicId,
+          type: Order.type,
+          couponId: Order.couponId,
+          discountCents: Order.discountCents,
+          addressSnapshot: Order.addressSnapshot,
+        })
+        .from(Order)
+        .where(eq(Order.publicId, claim.orderPublicId))
+        .limit(1)) as unknown as ExistingOrder[];
+
+      return row ?? null;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  return null;
 }
 
 /**
@@ -282,8 +342,11 @@ export const POST: APIRoute = async ({ request, session }) => {
   // consultas en el segundo clic.
   const idempotencyKey = safeStr(body.idempotencyKey).slice(0, 80) || null;
 
+  // Salida temprana y de sólo lectura para el caso normal de reintento: el
+  // pedido ya existe. La reserva se hace más abajo, justo antes de crearlo,
+  // para que un fallo de validación no deje la clave bloqueada.
   if (idempotencyKey) {
-    const existing = await findOrderByIdempotencyKey(idempotencyKey);
+    const existing = await findOrderByClaim(idempotencyKey);
     if (existing) return json(duplicateResponse(existing));
   }
 
@@ -562,10 +625,29 @@ export const POST: APIRoute = async ({ request, session }) => {
 
   const publicId = makePublicId();
 
+  // Reserva atómica: si otra petición con la misma clave llegó antes, ésta no
+  // crea nada y devuelve el pedido de aquélla. Va aquí y no al principio para
+  // que un fallo de validación no deje la clave bloqueada.
+  if (idempotencyKey) {
+    const claim = await claimIdempotencyKey(idempotencyKey);
+
+    if (claim === "duplicate") {
+      const existing = await findOrderByClaim(idempotencyKey);
+      if (existing) return json(duplicateResponse(existing));
+
+      // Reserva sin pedido tras esperar: la otra petición murió a mitad. Se
+      // libera para que el cliente pueda reintentar en vez de quedar atascado.
+      await releaseClaim(idempotencyKey);
+      return json(
+        { error: "CHECKOUT_IN_PROGRESS", message: "Tu pedido se está procesando. Vuelve a intentarlo." },
+        409,
+      );
+    }
+  }
+
   try {
     await db.insert(Order).values({
     publicId,
-    idempotencyKey,
     userId: authUser?.role === "CUSTOMER" ? authUser.id : null,
     couponId,
     type,
@@ -596,14 +678,9 @@ export const POST: APIRoute = async ({ request, session }) => {
     },
     });
   } catch (error) {
-    // La comprobación de arriba no cubre dos peticiones simultáneas: ambas
-    // pueden encontrar la clave libre antes de que ninguna inserte. El índice
-    // único es lo que decide, y aquí se recupera el pedido que sí ganó.
-    if (idempotencyKey && isUniqueViolation(error)) {
-      const existing = await findOrderByIdempotencyKey(idempotencyKey);
-      if (existing) return json(duplicateResponse(existing));
-    }
-
+    // Si el pedido no llega a crearse, la reserva no puede quedarse puesta: el
+    // cliente se quedaría sin poder reintentar con la misma clave.
+    if (idempotencyKey) await releaseClaim(idempotencyKey);
     throw error;
   }
 
@@ -613,7 +690,14 @@ export const POST: APIRoute = async ({ request, session }) => {
     .where(eq(Order.publicId, publicId))
     .limit(1);
 
-  if (!created) return json({ error: "ORDER_CREATE_FAILED" }, 500);
+  if (!created) {
+    if (idempotencyKey) await releaseClaim(idempotencyKey);
+    return json({ error: "ORDER_CREATE_FAILED" }, 500);
+  }
+
+  // A partir de aquí el pedido existe: la reserva apunta a él, y cualquier
+  // reintento con la misma clave lo devolverá en vez de crear otro.
+  if (idempotencyKey) await completeClaim(idempotencyKey, publicId);
 
   if (pm === "CARD") {
     const payment = await buildCardPaymentInsert({

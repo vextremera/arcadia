@@ -310,18 +310,6 @@ const Order = defineTable({
     id: column.number({ primaryKey: true }),
     publicId: column.text({ unique: true }),
 
-    /**
-     * Clave de idempotencia del checkout.
-     *
-     * Dos peticiones simultáneas (doble clic, reintento de red, dos pestañas)
-     * leen el carrito antes de que ninguna lo vacíe, así que cada una insertaba
-     * su pedido. El índice único es lo único atómico disponible: la segunda
-     * inserción falla y el endpoint devuelve el pedido ya creado.
-     *
-     * Opcional porque los pedidos anteriores a este cambio no la tienen.
-     */
-    idempotencyKey: column.text({ optional: true, unique: true }),
-
     userId: column.number({ optional: true, references: () => User.columns.id }),
 
     addressId: column.number({ optional: true, references: () => Address.columns.id }),
@@ -556,6 +544,30 @@ const TicketTemplate = defineTable({
 });
 
 /**
+ * Reserva de idempotencia del checkout.
+ *
+ * Dos peticiones simultáneas (doble clic, reintento de red, dos pestañas) leen
+ * el carrito antes de que ninguna lo vacíe, así que cada una crearía su pedido.
+ * El índice único es lo único atómico disponible para decidir cuál gana: la
+ * segunda inserción falla y el endpoint devuelve el pedido ya creado.
+ *
+ * Vive en tabla propia y no como columna de Order a propósito. Añadir una
+ * columna única a Order obliga a SQLite a recrear la tabla, y su DROP falla por
+ * las claves ajenas de OrderItem, Payment, Refund, LoyaltyLedger y PrintJob:
+ * el despliegue se caía ahí. Una tabla nueva es puramente aditiva.
+ */
+const CheckoutClaim = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    key: column.text({ unique: true }),
+    /** publicId del pedido resultante; null mientras se está creando. */
+    orderPublicId: column.text({ optional: true }),
+    createdAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "key", unique: true }, { on: "createdAt" }]
+});
+
+/**
  * Impresora física del local.
  *
  * `host`/`port` son la dirección en la LAN del restaurante (ESC/POS crudo sobre
@@ -683,6 +695,7 @@ export default defineDb({
     TicketTemplate,
     Printer,
     PrintJob,
+    CheckoutClaim,
 
     UpsellItem,
 
