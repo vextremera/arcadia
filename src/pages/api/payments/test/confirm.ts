@@ -64,11 +64,13 @@ export const POST: APIRoute = async ({ request, session }) => {
             })
             .where(eq(Payment.id, payment.id));
 
+        // Sólo cambia el estado de cobro. El del pedido sigue siendo "Nuevo":
+        // pagar no es un paso del flujo de preparación, y son dos columnas
+        // distintas precisamente para poder distinguirlo.
         await db
             .update(Order)
             .set({
                 paymentStatus: "PAID",
-                status: "PAID",
                 updatedAt: new Date(),
             })
             .where(eq(Order.id, order.id));

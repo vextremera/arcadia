@@ -61,11 +61,7 @@ for (const r of itemRows) {
 function statusLabel(s: string) {
   switch (s) {
     case "PENDING": return "Pendiente";
-    case "PAID": return "Pagado";
-    case "ACCEPTED": return "Aceptado";
-    case "PREPARING": return "En cocina";
-    case "READY": return "Listo";
-    case "OUT_FOR_DELIVERY": return "En reparto";
+        case "OUT_FOR_DELIVERY": return "En reparto";
     case "DELIVERED": return "Entregado";
     case "CANCELLED": return "Cancelado";
     default: return s;

@@ -53,7 +53,8 @@ function median(values: number[]) {
   return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-const OPEN_STATUSES = ["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
+// Pedidos aún vivos: nuevos y en reparto.
+const OPEN_STATUSES = ["PENDING", "OUT_FOR_DELIVERY"];
 const CLOSED_STATUSES = ["DELIVERED"];
 
 const url = Astro.url;

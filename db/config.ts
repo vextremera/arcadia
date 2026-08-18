@@ -318,7 +318,11 @@ const Order = defineTable({
 
     type: column.text({ enum: ["DELIVERY", "PICKUP"], default: "DELIVERY" }),
     status: column.text({
-      enum: ["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"],
+      // Flujo de tres pasos (Nuevo → En reparto → Entregado) más la salida por
+      // cancelación. Los códigos se conservan porque el DEFAULT de la columna
+      // es 'PENDING': cambiarlo obligaría a recrear la tabla, y su DROP falla
+      // por las claves ajenas. Ver src/lib/orderStatus.ts.
+      enum: ["PENDING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"],
       default: "PENDING"
     }),
     paymentStatus: column.text({

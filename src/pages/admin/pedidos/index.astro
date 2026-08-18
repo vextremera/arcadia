@@ -1,5 +1,6 @@
 ---
 import AdminLayout from "@/layouts/AdminLayout.astro";
+import { ORDER_STATUSES, nextOrderStatus, orderStatusLabel, normalizeOrderStatus } from "@/lib/orderStatus";
 import Card from "@/components/admin/ui/Card.astro";
 import StatCard from "@/components/admin/ui/StatCard.astro";
 import Badge from "@/components/admin/ui/Badge.astro";
@@ -36,16 +37,12 @@ function parsePaymentMethod(snapshot: unknown): PaymentMethod {
   return raw === "CASH" || raw === "CARD" ? raw : "UNKNOWN";
 }
 
-function nextSuggestedStatus(status: string, type: string) {
-  if (status === "PENDING" || status === "PAID") return "ACCEPTED";
-  if (status === "ACCEPTED") return "PREPARING";
-  if (status === "PREPARING") return "READY";
-  if (status === "READY") return type === "DELIVERY" ? "OUT_FOR_DELIVERY" : "DELIVERED";
-  if (status === "OUT_FOR_DELIVERY") return "DELIVERED";
-  return null;
+function nextSuggestedStatus(status: string) {
+  return nextOrderStatus(status);
 }
 
-const OPEN_STATUSES = ["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY"];
+// Pedidos aún vivos: nuevos y en reparto.
+const OPEN_STATUSES = ["PENDING", "OUT_FOR_DELIVERY"];
 
 const url = new URL(Astro.request.url);
 const status = (url.searchParams.get("status") ?? "").toUpperCase();
@@ -70,12 +67,14 @@ const decoratedOrders = allOrders.map((order) => {
     forcedPickup,
     couponCode,
     hasInternalNote: !!adminInternalNote,
-    nextStatus: nextSuggestedStatus(order.status, order.type),
+    nextStatus: nextSuggestedStatus(order.status),
   };
 });
 
 const orders = decoratedOrders.filter((order) => {
-  if (status && order.status !== status) return false;
+  // Se compara normalizado: un pedido anterior al cambio podría tener
+  // PREPARING y quedaría fuera del filtro "Nuevo".
+  if (status && normalizeOrderStatus(order.status) !== status) return false;
   if (type && order.type !== type) return false;
   if (paymentMethodFilter && order.paymentMethod !== paymentMethodFilter) return false;
   if (paymentStatusFilter && order.paymentStatus !== paymentStatusFilter) return false;
@@ -92,7 +91,7 @@ const orders = decoratedOrders.filter((order) => {
 
 const counters = {
   total: decoratedOrders.length,
-  open: decoratedOrders.filter((o) => OPEN_STATUSES.includes(o.status)).length,
+  open: decoratedOrders.filter((o) => OPEN_STATUSES.includes(normalizeOrderStatus(o.status))).length,
   paid: decoratedOrders.filter((o) => o.paymentStatus === "PAID").length,
   revenueCents: decoratedOrders.filter((o) => o.paymentStatus === "PAID").reduce((sum, o) => sum + Number(o.totalCents ?? 0), 0),
 };
@@ -121,8 +120,8 @@ const selectClass = "rounded-2xl border border-admin-border bg-white/[0.03] px-3
           />
           <select name="status" class={selectClass}>
             <option value="">Estado</option>
-            {["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"].map((value) => (
-              <option value={value} selected={status === value}>{value}</option>
+            {ORDER_STATUSES.map((value) => (
+              <option value={value} selected={status === value}>{orderStatusLabel(value)}</option>
             ))}
           </select>
           <select name="type" class={selectClass}>
@@ -185,7 +184,9 @@ const selectClass = "rounded-2xl border border-admin-border bg-white/[0.03] px-3
                       <div class="truncate text-xs text-admin-muted">{order.customerPhone ?? "—"}</div>
                     </td>
                     <td><Badge tone={orderTypeTone(order.type)}>{order.type === "DELIVERY" ? "Delivery" : "Pickup"}</Badge></td>
-                    <td><Badge tone={orderStatusTone(order.status)}>{order.status}</Badge></td>
+                    {/* Se normaliza al mostrar: un pedido anterior al cambio
+                        puede seguir teniendo PREPARING en base de datos. */}
+                    <td><Badge tone={orderStatusTone(normalizeOrderStatus(order.status))}>{orderStatusLabel(order.status)}</Badge></td>
                     <td>
                       <div class="flex flex-wrap items-center gap-1.5">
                         <Badge tone={paymentStatusTone(order.paymentStatus)}>{order.paymentStatus}</Badge>

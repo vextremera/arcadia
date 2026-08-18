@@ -26,13 +26,7 @@ type AddressSnapshot = {
   } | null;
 };
 
-type KitchenStatus =
-  | "PENDING"
-  | "PAID"
-  | "ACCEPTED"
-  | "PREPARING"
-  | "READY"
-  | "OUT_FOR_DELIVERY";
+type KitchenStatus = "PENDING" | "OUT_FOR_DELIVERY";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -41,14 +35,10 @@ function json(data: unknown, status = 200) {
   });
 }
 
-const KITCHEN_STATUSES: KitchenStatus[] = [
-  "PENDING",
-  "PAID",
-  "ACCEPTED",
-  "PREPARING",
-  "READY",
-  "OUT_FOR_DELIVERY",
-];
+// El pase sólo muestra lo que aún no se ha entregado: nuevos y en reparto.
+// Los estados obsoletos de pedidos antiguos se consolidan en PENDING con la
+// migración db/migrate-order-status.ts.
+const KITCHEN_STATUSES: KitchenStatus[] = ["PENDING", "OUT_FOR_DELIVERY"];
 
 function readLastAdminEvent(snapshot: AddressSnapshot) {
   const list = Array.isArray(snapshot.adminEvents) ? snapshot.adminEvents : [];

@@ -2,10 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 type KitchenOrderStatus =
   | "PENDING"
-  | "PAID"
-  | "ACCEPTED"
-  | "PREPARING"
-  | "READY"
   | "OUT_FOR_DELIVERY"
   | "DELIVERED"
   | "CANCELLED";
@@ -158,14 +154,6 @@ function statusPillClass(status: KitchenOrderStatus) {
   switch (status) {
     case "PENDING":
       return "bg-amber-400/15 text-amber-300";
-    case "PAID":
-      return "bg-sky-400/15 text-sky-300";
-    case "ACCEPTED":
-      return "bg-cyan-400/15 text-cyan-300";
-    case "PREPARING":
-      return "bg-violet-400/15 text-violet-300";
-    case "READY":
-      return "bg-emerald-400/15 text-emerald-300";
     case "OUT_FOR_DELIVERY":
       return "bg-fuchsia-400/15 text-fuchsia-300";
     case "DELIVERED":
@@ -208,23 +196,8 @@ function sortByQueueTime(a: KitchenOrder, b: KitchenOrder) {
 }
 
 function nextPrimaryAction(order: KitchenOrder) {
-  if (order.status === "PENDING" || order.status === "PAID") {
-    return { label: "Aceptar", status: "ACCEPTED" as const };
-  }
-
-  if (order.status === "ACCEPTED") {
-    return { label: "Preparando", status: "PREPARING" as const };
-  }
-
-  if (order.status === "PREPARING") {
-    return { label: "Marcar listo", status: "READY" as const };
-  }
-
-  if (order.status === "READY") {
-    if (order.type === "DELIVERY") {
-      return { label: "En reparto", status: "OUT_FOR_DELIVERY" as const };
-    }
-    return { label: "Entregado", status: "DELIVERED" as const };
+  if (order.status === "PENDING") {
+    return { label: "En reparto", status: "OUT_FOR_DELIVERY" as const };
   }
 
   if (order.status === "OUT_FOR_DELIVERY") {
@@ -518,22 +491,14 @@ export default function KitchenBoard({ pase = false }: KitchenBoardProps = {}) {
   const columns = useMemo(() => {
     const orders = visibleOrders;
     const nuevos = orders
-      .filter((order) => order.status === "PENDING" || order.status === "PAID")
-      .sort(sortByQueueTime);
-
-    const cocina = orders
-      .filter((order) => order.status === "ACCEPTED" || order.status === "PREPARING")
-      .sort(sortByQueueTime);
-
-    const listos = orders
-      .filter((order) => order.status === "READY")
+      .filter((order) => order.status === "PENDING")
       .sort(sortByQueueTime);
 
     const reparto = orders
       .filter((order) => order.status === "OUT_FOR_DELIVERY")
       .sort(sortByQueueTime);
 
-    return { nuevos, cocina, listos, reparto };
+    return { nuevos, reparto };
   }, [visibleOrders]);
 
   const stats = useMemo(() => {
@@ -710,10 +675,8 @@ export default function KitchenBoard({ pase = false }: KitchenBoardProps = {}) {
         >
           {(
             [
-              { title: "Nuevos", hint: "Pendientes de aceptar", tone: "new", orders: columns.nuevos },
-              { title: "En cocina", hint: "Aceptados y en preparación", tone: "kitchen", orders: columns.cocina },
-              { title: "Listos", hint: "Esperando salida", tone: "ready", orders: columns.listos },
-              { title: "Reparto", hint: "En camino", tone: "delivery", orders: columns.reparto },
+              { title: "Nuevos", hint: "Pendientes de salir", tone: "new", orders: columns.nuevos },
+              { title: "En reparto", hint: "En camino", tone: "delivery", orders: columns.reparto },
             ] as const
           ).map((column) => (
             <Column

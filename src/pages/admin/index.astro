@@ -47,14 +47,8 @@ const hourFormatter = (time: Time) => {
   return `${String(hour).padStart(2, "0")}:00`;
 };
 
-const PENDING_STATUSES = [
-  "PENDING",
-  "PAID",
-  "ACCEPTED",
-  "PREPARING",
-  "READY",
-  "OUT_FOR_DELIVERY",
-] as const;
+// Pedidos aún vivos: nuevos y en reparto.
+const PENDING_STATUSES = ["PENDING", "OUT_FOR_DELIVERY"] as const;
 
 const todayISO = getTodayDateISO();
 

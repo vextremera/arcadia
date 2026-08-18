@@ -38,10 +38,6 @@ export function toneClasses(tone: ToneName): string {
 /** Estados de `Order.status`. */
 const ORDER_STATUS_TONES: Record<string, ToneName> = {
   PENDING: "warning",
-  PAID: "primary",
-  ACCEPTED: "cyan",
-  PREPARING: "violet",
-  READY: "success",
   OUT_FOR_DELIVERY: "fuchsia",
   DELIVERED: "success",
   CANCELLED: "danger",

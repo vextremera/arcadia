@@ -19,10 +19,6 @@ import { enqueueOrderPrintForPrinter } from "@/server/printing/queue";
 
 type OrderStatus =
   | "PENDING"
-  | "PAID"
-  | "ACCEPTED"
-  | "PREPARING"
-  | "READY"
   | "OUT_FOR_DELIVERY"
   | "DELIVERED"
   | "CANCELLED";
@@ -55,10 +51,6 @@ type StoredAdminEvent = {
 
 const ALLOWED_STATUS = new Set<OrderStatus>([
   "PENDING",
-  "PAID",
-  "ACCEPTED",
-  "PREPARING",
-  "READY",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
   "CANCELLED",
