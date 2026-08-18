@@ -23,3 +23,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+# Base de datos local de Astro DB (generada, no es fuente)
+db/local.db
+*.db
