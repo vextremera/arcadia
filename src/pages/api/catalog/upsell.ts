@@ -17,8 +17,7 @@ export const GET: APIRoute = async () => {
       imageUrl: Product.imageUrl,
       priceCents: Product.priceCents,
       active: Product.active,
-      deliveryEnabled: Product.deliveryEnabled,
-      pickupEnabled: Product.pickupEnabled,
+      deliveryEnabled: Product.deliveryEnabled,
       sortOrder: UpsellItem.sortOrder,
     })
     .from(UpsellItem)

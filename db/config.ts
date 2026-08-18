@@ -103,8 +103,16 @@ const Product = defineTable({
     imageUrl: column.text({ optional: true }),
     priceCents: column.number(),
 
+    /**
+     * Canales en los que se ofrece el producto: DOMICILIO y CARTA.
+     *
+     * `pickupEnabled` se retiró: la recogida no es un canal del producto sino
+     * un tipo de pedido del checkout, y nada filtraba por ella —los 157
+     * productos la tenían activada—. Los nombres de columna se conservan
+     * porque renombrarlos obligaría a borrar y volver a crear la columna,
+     * perdiendo el dato; las etiquetas viven en src/lib/productChannels.ts.
+     */
     deliveryEnabled: column.boolean({ default: true }),
-    pickupEnabled: column.boolean({ default: true }),
     dineInEnabled: column.boolean({ default: true }),
 
     active: column.boolean({ default: true }),

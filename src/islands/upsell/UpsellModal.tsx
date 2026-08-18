@@ -10,8 +10,7 @@ type UpsellProduct = {
   imageUrl: string | null;
   priceCents: number;
   active: boolean;
-  deliveryEnabled: boolean;
-  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
 };
 
 

@@ -89,7 +89,6 @@ const [product] = await db
     imageUrl: Product.imageUrl,
     priceCents: Product.priceCents,
     deliveryEnabled: Product.deliveryEnabled,
-    pickupEnabled: Product.pickupEnabled,
     dineInEnabled: Product.dineInEnabled,
     active: Product.active,
     createdAt: Product.createdAt,
@@ -456,9 +455,8 @@ const errorMessages = notices.map((n) => n.error).filter(Boolean);
     <div class="flex flex-wrap items-center gap-2.5">
       <Badge tone={product.active ? "success" : "danger"}>{product.active ? "Activo" : "Inactivo"}</Badge>
       <Badge tone="neutral">{product.categoryName}</Badge>
-      <Badge tone={product.deliveryEnabled ? "cyan" : "neutral"}>Delivery</Badge>
-      <Badge tone={product.pickupEnabled ? "indigo" : "neutral"}>Pickup</Badge>
-      <Badge tone={product.dineInEnabled ? "violet" : "neutral"}>Sala</Badge>
+      <Badge tone={product.deliveryEnabled ? "cyan" : "neutral"}>Domicilio</Badge>
+      <Badge tone={product.dineInEnabled ? "violet" : "neutral"}>Carta</Badge>
       <span class="text-xs text-admin-muted">Actualizado: {formatDate(product.updatedAt)}</span>
     </div>
 
@@ -562,16 +560,12 @@ const errorMessages = notices.map((n) => n.error).filter(Boolean);
             Activo
           </label>
           <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
-            <input class={checkboxClass} type="checkbox" name="deliveryEnabled" checked={product.deliveryEnabled} />
-            Delivery
-          </label>
-          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
-            <input class={checkboxClass} type="checkbox" name="pickupEnabled" checked={product.pickupEnabled} />
-            Pickup
-          </label>
-          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
             <input class={checkboxClass} type="checkbox" name="dineInEnabled" checked={product.dineInEnabled} />
-            Sala
+            Carta
+          </label>
+          <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
+            <input class={checkboxClass} type="checkbox" name="deliveryEnabled" checked={product.deliveryEnabled} />
+            Domicilio
           </label>
         </div>
 

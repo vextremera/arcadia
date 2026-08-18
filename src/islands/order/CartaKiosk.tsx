@@ -16,8 +16,7 @@ type MenuProduct = {
   description: string | null;
   imageUrl: string | null;
   priceCents: number;
-  deliveryEnabled: boolean;
-  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
   ingredients: string[];
   isConfigurable: boolean;
   allergens: ProductAllergen[];

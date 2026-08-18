@@ -808,8 +808,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
-      pickupEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -1252,8 +1251,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
-      pickupEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -1572,8 +1570,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
-      pickupEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2056,8 +2053,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
-      pickupEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2338,8 +2334,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
-      pickupEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2502,8 +2497,7 @@ export default async function seed() {
       imageUrl: null,
       priceCents: 0,
 
-      deliveryEnabled: false,
-      pickupEnabled: false,
+      deliveryEnabled: false,
       dineInEnabled: true,
 
       active: false, // ✅ no salen en carta/pedir

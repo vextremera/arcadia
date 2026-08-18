@@ -37,8 +37,7 @@ type ProductRow = {
   description: string | null;
   imageUrl: string | null;
   priceCents: number;
-  deliveryEnabled: boolean;
-  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
 };
 
 const NUMERIC_ORDER_CATEGORIES = new Set(["platos-combinados", "platos-infantiles"]);
@@ -95,8 +94,7 @@ export const GET: APIRoute = async () => {
       description: Product.description,
       imageUrl: Product.imageUrl,
       priceCents: Product.priceCents,
-      deliveryEnabled: Product.deliveryEnabled,
-      pickupEnabled: Product.pickupEnabled,
+      deliveryEnabled: Product.deliveryEnabled,
     })
     .from(Product)
     .where(and(inArray(Product.categoryId, categoryIds), eq(Product.active, true)))
@@ -199,8 +197,7 @@ export const GET: APIRoute = async () => {
       description: string | null;
       imageUrl: string | null;
       priceCents: number;
-      deliveryEnabled: boolean;
-      pickupEnabled: boolean;
+      deliveryEnabled: boolean;
       ingredients: string[];
       allergens: Array<{ slug: string; name: string; iconUrl: string | null }>;
       isConfigurable: boolean;

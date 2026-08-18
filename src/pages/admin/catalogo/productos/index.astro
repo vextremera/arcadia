@@ -57,8 +57,7 @@ const allRows = await db
     details: Product.details,
     imageUrl: Product.imageUrl,
     priceCents: Product.priceCents,
-    deliveryEnabled: Product.deliveryEnabled,
-    pickupEnabled: Product.pickupEnabled,
+    deliveryEnabled: Product.deliveryEnabled,
     dineInEnabled: Product.dineInEnabled,
     active: Product.active,
     updatedAt: Product.updatedAt,
@@ -208,19 +207,8 @@ const filteredProducts = products.filter((product) => {
   if (statusFilter === "inactive" && product.active) return false;
   if (statusFilter === "configurable" && !product.isConfigurable) return false;
 
-  if (channelFilter === "delivery" && !product.deliveryEnabled) return false;
-  if (channelFilter === "pickup" && !product.pickupEnabled) return false;
-  if (
-    channelFilter === "both" &&
-    (!product.deliveryEnabled || !product.pickupEnabled)
-  )
-    return false;
-  if (
-    channelFilter === "restricted" &&
-    product.deliveryEnabled &&
-    product.pickupEnabled
-  )
-    return false;
+  if (channelFilter === "domicilio" && !product.deliveryEnabled) return false;
+  if (channelFilter === "carta" && !product.dineInEnabled) return false;
 
   if (q) {
     const haystack = [
@@ -248,12 +236,7 @@ const imageProducts = products.filter((product) =>
   Boolean(product.imageUrl),
 ).length;
 const restrictedProducts = products.filter(
-  (product) =>
-    !(
-      product.deliveryEnabled &&
-      product.pickupEnabled &&
-      product.dineInEnabled
-    ),
+  (product) => !(product.deliveryEnabled && product.dineInEnabled),
 ).length;
 const hasFilters = Boolean(
   q || categoryFilter || statusFilter || channelFilter,
@@ -345,10 +328,8 @@ const summaryCards = [
           </select>
           <select class="rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-sky-400/30 focus:outline-none" name="channel">
             <option value="" selected={channelFilter === ""}>Canal</option>
-            <option value="delivery" selected={channelFilter === "delivery"}>Delivery</option>
-            <option value="pickup" selected={channelFilter === "pickup"}>Pickup</option>
-            <option value="both" selected={channelFilter === "both"}>Ambos</option>
-            <option value="restricted" selected={channelFilter === "restricted"}>Restringido</option>
+            <option value="carta" selected={channelFilter === "carta"}>Carta</option>
+            <option value="domicilio" selected={channelFilter === "domicilio"}>Domicilio</option>
           </select>
           <button class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-sky-400/15 bg-sky-400/10 px-3.5 py-2 text-sm font-semibold text-sky-100 transition hover:border-sky-400/25 hover:bg-sky-400/15" type="submit">
             Filtrar
@@ -414,22 +395,18 @@ const summaryCards = [
             <textarea class="min-h-20 w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/40 focus:outline-none" name="description" disabled={!canCreate} />
           </label>
 
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
               <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked disabled={!canCreate} />
               Activo
             </label>
             <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
               <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="deliveryEnabled" checked disabled={!canCreate} />
-              Delivery
+              Domicilio
             </label>
             <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
-              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="pickupEnabled" checked disabled={!canCreate} />
-              Pickup
-            </label>
-            <label class="flex items-center gap-2 rounded-2xl border border-admin-border bg-white/[0.03] px-3 py-2.5 text-sm text-slate-300">
-              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="dineInEnabled" disabled={!canCreate} />
-              Sala
+              <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="dineInEnabled" checked disabled={!canCreate} />
+              Carta
             </label>
           </div>
 
@@ -479,9 +456,8 @@ const summaryCards = [
                     <td class="font-semibold text-white">{money(product.priceCents)}</td>
                     <td>
                       <div class="flex gap-1.5">
-                        <Badge tone={product.deliveryEnabled ? "cyan" : "neutral"}>D</Badge>
-                        <Badge tone={product.pickupEnabled ? "indigo" : "neutral"}>P</Badge>
-                        <Badge tone={product.dineInEnabled ? "violet" : "neutral"}>S</Badge>
+                        <Badge tone={product.dineInEnabled ? "violet" : "neutral"}>Carta</Badge>
+                        <Badge tone={product.deliveryEnabled ? "cyan" : "neutral"}>Domicilio</Badge>
                       </div>
                     </td>
                     <td>

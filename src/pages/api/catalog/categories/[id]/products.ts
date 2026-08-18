@@ -28,8 +28,7 @@ export const GET: APIRoute = async ({ params }) => {
       description: Product.description,
       imageUrl: Product.imageUrl,
       priceCents: Product.priceCents,
-      deliveryEnabled: Product.deliveryEnabled,
-      pickupEnabled: Product.pickupEnabled,
+      deliveryEnabled: Product.deliveryEnabled,
     })
     .from(Product)
     .where(and(eq(Product.categoryId, id), eq(Product.active, true)))
