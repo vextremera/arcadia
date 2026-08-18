@@ -26,3 +26,5 @@ pnpm-debug.log*
 # Base de datos local de Astro DB (generada, no es fuente)
 db/local.db
 *.db
+.vercel
+.env*

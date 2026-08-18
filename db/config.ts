@@ -318,11 +318,22 @@ const Order = defineTable({
 
     type: column.text({ enum: ["DELIVERY", "PICKUP"], default: "DELIVERY" }),
     status: column.text({
-      // Flujo de tres pasos (Nuevo → En reparto → Entregado) más la salida por
-      // cancelación. Los códigos se conservan porque el DEFAULT de la columna
-      // es 'PENDING': cambiarlo obligaría a recrear la tabla, y su DROP falla
-      // por las claves ajenas. Ver src/lib/orderStatus.ts.
-      enum: ["PENDING", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"],
+      /**
+       * La lista se conserva completa a propósito, aunque el flujo vigente sea
+       * de tres estados (Nuevo → En reparto → Entregado) más la cancelación.
+       *
+       * Astro DB compara las columnas con un diff profundo que incluye este
+       * array: recortarlo marca la columna como modificada y obliga a recrear
+       * la tabla, cuyo DROP falla por las claves ajenas de OrderItem, Payment,
+       * Refund, LoyaltyLedger y PrintJob. Ya tumbó dos despliegues.
+       *
+       * Además los pedidos antiguos siguen teniendo estos valores guardados:
+       * la base debe admitirlos aunque la aplicación ya no los ofrezca.
+       *
+       * Los estados vigentes los define src/lib/orderStatus.ts, que es lo que
+       * gobierna la interfaz y las transiciones.
+       */
+      enum: ["PENDING", "PAID", "ACCEPTED", "PREPARING", "READY", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"],
       default: "PENDING"
     }),
     paymentStatus: column.text({
