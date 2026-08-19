@@ -567,6 +567,30 @@ const TicketTemplate = defineTable({
 });
 
 /**
+ * Caché de geocodificación de direcciones.
+ *
+ * El servicio de Nominatim (OpenStreetMap) es gratuito pero pide no abusar:
+ * una consulta por segundo y cachear los resultados. Sin caché, cada tecla en
+ * el formulario de checkout sería una petición.
+ *
+ * `found` en false también se guarda: una dirección que no existe tampoco debe
+ * reconsultarse en cada intento.
+ */
+const GeocodeCache = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    /** Dirección normalizada que se consultó. */
+    query: column.text({ unique: true }),
+    found: column.boolean({ default: false }),
+    lat: column.number({ optional: true }),
+    lng: column.number({ optional: true }),
+    label: column.text({ optional: true }),
+    createdAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "query", unique: true }]
+});
+
+/**
  * Reserva de idempotencia del checkout.
  *
  * Dos peticiones simultáneas (doble clic, reintento de red, dos pestañas) leen
@@ -719,6 +743,7 @@ export default defineDb({
     Printer,
     PrintJob,
     CheckoutClaim,
+    GeocodeCache,
 
     UpsellItem,
 

@@ -22,7 +22,12 @@ import { getArcadiaAvailability } from "@/server/time/madrid";
 import { validateCheckoutCoupon } from "@/server/checkout/coupons";
 import { normalizePaymentMethod } from "@/server/payments/settings";
 import { randomUUID } from "node:crypto";
-import { validateDeliveryAddressByArea } from "@/server/delivery/area";
+import {
+  validateDeliveryPoint,
+  normalizeDeliveryAreaRule,
+  DEFAULT_DELIVERY_AREA_RULE,
+} from "@/server/delivery/area";
+import { geocodeAddress } from "@/server/delivery/geocode";
 import { awardOrderPointsOnce } from "@/server/loyalty/engine";
 import { enqueueOrderPrints } from "@/server/printing/queue";
 
@@ -52,8 +57,6 @@ type AvailabilityLike = Awaited<ReturnType<typeof getArcadiaAvailability>> & {
   };
   todayDateISO?: string;
 };
-
-const DELIVERY_AREA_RULE = { enabled: true };
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -407,8 +410,17 @@ export const POST: APIRoute = async ({ request, session }) => {
     );
   }
 
+  // Se guarda en el pedido para poder explicar después por qué se aceptó o se
+  // rechazó una dirección concreta.
   let deliveryAreaMeta:
-    | { enabled: boolean; status: string; message: string }
+    | {
+      enabled: boolean;
+      status: string;
+      message: string;
+      distanceMeters: number | null;
+      lat: number | null;
+      lng: number | null;
+    }
     | null = null;
 
   if (type === "DELIVERY") {
@@ -422,28 +434,40 @@ export const POST: APIRoute = async ({ request, session }) => {
       );
     }
 
-    const deliveryAreaRuleValue = await session?.get?.("noop"); // no-op para mantener flow sin romper
-    void deliveryAreaRuleValue;
-
-    const deliveryAreaCheck = validateDeliveryAddressByArea(
-      {
-        city: address.city,
-        postalCode: address.postalCode,
-      },
-      ((await db
+    // Se vuelve a geocodificar y a medir aquí: el navegador puede mandar las
+    // coordenadas que le convengan, así que su comprobación sólo sirve para
+    // pintar el mapa. La caché hace que normalmente no haya consulta extra.
+    const deliveryAreaRule = normalizeDeliveryAreaRule(
+      (await db
         .select({ value: AppSetting.value })
         .from(AppSetting)
         .where(eq(AppSetting.key, "deliveryAreaRule"))
         .limit(1)
-        .then((rows) => rows[0]?.value)) as { enabled?: boolean } | undefined)?.enabled === true
-        ? { enabled: true }
-        : { enabled: false }
+        .then((rows) => rows[0]?.value)) ?? DEFAULT_DELIVERY_AREA_RULE
     );
+
+    const geocoded = deliveryAreaRule.enabled
+      ? await geocodeAddress({
+        line1: address.line1,
+        city: address.city,
+        postalCode: address.postalCode,
+      })
+      : null;
+
+    const deliveryPoint =
+      geocoded?.found && geocoded.lat !== null && geocoded.lng !== null
+        ? { lat: geocoded.lat, lng: geocoded.lng }
+        : null;
+
+    const deliveryAreaCheck = validateDeliveryPoint(deliveryPoint, deliveryAreaRule);
 
     deliveryAreaMeta = {
       enabled: deliveryAreaCheck.enabled,
       status: deliveryAreaCheck.status,
       message: deliveryAreaCheck.message,
+      distanceMeters: deliveryAreaCheck.distanceMeters,
+      lat: deliveryPoint?.lat ?? null,
+      lng: deliveryPoint?.lng ?? null,
     };
 
     if (deliveryAreaCheck.enabled && !deliveryAreaCheck.allowed) {

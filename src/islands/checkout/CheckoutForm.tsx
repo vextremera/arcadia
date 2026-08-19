@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "@/islands/_shared/http";
 import { getClientLang, type ClientSiteLang } from "@/islands/_shared/lang";
 import { formatEuros as money } from "@/lib/money";
+import DeliveryAreaMap from "@/islands/checkout/DeliveryAreaMap";
+import { formatDistance } from "@/server/delivery/area";
 
 type Availability = {
   now: string;
@@ -99,29 +101,23 @@ async function safeJson<T>(url: string): Promise<T | null> {
   }
 }
 
-function normalizeAreaText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function isDeliveryAreaAllowed(city: string, postalCode: string) {
-  const normalizedCity = normalizeAreaText(city);
-  const normalizedPostalCode = String(postalCode ?? "").trim();
-
-  return normalizedCity === "lloret de mar" && normalizedPostalCode === "17310";
-}
+type AreaCheck = {
+  status: "INSIDE" | "OUTSIDE" | "UNKNOWN" | "DISABLED";
+  allowed: boolean;
+  message: string;
+  distanceMeters: number | null;
+  address: { lat: number; lng: number; label: string | null } | null;
+  area: { lat: number; lng: number; radiusMeters: number; enabled: boolean };
+};
 
 const LAST_ADDRESS_KEY = "arcadia:lastAddressId";
 
 
 const checkoutCopy = {
-  es: { loading: "Cargando checkout…", empty: "Tu carrito está vacío.", incompleteArea: "Completa ciudad y código postal para comprobar si entra en la zona de reparto.", outsideArea: "Esta dirección está fuera de la zona de reparto. Solo repartimos en Lloret de Mar (17310).", insideArea: "Dirección dentro de la zona de reparto.", couponError: "No se ha podido validar el cupón.", defaultError: "No se pudo marcar como default.", defaultOk: "Dirección marcada como default.", submitError: "Error al crear el pedido", pickupOnly: "Solo recogida", deliveryUnavailable: "Delivery no disponible ahora", orderType: "Tipo de pedido", delivery: "Delivery", pickup: "Recogida", contact: "Datos de contacto", name: "Nombre", phone: "Teléfono", emailOptional: "Email (opcional)", address: "Dirección", account: "Mi cuenta", savedAddress: "Usar dirección guardada", newAddress: "— Introducir nueva —", makeDefault: "Hacer default", defaultTag: " (default)", savedHint: "Si eliges una guardada, no se volverá a guardar.", floor: "Piso/puerta (opcional)", city: "Ciudad", postalCode: "Código postal", addressNotes: "Notas de dirección (opcional)", deliveryZone: "Zona de reparto", saveAddress: "Guardar esta dirección en mi cuenta", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Trabajo / Suegros…", saveDefault: "Guardar como dirección default", loginToSave: "Inicia sesión para guardar direcciones en tu cuenta.", payment: "Pago", paymentInfo: "Efectivo y tarjeta están disponibles tanto en delivery como en recogida.", cash: "Efectivo", card: "Tarjeta", coupon: "Cupón", apply: "Aplicar", validating: "Validando…", remove: "Quitar", orderComments: "Comentarios del pedido", orderCommentsHelp: "Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).", summary: "Resumen", subtotal: "Subtotal", total: "Total", confirm: "Confirmar pedido", submitting: "Enviando pedido…" },
-  ca: { loading: "Carregant checkout…", empty: "El teu carret és buit.", incompleteArea: "Completa ciutat i codi postal per comprovar si entra dins la zona de repartiment.", outsideArea: "Aquesta adreça és fora de la zona de repartiment. Només repartim a Lloret de Mar (17310).", insideArea: "Adreça dins la zona de repartiment.", couponError: "No s'ha pogut validar el cupó.", defaultError: "No s'ha pogut marcar com a default.", defaultOk: "Adreça marcada com a default.", submitError: "Error en crear la comanda", pickupOnly: "Només recollida", deliveryUnavailable: "Delivery no disponible ara", orderType: "Tipus de comanda", delivery: "Delivery", pickup: "Recollida", contact: "Dades de contacte", name: "Nom", phone: "Telèfon", emailOptional: "Email (opcional)", address: "Adreça", account: "El meu compte", savedAddress: "Fer servir una adreça guardada", newAddress: "— Introduir-ne una de nova —", makeDefault: "Fer default", defaultTag: " (default)", savedHint: "Si n'esculls una de guardada, no es tornarà a desar.", floor: "Pis/porta (opcional)", city: "Ciutat", postalCode: "Codi postal", addressNotes: "Notes de l'adreça (opcional)", deliveryZone: "Zona de repartiment", saveAddress: "Guardar aquesta adreça al meu compte", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Feina / Família…", saveDefault: "Guardar com a adreça default", loginToSave: "Inicia sessió per guardar adreces al teu compte.", payment: "Pagament", paymentInfo: "Efectiu i targeta estan disponibles tant per delivery com per recollida.", cash: "Efectiu", card: "Targeta", coupon: "Cupó", apply: "Aplicar", validating: "Validant…", remove: "Treure", orderComments: "Comentaris de la comanda", orderCommentsHelp: "Per a coses com “més fet”, “sense sal”, etc. (no ingredients).", summary: "Resum", subtotal: "Subtotal", total: "Total", confirm: "Confirmar comanda", submitting: "Enviant comanda…" },
-  en: { loading: "Loading checkout…", empty: "Your cart is empty.", incompleteArea: "Complete city and postal code to check whether it is inside the delivery area.", outsideArea: "This address is outside the delivery area. We only deliver in Lloret de Mar (17310).", insideArea: "Address inside the delivery area.", couponError: "The coupon could not be validated.", defaultError: "Could not mark as default.", defaultOk: "Address marked as default.", submitError: "Error creating the order", pickupOnly: "Pickup only", deliveryUnavailable: "Delivery unavailable right now", orderType: "Order type", delivery: "Delivery", pickup: "Pickup", contact: "Contact details", name: "Name", phone: "Phone", emailOptional: "Email (optional)", address: "Address", account: "My account", savedAddress: "Use saved address", newAddress: "— Enter a new one —", makeDefault: "Make default", defaultTag: " (default)", savedHint: "If you choose a saved one, it will not be stored again.", floor: "Flat / door (optional)", city: "City", postalCode: "Postal code", addressNotes: "Address notes (optional)", deliveryZone: "Delivery area", saveAddress: "Save this address to my account", labelOptional: "Label (optional)", labelPlaceholder: "Home / Work / Parents…", saveDefault: "Save as default address", loginToSave: "Sign in to save addresses to your account.", payment: "Payment", paymentInfo: "Cash and card are available for both delivery and pickup.", cash: "Cash", card: "Card", coupon: "Coupon", apply: "Apply", validating: "Validating…", remove: "Remove", orderComments: "Order notes", orderCommentsHelp: "For things like “well done”, “no salt”, etc. (not ingredients).", summary: "Summary", subtotal: "Subtotal", total: "Total", confirm: "Confirm order", submitting: "Sending order…" },
-  fr: { loading: "Chargement du checkout…", empty: "Votre panier est vide.", incompleteArea: "Complétez la ville et le code postal pour vérifier si l'adresse est dans la zone de livraison.", outsideArea: "Cette adresse est hors de la zone de livraison. Nous livrons uniquement à Lloret de Mar (17310).", insideArea: "Adresse dans la zone de livraison.", couponError: "Le coupon n'a pas pu être validé.", defaultError: "Impossible de définir cette adresse par défaut.", defaultOk: "Adresse définie par défaut.", submitError: "Erreur lors de la création de la commande", pickupOnly: "Retrait uniquement", deliveryUnavailable: "Livraison indisponible pour le moment", orderType: "Type de commande", delivery: "Livraison", pickup: "Retrait", contact: "Coordonnées", name: "Nom", phone: "Téléphone", emailOptional: "Email (optionnel)", address: "Adresse", account: "Mon compte", savedAddress: "Utiliser une adresse enregistrée", newAddress: "— Saisir une nouvelle adresse —", makeDefault: "Définir par défaut", defaultTag: " (défaut)", savedHint: "Si vous en choisissez une enregistrée, elle ne sera pas sauvegardée de nouveau.", floor: "Étage / porte (optionnel)", city: "Ville", postalCode: "Code postal", addressNotes: "Notes d'adresse (optionnel)", deliveryZone: "Zone de livraison", saveAddress: "Enregistrer cette adresse dans mon compte", labelOptional: "Étiquette (optionnel)", labelPlaceholder: "Maison / Travail / Famille…", saveDefault: "Enregistrer comme adresse par défaut", loginToSave: "Connectez-vous pour enregistrer des adresses dans votre compte.", payment: "Paiement", paymentInfo: "Espèces et carte sont disponibles aussi bien en livraison qu'en retrait.", cash: "Espèces", card: "Carte", coupon: "Coupon", apply: "Appliquer", validating: "Validation…", remove: "Retirer", orderComments: "Commentaires de la commande", orderCommentsHelp: "Pour des choses comme “plus cuit”, “sans sel”, etc. (pas des ingrédients).", summary: "Résumé", subtotal: "Sous-total", total: "Total", confirm: "Confirmer la commande", submitting: "Envoi de la commande…" },
+  es: { loading: "Cargando checkout…", empty: "Tu carrito está vacío.", incompleteArea: "Completa ciudad y código postal para comprobar si entra en la zona de reparto.", outsideArea: "Esta dirección está fuera de la zona de reparto.", insideArea: "Dirección dentro de la zona de reparto.", areaInside: "Dentro de la zona de reparto, a {d} del local.", areaOutside: "Fuera de la zona de reparto: está a {d} y repartimos hasta {r}.", areaUnknown: "No hemos podido situar la dirección en el mapa. La confirmaremos al preparar el pedido.", outsideAreaHelp: "Cambia la dirección por otra dentro de la zona o recoge el pedido en el local.", switchToPickup: "Recoger en el local", mapLocal: "Arcadia", mapYou: "Tu dirección", couponError: "No se ha podido validar el cupón.", defaultError: "No se pudo marcar como default.", defaultOk: "Dirección marcada como default.", submitError: "Error al crear el pedido", pickupOnly: "Solo recogida", deliveryUnavailable: "Delivery no disponible ahora", orderType: "Tipo de pedido", delivery: "Delivery", pickup: "Recogida", contact: "Datos de contacto", name: "Nombre", phone: "Teléfono", emailOptional: "Email (opcional)", address: "Dirección", account: "Mi cuenta", savedAddress: "Usar dirección guardada", newAddress: "— Introducir nueva —", makeDefault: "Hacer default", defaultTag: " (default)", savedHint: "Si eliges una guardada, no se volverá a guardar.", floor: "Piso/puerta (opcional)", city: "Ciudad", postalCode: "Código postal", addressNotes: "Notas de dirección (opcional)", deliveryZone: "Zona de reparto", saveAddress: "Guardar esta dirección en mi cuenta", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Trabajo / Suegros…", saveDefault: "Guardar como dirección default", loginToSave: "Inicia sesión para guardar direcciones en tu cuenta.", payment: "Pago", paymentInfo: "Efectivo y tarjeta están disponibles tanto en delivery como en recogida.", cash: "Efectivo", card: "Tarjeta", coupon: "Cupón", apply: "Aplicar", validating: "Validando…", remove: "Quitar", orderComments: "Comentarios del pedido", orderCommentsHelp: "Para cosas como “más hecho”, “sin sal”, etc. (no ingredientes).", summary: "Resumen", subtotal: "Subtotal", total: "Total", confirm: "Confirmar pedido", submitting: "Enviando pedido…" },
+  ca: { loading: "Carregant checkout…", empty: "El teu carret és buit.", incompleteArea: "Completa ciutat i codi postal per comprovar si entra dins la zona de repartiment.", outsideArea: "Aquesta adreça és fora de la zona de repartiment.", insideArea: "Adreça dins la zona de repartiment.", areaInside: "Dins la zona de repartiment, a {d} del local.", areaOutside: "Fora de la zona de repartiment: és a {d} i repartim fins a {r}.", areaUnknown: "No hem pogut situar l'adreça al mapa. La confirmarem en preparar la comanda.", outsideAreaHelp: "Canvia l'adreça per una altra dins la zona o recull la comanda al local.", switchToPickup: "Recollir al local", mapLocal: "Arcadia", mapYou: "La teva adreça", couponError: "No s'ha pogut validar el cupó.", defaultError: "No s'ha pogut marcar com a default.", defaultOk: "Adreça marcada com a default.", submitError: "Error en crear la comanda", pickupOnly: "Només recollida", deliveryUnavailable: "Delivery no disponible ara", orderType: "Tipus de comanda", delivery: "Delivery", pickup: "Recollida", contact: "Dades de contacte", name: "Nom", phone: "Telèfon", emailOptional: "Email (opcional)", address: "Adreça", account: "El meu compte", savedAddress: "Fer servir una adreça guardada", newAddress: "— Introduir-ne una de nova —", makeDefault: "Fer default", defaultTag: " (default)", savedHint: "Si n'esculls una de guardada, no es tornarà a desar.", floor: "Pis/porta (opcional)", city: "Ciutat", postalCode: "Codi postal", addressNotes: "Notes de l'adreça (opcional)", deliveryZone: "Zona de repartiment", saveAddress: "Guardar aquesta adreça al meu compte", labelOptional: "Etiqueta (opcional)", labelPlaceholder: "Casa / Feina / Família…", saveDefault: "Guardar com a adreça default", loginToSave: "Inicia sessió per guardar adreces al teu compte.", payment: "Pagament", paymentInfo: "Efectiu i targeta estan disponibles tant per delivery com per recollida.", cash: "Efectiu", card: "Targeta", coupon: "Cupó", apply: "Aplicar", validating: "Validant…", remove: "Treure", orderComments: "Comentaris de la comanda", orderCommentsHelp: "Per a coses com “més fet”, “sense sal”, etc. (no ingredients).", summary: "Resum", subtotal: "Subtotal", total: "Total", confirm: "Confirmar comanda", submitting: "Enviant comanda…" },
+  en: { loading: "Loading checkout…", empty: "Your cart is empty.", incompleteArea: "Complete city and postal code to check whether it is inside the delivery area.", outsideArea: "This address is outside the delivery area.", insideArea: "Address inside the delivery area.", areaInside: "Inside the delivery area, {d} from the restaurant.", areaOutside: "Outside the delivery area: it is {d} away and we deliver up to {r}.", areaUnknown: "We could not place the address on the map. We will confirm it when preparing the order.", outsideAreaHelp: "Change the address for one inside the area, or pick the order up at the restaurant.", switchToPickup: "Pick up at the restaurant", mapLocal: "Arcadia", mapYou: "Your address", couponError: "The coupon could not be validated.", defaultError: "Could not mark as default.", defaultOk: "Address marked as default.", submitError: "Error creating the order", pickupOnly: "Pickup only", deliveryUnavailable: "Delivery unavailable right now", orderType: "Order type", delivery: "Delivery", pickup: "Pickup", contact: "Contact details", name: "Name", phone: "Phone", emailOptional: "Email (optional)", address: "Address", account: "My account", savedAddress: "Use saved address", newAddress: "— Enter a new one —", makeDefault: "Make default", defaultTag: " (default)", savedHint: "If you choose a saved one, it will not be stored again.", floor: "Flat / door (optional)", city: "City", postalCode: "Postal code", addressNotes: "Address notes (optional)", deliveryZone: "Delivery area", saveAddress: "Save this address to my account", labelOptional: "Label (optional)", labelPlaceholder: "Home / Work / Parents…", saveDefault: "Save as default address", loginToSave: "Sign in to save addresses to your account.", payment: "Payment", paymentInfo: "Cash and card are available for both delivery and pickup.", cash: "Cash", card: "Card", coupon: "Coupon", apply: "Apply", validating: "Validating…", remove: "Remove", orderComments: "Order notes", orderCommentsHelp: "For things like “well done”, “no salt”, etc. (not ingredients).", summary: "Summary", subtotal: "Subtotal", total: "Total", confirm: "Confirm order", submitting: "Sending order…" },
+  fr: { loading: "Chargement du checkout…", empty: "Votre panier est vide.", incompleteArea: "Complétez la ville et le code postal pour vérifier si l'adresse est dans la zone de livraison.", outsideArea: "Cette adresse est hors de la zone de livraison.", insideArea: "Adresse dans la zone de livraison.", areaInside: "Dans la zone de livraison, à {d} du restaurant.", areaOutside: "Hors de la zone de livraison : à {d} alors que nous livrons jusqu'à {r}.", areaUnknown: "Nous n'avons pas pu situer l'adresse sur la carte. Nous la confirmerons en préparant la commande.", outsideAreaHelp: "Indiquez une autre adresse dans la zone ou venez chercher la commande sur place.", switchToPickup: "Retrait sur place", mapLocal: "Arcadia", mapYou: "Votre adresse", couponError: "Le coupon n'a pas pu être validé.", defaultError: "Impossible de définir cette adresse par défaut.", defaultOk: "Adresse définie par défaut.", submitError: "Erreur lors de la création de la commande", pickupOnly: "Retrait uniquement", deliveryUnavailable: "Livraison indisponible pour le moment", orderType: "Type de commande", delivery: "Livraison", pickup: "Retrait", contact: "Coordonnées", name: "Nom", phone: "Téléphone", emailOptional: "Email (optionnel)", address: "Adresse", account: "Mon compte", savedAddress: "Utiliser une adresse enregistrée", newAddress: "— Saisir une nouvelle adresse —", makeDefault: "Définir par défaut", defaultTag: " (défaut)", savedHint: "Si vous en choisissez une enregistrée, elle ne sera pas sauvegardée de nouveau.", floor: "Étage / porte (optionnel)", city: "Ville", postalCode: "Code postal", addressNotes: "Notes d'adresse (optionnel)", deliveryZone: "Zone de livraison", saveAddress: "Enregistrer cette adresse dans mon compte", labelOptional: "Étiquette (optionnel)", labelPlaceholder: "Maison / Travail / Famille…", saveDefault: "Enregistrer comme adresse par défaut", loginToSave: "Connectez-vous pour enregistrer des adresses dans votre compte.", payment: "Paiement", paymentInfo: "Espèces et carte sont disponibles aussi bien en livraison qu'en retrait.", cash: "Espèces", card: "Carte", coupon: "Coupon", apply: "Appliquer", validating: "Validation…", remove: "Retirer", orderComments: "Commentaires de la commande", orderCommentsHelp: "Pour des choses comme “plus cuit”, “sans sel”, etc. (pas des ingrédients).", summary: "Résumé", subtotal: "Sous-total", total: "Total", confirm: "Confirmer la commande", submitting: "Envoi de la commande…" },
 } satisfies Record<ClientSiteLang, Record<string, string>>;
 
 
@@ -189,30 +185,90 @@ export default function CheckoutForm() {
 
   const deliveryAreaRuleEnabled = Boolean(avail?.deliveryAreaRule?.enabled);
 
+  /**
+   * La zona ya no se decide comparando ciudad y código postal: se sitúa la
+   * dirección en el mapa y se mide la distancia real al local. La consulta va
+   * al servidor, que es quien geocodifica y cachea.
+   */
+  const [areaCheck, setAreaCheck] = useState<AreaCheck | null>(null);
+  const [areaLoading, setAreaLoading] = useState(false);
+
+  useEffect(() => {
+    if (type !== "DELIVERY" || !deliveryAreaRuleEnabled) return;
+    if (!line1.trim() || !city.trim() || !postalCode.trim()) {
+      setAreaCheck(null);
+      return;
+    }
+
+    let cancelled = false;
+    setAreaLoading(true);
+
+    // Se espera a que deje de teclear: sin esto habría una geocodificación
+    // por cada letra del portal.
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch("/api/delivery/check", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ line1, city, postalCode }),
+        });
+        const data = (await res.json()) as AreaCheck;
+        if (!cancelled) setAreaCheck(data);
+      } catch {
+        if (!cancelled) setAreaCheck(null);
+      } finally {
+        if (!cancelled) setAreaLoading(false);
+      }
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.setTimeout(() => setAreaLoading(false), 0);
+    };
+  }, [type, deliveryAreaRuleEnabled, line1, city, postalCode]);
+
   const deliveryAreaStatus = useMemo(() => {
     if (type !== "DELIVERY") return "IDLE" as const;
     if (!deliveryAreaRuleEnabled) return "DISABLED" as const;
-    if (!city.trim() || !postalCode.trim()) return "INCOMPLETE" as const;
-    return isDeliveryAreaAllowed(city, postalCode) ? ("INSIDE" as const) : ("OUTSIDE" as const);
-  }, [type, deliveryAreaRuleEnabled, city, postalCode]);
+    if (!line1.trim() || !city.trim() || !postalCode.trim()) return "INCOMPLETE" as const;
+    if (!areaCheck) return "CHECKING" as const;
+    return areaCheck.status;
+  }, [type, deliveryAreaRuleEnabled, line1, city, postalCode, areaCheck]);
 
   const deliveryAreaMessage = useMemo(() => {
     if (type !== "DELIVERY" || !deliveryAreaRuleEnabled) return "";
-    if (deliveryAreaStatus === "INCOMPLETE") {
-      return tt.incompleteArea;
+    if (deliveryAreaStatus === "INCOMPLETE") return tt.incompleteArea;
+    if (deliveryAreaStatus === "CHECKING") return tt.validating;
+
+    // El mensaje se compone aquí y no en servidor porque el checkout está en
+    // cuatro idiomas y la respuesta de la API es una sola.
+    const distance = areaCheck?.distanceMeters;
+    const radius = areaCheck?.area.radiusMeters ?? 0;
+
+    if (deliveryAreaStatus === "INSIDE" && typeof distance === "number") {
+      return tt.areaInside.replace("{d}", formatDistance(distance));
     }
-    if (deliveryAreaStatus === "OUTSIDE") {
-      return tt.outsideArea;
+    if (deliveryAreaStatus === "OUTSIDE" && typeof distance === "number") {
+      return tt.areaOutside.replace("{d}", formatDistance(distance)).replace("{r}", formatDistance(radius));
     }
-    return tt.insideArea;
-  }, [type, deliveryAreaRuleEnabled, deliveryAreaStatus]);
+    if (deliveryAreaStatus === "UNKNOWN") return tt.areaUnknown;
+
+    return "";
+  }, [type, deliveryAreaRuleEnabled, deliveryAreaStatus, areaCheck, tt]);
 
   const deliveryDisabled = useMemo(() => !avail?.deliveryAvailable, [avail]);
 
   const checkoutBlocked = useMemo(() => {
     if (avail?.pauseOrders) return true;
     if (type === "DELIVERY" && deliveryAreaRuleEnabled) {
-      return deliveryAreaStatus === "OUTSIDE" || deliveryAreaStatus === "INCOMPLETE";
+      // También se bloquea mientras se comprueba: si no, dando al botón rápido
+      // se podría enviar una dirección que aún no se ha situado en el mapa.
+      return (
+        deliveryAreaStatus === "OUTSIDE" ||
+        deliveryAreaStatus === "INCOMPLETE" ||
+        deliveryAreaStatus === "CHECKING"
+      );
     }
     return false;
   }, [avail, type, deliveryAreaRuleEnabled, deliveryAreaStatus]);
@@ -711,7 +767,50 @@ export default function CheckoutForm() {
                   }`}
               >
                 <div class="font-semibold">{tt.deliveryZone}</div>
-                <p class="mt-1 leading-6">{deliveryAreaMessage}</p>
+                <p class="mt-1 leading-6" aria-live="polite">
+                  {areaLoading ? tt.validating : deliveryAreaMessage}
+                </p>
+
+                {areaCheck?.area.enabled ? (
+                  <div class="mt-3">
+                    <DeliveryAreaMap
+                      area={areaCheck.area}
+                      address={areaCheck.address}
+                      inside={deliveryAreaStatus !== "OUTSIDE"}
+                      labels={{ local: tt.mapLocal, you: tt.mapYou }}
+                    />
+
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-600">
+                      <span class="inline-flex items-center gap-1.5">
+                        <span class="inline-block h-2.5 w-2.5 rounded-full bg-zinc-900" />
+                        {tt.mapLocal}
+                      </span>
+                      {areaCheck.address ? (
+                        <span class="inline-flex items-center gap-1.5">
+                          <span
+                            class={`inline-block h-2.5 w-2.5 rounded-full ${deliveryAreaStatus === "OUTSIDE" ? "bg-rose-600" : "bg-emerald-600"
+                              }`}
+                          />
+                          {tt.mapYou}
+                        </span>
+                      ) : null}
+                      <span>{formatDistance(areaCheck.area.radiusMeters)}</span>
+                    </div>
+                  </div>
+                ) : null}
+
+                {deliveryAreaStatus === "OUTSIDE" ? (
+                  <div class="mt-3">
+                    <p class="leading-6">{tt.outsideAreaHelp}</p>
+                    <button
+                      type="button"
+                      class="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white"
+                      onClick={() => setType("PICKUP")}
+                    >
+                      {tt.switchToPickup}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

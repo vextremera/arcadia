@@ -8,6 +8,12 @@ import Modal from "@/components/admin/ui/Modal.astro";
 import type { ToneName } from "@/lib/admin/tones";
 import { db, AppSetting, OpeningHour, SpecialDate, eq } from "astro:db";
 import { getArcadiaAvailability, type ArcadiaChannel } from "@/server/time/madrid";
+import {
+  normalizeDeliveryAreaRule,
+  formatDistance,
+  DEFAULT_DELIVERY_AREA_RULE,
+  type DeliveryAreaRule,
+} from "@/server/delivery/area";
 
 type OperatingHoursSetting = {
   open: { start: string; end: string };
@@ -17,7 +23,7 @@ type OperatingHoursSetting = {
 
 type DeliveryFeeSetting = { cents: number };
 type OpsFlagsSetting = { pauseOrders: boolean; forcePickup: boolean };
-type DeliveryAreaRuleSetting = { enabled: boolean };
+type DeliveryAreaRuleSetting = DeliveryAreaRule;
 
 type ChannelEditor = {
   key: ArcadiaChannel;
@@ -68,7 +74,7 @@ const DEFAULTS = {
   } satisfies OperatingHoursSetting,
   deliveryFee: { cents: 0 } satisfies DeliveryFeeSetting,
   opsFlags: { pauseOrders: false, forcePickup: false } satisfies OpsFlagsSetting,
-  deliveryAreaRule: { enabled: false } satisfies DeliveryAreaRuleSetting,
+  deliveryAreaRule: DEFAULT_DELIVERY_AREA_RULE satisfies DeliveryAreaRuleSetting,
 };
 
 async function getSetting<T>(key: string, fallback: T): Promise<T> {
@@ -136,7 +142,9 @@ const availability = await getArcadiaAvailability(new Date());
 const operatingHours = await getSetting<OperatingHoursSetting>("operatingHours", DEFAULTS.operatingHours);
 const deliveryFee = await getSetting<DeliveryFeeSetting>("deliveryFee", DEFAULTS.deliveryFee);
 const opsFlags = await getSetting<OpsFlagsSetting>("opsFlags", DEFAULTS.opsFlags);
-const deliveryAreaRule = await getSetting<DeliveryAreaRuleSetting>("deliveryAreaRule", DEFAULTS.deliveryAreaRule);
+const deliveryAreaRule = normalizeDeliveryAreaRule(
+  await getSetting<DeliveryAreaRuleSetting>("deliveryAreaRule", DEFAULTS.deliveryAreaRule),
+);
 
 const openStart = operatingHours.open?.start ?? DEFAULTS.operatingHours.open.start;
 const openEnd = operatingHours.open?.end ?? DEFAULTS.operatingHours.open.end;
@@ -145,7 +153,7 @@ const kitchenEnd = operatingHours.kitchen?.end ?? DEFAULTS.operatingHours.kitche
 const deliveryStart = operatingHours.delivery?.start ?? DEFAULTS.operatingHours.delivery.start;
 const deliveryEnd = operatingHours.delivery?.end ?? DEFAULTS.operatingHours.delivery.end;
 const deliveryFeeEur = (Number(deliveryFee?.cents ?? 0) / 100).toFixed(2);
-const deliveryAreaSummary = "Lloret de Mar · 17310";
+const deliveryAreaSummary = `Radio de ${formatDistance(deliveryAreaRule.radiusMeters)} desde el local`;
 
 const openingHourRows = await db
   .select({
@@ -370,6 +378,27 @@ const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-[0
               Restringir área de delivery
             </label>
           </div>
+
+          <div class="grid gap-3 sm:grid-cols-3">
+            <label class="block">
+              <span class={labelClass}>Radio de reparto (m)</span>
+              <input class={fieldInputClass} type="number" step="50" min="100" name="deliveryAreaRadiusMeters" value={deliveryAreaRule.radiusMeters} />
+            </label>
+            <label class="block">
+              <span class={labelClass}>Latitud del local</span>
+              <input class={fieldInputClass} type="number" step="0.00001" name="deliveryAreaLat" value={deliveryAreaRule.lat} />
+            </label>
+            <label class="block">
+              <span class={labelClass}>Longitud del local</span>
+              <input class={fieldInputClass} type="number" step="0.00001" name="deliveryAreaLng" value={deliveryAreaRule.lng} />
+            </label>
+          </div>
+
+          <p class="text-xs text-slate-400">
+            El radio se mide en línea recta desde estas coordenadas. En el checkout el cliente ve
+            el círculo sobre un mapa y, si su dirección queda fuera, se le ofrece recoger el pedido
+            en el local.
+          </p>
         </div>
 
         <button type="submit" class="mt-5 inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15">

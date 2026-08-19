@@ -1,4 +1,9 @@
 import type { APIRoute } from "astro";
+import {
+  normalizeDeliveryAreaRule,
+  DEFAULT_DELIVERY_AREA_RULE as DEFAULT_AREA_RULE,
+  type DeliveryAreaRule,
+} from "@/server/delivery/area";
 import { db, AppSetting, eq } from "astro:db";
 import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
 
@@ -22,9 +27,8 @@ type OpsFlagsSetting = {
   forcePickup: boolean;
 };
 
-type DeliveryAreaRuleSetting = {
-  enabled: boolean;
-};
+// La forma de la regla vive en el servidor de delivery: aquí sólo se edita.
+type DeliveryAreaRuleSetting = DeliveryAreaRule;
 
 const DEFAULT_OPERATING_HOURS: OperatingHoursSetting = {
   open: { start: "07:30", end: "00:00" },
@@ -34,7 +38,13 @@ const DEFAULT_OPERATING_HOURS: OperatingHoursSetting = {
 
 const DEFAULT_DELIVERY_FEE: DeliveryFeeSetting = { cents: 0 };
 const DEFAULT_OPS_FLAGS: OpsFlagsSetting = { pauseOrders: false, forcePickup: false };
-const DEFAULT_DELIVERY_AREA_RULE: DeliveryAreaRuleSetting = { enabled: false };
+const DEFAULT_DELIVERY_AREA_RULE: DeliveryAreaRuleSetting = DEFAULT_AREA_RULE;
+
+/** Convierte un campo del formulario en número, o lo deja pasar como vacío. */
+function numberOrUndefined(value: FormDataEntryValue | null): number | undefined {
+  const parsed = Number(String(value ?? "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -175,9 +185,14 @@ export const POST: APIRoute = async (context) => {
     pauseOrders: form.get("pauseOrders") === "on",
     forcePickup: form.get("forcePickup") === "on",
   };
-  const nextDeliveryAreaRule: DeliveryAreaRuleSetting = {
+  // normalizeDeliveryAreaRule pone el suelo al radio y rellena lo que venga
+  // vacío, para que un campo mal escrito no deje a todo el pueblo fuera.
+  const nextDeliveryAreaRule: DeliveryAreaRuleSetting = normalizeDeliveryAreaRule({
     enabled: form.get("deliveryAreaEnabled") === "on",
-  };
+    lat: numberOrUndefined(form.get("deliveryAreaLat")),
+    lng: numberOrUndefined(form.get("deliveryAreaLng")),
+    radiusMeters: numberOrUndefined(form.get("deliveryAreaRadiusMeters")),
+  });
 
   const previousOperatingHours = await getSettingValue<OperatingHoursSetting>(
     "operatingHours",
