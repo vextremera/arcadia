@@ -5,6 +5,7 @@ import {
   UserProfile,
   LoyaltyTier,
   LoyaltyLedger,
+  and,
   eq,
 } from "astro:db";
 
@@ -177,6 +178,39 @@ export const POST: APIRoute = async (context) => {
 
     if (!isRole(role)) {
       return context.redirect(redirectToUser(userId, { error: "invalid-role" }));
+    }
+
+    /**
+     * Sólo un ADMIN reparte permisos.
+     *
+     * Antes bastaba con ser STAFF para llegar aquí y mandar `role=ADMIN` sobre
+     * la propia cuenta: cualquiera con acceso al pase de cocina se convertía en
+     * administrador. Lo mismo con desactivar cuentas, que sirve para dejar
+     * fuera al administrador de verdad.
+     */
+    const isPromoting = role !== user.role;
+    const isChangingAccess = active !== user.active;
+
+    if ((isPromoting || isChangingAccess) && authUser.role !== "ADMIN") {
+      return context.redirect(redirectToUser(userId, { error: "forbidden-role" }));
+    }
+
+    // Quitarse a uno mismo el rol o el acceso deja el panel sin quien lo
+    // gobierne, y no hay forma de recuperarlo desde la propia web.
+    if (userId === authUser.id && (role !== "ADMIN" || !active)) {
+      return context.redirect(redirectToUser(userId, { error: "self-lockout" }));
+    }
+
+    // Tampoco se puede dejar el sistema sin ningún administrador activo.
+    if (user.role === "ADMIN" && user.active && (role !== "ADMIN" || !active)) {
+      const admins = await db
+        .select({ id: User.id })
+        .from(User)
+        .where(and(eq(User.role, "ADMIN"), eq(User.active, true)));
+
+      if (admins.length <= 1) {
+        return context.redirect(redirectToUser(userId, { error: "last-admin" }));
+      }
     }
 
     if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {

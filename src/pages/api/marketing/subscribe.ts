@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { db, NewsletterSubscriber, User, eq } from "astro:db";
+import { checkRateLimit, clientKey, tooManyRequests } from "@/server/security/rateLimit";
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -21,7 +22,20 @@ async function getNextSubscriberId() {
   return rows.reduce((max, row) => Math.max(max, row.id), 0) + 1;
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, locals } = context;
+  // Diez altas por hora e IP. La lista de correo es un dato de negocio: sin
+  // límite se llena de direcciones inventadas y de gente apuntada sin querer.
+  const limit = await checkRateLimit({
+    key: `subscribe:${clientKey(context)}`,
+    limit: 10,
+    windowSeconds: 60 * 60,
+  });
+
+  if (!limit.allowed) {
+    return tooManyRequests(limit, "Demasiadas peticiones. Inténtalo dentro de un rato.");
+  }
+
   let body: { email?: string; acceptedTerms?: boolean } | null = null;
 
   try {

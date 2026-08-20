@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { checkRateLimit, clientKey, tooManyRequests } from "@/server/security/rateLimit";
 import {
   validateCheckoutCoupon,
   type CheckoutOrderType,
@@ -18,7 +19,24 @@ function json(data: unknown, status = 200) {
   });
 }
 
-export const POST: APIRoute = async ({ request, session }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, session } = context;
+  /**
+   * Treinta comprobaciones por minuto e IP.
+   *
+   * Este endpoint dice si un código de cupón existe y cuánto descuenta. Sin
+   * límite se pueden recorrer combinaciones hasta dar con una promoción viva.
+   */
+  const limit = await checkRateLimit({
+    key: `coupon:${clientKey(context)}`,
+    limit: 30,
+    windowSeconds: 60,
+  });
+
+  if (!limit.allowed) {
+    return tooManyRequests(limit, "Demasiados intentos con cupones. Espera un momento.");
+  }
+
   const body = await request.json().catch(() => null);
   if (!body) {
     return json({ ok: false, error: "INVALID_JSON", message: "Body inválido." }, 400);

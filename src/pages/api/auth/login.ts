@@ -1,9 +1,21 @@
 import type { APIRoute } from "astro";
 import { db, User, eq } from "astro:db";
-import { verifyPassword } from "@/server/auth/password";
+import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { randomUUID } from "node:crypto";
+import { checkRateLimit, clientKey } from "@/server/security/rateLimit";
+import { safeInternalPath } from "@/server/security/redirects";
 
 const SESSION_COOKIE = "astro-session";
+
+/**
+ * Hash de descarte para gastar el mismo tiempo con un email que no existe.
+ *
+ * Comprobar la contraseña cuesta unos milisegundos medibles. Al salir antes de
+ * tiempo cuando el usuario no existía, la respuesta llegaba notablemente más
+ * rápido y eso permite comprobar qué correos están registrados en el
+ * restaurante sin acertar ni una contraseña.
+ */
+const DUMMY_HASH = hashPassword(randomUUID());
 
 function toNextParam(next: string) {
   const n = String(next ?? "").trim();
@@ -33,29 +45,40 @@ async function verifyRecaptcha(token: string, remoteip?: string | null) {
   return !!data?.success;
 }
 
-export const POST: APIRoute = async ({ request, session, redirect, cookies, clientAddress }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, session, redirect, cookies } = context;
   if (!session) return new Response("Session not available", { status: 500 });
 
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");
-  const next = String(form.get("next") ?? "").trim();
+  // Sólo rutas internas: `next` venía del formulario y se seguía a ciegas, así
+  // que servía para llevar al usuario recién identificado a un sitio ajeno.
+  const next = safeInternalPath(form.get("next"));
   const remember = String(form.get("remember") ?? "") === "on";
 
+  const clientIp = clientKey(context);
+
+  // Diez intentos por minuto y IP. Sin esto se pueden probar contraseñas sin
+  // límite: el captcha ayuda, pero desaparece si falta la clave del servicio.
+  const limit = await checkRateLimit({
+    key: `login:${clientIp}`,
+    limit: 10,
+    windowSeconds: 60,
+  });
+
+  if (!limit.allowed) {
+    return redirect(`/login?error=rate${toNextParam(next)}`, 302);
+  }
+
   const captchaToken = String(form.get("g-recaptcha-response") ?? "").trim();
-  const captchaOk = await verifyRecaptcha(captchaToken, clientAddress ?? null);
+  // La IP se toma de la misma función protegida que el límite: leer
+  // `context.clientAddress` a pelo tira la petición cuando el adaptador no
+  // puede resolverla.
+  const captchaOk = await verifyRecaptcha(captchaToken, clientIp);
   if (!captchaOk) return redirect(`/login?error=captcha${toNextParam(next)}`, 302);
 
   if (!email || !password) return redirect(`/login?error=invalid${toNextParam(next)}`, 302);
-
-  // Mantener carrito: reutilizamos el sessionId existente si lo hay
-  const url = new URL(request.url);
-  const secure = url.protocol === "https:";
-  const existingSessionId = cookies.get(SESSION_COOKIE)?.value;
-  const sessionId = existingSessionId || randomUUID();
-  if (!existingSessionId) {
-    await session.load(sessionId);
-  }
 
   const [u] = await db
     .select({
@@ -70,10 +93,27 @@ export const POST: APIRoute = async ({ request, session, redirect, cookies, clie
     .where(eq(User.email, email))
     .limit(1);
 
-  if (!u || !u.active) return redirect(`/login?error=invalid${toNextParam(next)}`, 302);
+  // Se comprueba siempre algo, exista el usuario o no, para que las dos
+  // respuestas tarden lo mismo.
+  const passwordOk = verifyPassword(password, u?.passwordHash ?? DUMMY_HASH);
 
-  const ok = verifyPassword(password, u.passwordHash);
-  if (!ok) return redirect(`/login?error=invalid${toNextParam(next)}`, 302);
+  if (!u || !u.active || !passwordOk) {
+    return redirect(`/login?error=invalid${toNextParam(next)}`, 302);
+  }
+
+  /**
+   * Sesión nueva al entrar, conservando el carrito.
+   *
+   * Antes se reutilizaba el identificador de sesión que ya trajera el
+   * navegador. Quien consiguiera fijar esa cookie en el navegador de otra
+   * persona (desde un subdominio, una wifi sin https, un enlace preparado)
+   * conocía de antemano el identificador que, tras identificarse la víctima,
+   * pasaba a estar autenticado como ella. Rotarlo corta ese vínculo.
+   *
+   * `regenerate` conserva los datos, así que el carrito sigue donde estaba, y
+   * borra la sesión antigua del almacén.
+   */
+  await session.regenerate();
 
   await session.set("user", {
     id: u.id,
@@ -81,6 +121,10 @@ export const POST: APIRoute = async ({ request, session, redirect, cookies, clie
     name: u.name ?? null,
     role: u.role as any,
   });
+
+  const url = new URL(request.url);
+  const secure = url.protocol === "https:";
+  const sessionId = cookies.get(SESSION_COOKIE)?.value ?? randomUUID();
 
   // Remember me: cookie persistente 30 días
   cookies.set(SESSION_COOKIE, sessionId, {

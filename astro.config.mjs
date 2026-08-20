@@ -49,6 +49,19 @@ export default defineConfig({
   output: "server",
   adapter: vercel(),
 
+  /**
+   * `security.csp` de Astro está desactivado a propósito.
+   *
+   * Astro construye la política calculando el hash de cada script, pero sólo de
+   * los que él procesa: los diez `<script is:inline>` del proyecto (menú móvil,
+   * barra lateral del panel, pantallas de menú diario y festivo…) quedan fuera
+   * y el navegador los bloquea. Se probó contra el build y tumbaba el menú
+   * hamburguesa y buena parte del panel. Además dos de ellos usan `define:vars`,
+   * que obliga a `is:inline` y no admite otra forma.
+   *
+   * La política se envía desde src/server/security/headers.ts, sin hashes.
+   */
+
   integrations: [db(), preact()],
 
   fonts: [

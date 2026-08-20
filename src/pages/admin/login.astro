@@ -4,7 +4,8 @@ import SiteLayout from "@/layouts/SiteLayout.astro";
 const error = Astro.url.searchParams.get("error") ?? "";
 
 const errorMessage =
-  error === "invalid" ? "Email o contraseña incorrectos." : "";
+  error === "invalid" ? "Email o contraseña incorrectos." :
+    error === "rate" ? "Demasiados intentos. Espera un minuto y vuelve a probar." : "";
 ---
 
 <SiteLayout title="Admin Login · Arcadia" fullWidth={true}>

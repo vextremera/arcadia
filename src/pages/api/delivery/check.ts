@@ -9,6 +9,7 @@
 import type { APIRoute } from "astro";
 import { db, AppSetting, eq } from "astro:db";
 import { geocodeAddress } from "@/server/delivery/geocode";
+import { checkRateLimit, clientKey, tooManyRequests } from "@/server/security/rateLimit";
 import {
   normalizeDeliveryAreaRule,
   validateDeliveryPoint,
@@ -34,7 +35,26 @@ export async function getDeliveryAreaRule() {
   return normalizeDeliveryAreaRule(row?.value ?? DEFAULT_DELIVERY_AREA_RULE);
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request } = context;
+  /**
+   * Veinte comprobaciones por minuto e IP.
+   *
+   * Cada dirección nueva sale a Nominatim por una cola de una consulta por
+   * segundo, compartida por todos los clientes. Sin límite, una sola persona
+   * pidiendo direcciones inventadas atasca esa cola y deja el mapa del
+   * checkout en blanco para el resto — además de gastar la cuota gratuita.
+   */
+  const limit = await checkRateLimit({
+    key: `delivery-check:${clientKey(context)}`,
+    limit: 20,
+    windowSeconds: 60,
+  });
+
+  if (!limit.allowed) {
+    return tooManyRequests(limit, "Demasiadas comprobaciones de dirección. Espera un momento.");
+  }
+
   let body: { line1?: string; city?: string; postalCode?: string } = {};
 
   try {

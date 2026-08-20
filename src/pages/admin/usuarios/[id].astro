@@ -127,6 +127,9 @@ const errorMessage =
   errorParam === "missing-email" ? "El email es obligatorio." :
   errorParam === "invalid-email" ? "El email no es válido." :
   errorParam === "invalid-role" ? "El rol no es válido." :
+  errorParam === "forbidden-role" ? "Solo un administrador puede cambiar el rol o el acceso de una cuenta." :
+  errorParam === "self-lockout" ? "No puedes quitarte a ti mismo el rol de administrador ni desactivar tu cuenta." :
+  errorParam === "last-admin" ? "Debe quedar al menos un administrador activo." :
   errorParam === "invalid-birthday" ? "La fecha de nacimiento no es válida." :
   errorParam === "duplicate-email" ? "Ya existe otro usuario con ese email." :
   errorParam === "points-required" ? "Indica una cantidad de puntos válida." :

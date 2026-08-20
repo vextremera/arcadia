@@ -28,6 +28,7 @@ import {
   DEFAULT_DELIVERY_AREA_RULE,
 } from "@/server/delivery/area";
 import { geocodeAddress } from "@/server/delivery/geocode";
+import { checkRateLimit, clientKey, tooManyRequests } from "@/server/security/rateLimit";
 import { awardOrderPointsOnce } from "@/server/loyalty/engine";
 import { enqueueOrderPrints } from "@/server/printing/queue";
 
@@ -303,8 +304,29 @@ async function buildCardPaymentInsert(params: {
   } satisfies PaymentInsert;
 }
 
-export const POST: APIRoute = async ({ request, session }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, session } = context;
   if (!session) return new Response("Session not available", { status: 500 });
+
+  /**
+   * Veinte pedidos por hora e IP.
+   *
+   * La clave de idempotencia ya evita que un doble clic duplique un pedido,
+   * pero no impide que alguien lance cientos distintos: la cocina se llenaría
+   * de comandas falsas y la impresora las sacaría todas.
+   *
+   * El margen es amplio a propósito. Varias personas pueden pedir desde la
+   * misma wifi (un hotel, un camping) y salir con la misma IP.
+   */
+  const limit = await checkRateLimit({
+    key: `checkout:${clientKey(context)}`,
+    limit: 20,
+    windowSeconds: 60 * 60,
+  });
+
+  if (!limit.allowed) {
+    return tooManyRequests(limit, "Demasiados pedidos seguidos. Espera un momento o llámanos.");
+  }
 
   const authUser = (await session.get("user")) as SessionUser | undefined;
 

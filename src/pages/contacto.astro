@@ -6,7 +6,8 @@ const lang = Astro.locals.lang ?? DEFAULT_LANG;
 const t = getSiteCopy(lang).contact;
 
 const sent = Astro.url.searchParams.get("sent") === "1";
-const error = Astro.url.searchParams.get("error") === "1";
+// El límite de envíos devuelve `error=rate`; para el visitante es un error más.
+const error = ["1", "rate"].includes(Astro.url.searchParams.get("error") ?? "");
 ---
 
 <SiteLayout title={`${t.title} · Arcadia`}>

@@ -1,8 +1,14 @@
 import type { APIRoute } from "astro";
 import nodemailer from "nodemailer";
+import { escapeHtml, escapeHtmlWithBreaks } from "@/server/security/html";
+import { checkRateLimit, clientKey } from "@/server/security/rateLimit";
 
 function safeText(value: FormDataEntryValue | null) {
     return String(value ?? "").trim();
+}
+
+function isValidEmail(email: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function withQuery(path: string, params: Record<string, string>) {
@@ -13,7 +19,25 @@ function withQuery(path: string, params: Record<string, string>) {
     return `${url.pathname}${url.search}`;
 }
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async (context) => {
+    const { request, redirect } = context;
+    /**
+     * Cinco mensajes por hora y IP.
+     *
+     * Este endpoint manda correo con la cuenta SMTP del restaurante. Sin límite,
+     * cualquiera la usa de altavoz hasta que el proveedor la marca como origen
+     * de spam, y entonces el bar se queda sin correo saliente.
+     */
+    const limit = await checkRateLimit({
+        key: `contact:${clientKey(context)}`,
+        limit: 5,
+        windowSeconds: 60 * 60,
+    });
+
+    if (!limit.allowed) {
+        return redirect(withQuery("/contacto", { error: "rate" }), 302);
+    }
+
     const form = await request.formData();
 
     const name = safeText(form.get("name")).slice(0, 120);
@@ -22,6 +46,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const message = safeText(form.get("message")).slice(0, 5000);
 
     if (!name || !email || !subject || !message) {
+        return redirect(withQuery("/contacto", { error: "1" }), 302);
+    }
+
+    // El email acaba en la cabecera Reply-To del correo: tiene que parecer una
+    // dirección, no texto libre.
+    if (!isValidEmail(email)) {
         return redirect(withQuery("/contacto", { error: "1" }), 302);
     }
 
@@ -58,12 +88,15 @@ export const POST: APIRoute = async ({ request, redirect }) => {
             replyTo: email || replyTo,
             subject: `[Arcadia Contact] ${subject}`,
             text: `Nombre: ${name}\nEmail: ${email}\n\n${message}`,
+            // Todo lo que escribe el remitente va escapado: si no, mandando
+            // `<a href="...">Pincha aquí</a>` se le cuela al personal un enlace
+            // con pinta de legítimo dentro de un correo que sí sale de la web.
             html: `
-        <p><b>Nombre:</b> ${name}</p>
-        <p><b>Email:</b> ${email}</p>
-        <p><b>Asunto:</b> ${subject}</p>
+        <p><b>Nombre:</b> ${escapeHtml(name)}</p>
+        <p><b>Email:</b> ${escapeHtml(email)}</p>
+        <p><b>Asunto:</b> ${escapeHtml(subject)}</p>
         <hr />
-        <p>${message.replace(/\n/g, "<br />")}</p>
+        <p>${escapeHtmlWithBreaks(message)}</p>
       `,
         });
 

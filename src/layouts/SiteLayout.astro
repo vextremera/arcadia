@@ -61,11 +61,6 @@ const mainClass =
       href="/ARCADIA_LOGO_WHITE.svg"
     />
 
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/css/flag-icons.min.css"
-    />
-
     <title>{title}</title>
 
     <Font cssVariable="--font-sigmar" preload />
@@ -103,8 +98,37 @@ const mainClass =
         flex: 0 0 auto;
       }
 
+      /*
+       * Banderas del selector de idioma.
+       *
+       * Antes venían de una hoja de 28 KB servida por jsdelivr en todas las
+       * páginas, para usar cuatro de sus doscientas cincuenta banderas. Aparte
+       * del peso, era una dependencia de terceros en el camino crítico: quien
+       * pudiera alterar ese fichero (o mover la etiqueta de git a la que
+       * apuntaba) inyectaba CSS en todo el sitio, y con CSS se puede tapar la
+       * interfaz o sacar datos por selectores de atributo.
+       */
       .lang-flag.fi {
         line-height: 1;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover;
+      }
+
+      .lang-flag.fi-es {
+        background-image: url("/images/flags/es.svg");
+      }
+
+      .lang-flag.fi-es-ct {
+        background-image: url("/images/flags/es-ct.svg");
+      }
+
+      .lang-flag.fi-gb {
+        background-image: url("/images/flags/gb.svg");
+      }
+
+      .lang-flag.fi-fr {
+        background-image: url("/images/flags/fr.svg");
       }
     </style>
   </head>
