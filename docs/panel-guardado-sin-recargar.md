@@ -44,6 +44,25 @@ El resultado se decide por la URL a la que redirige el servidor (`?saved=` o
 "el primer recuadro verde" cogía la insignia **Admin total** de la pantalla de
 Equipo y la mostraba como si fuera el resultado de guardar.
 
+## Los buscadores
+
+Los siete formularios de filtro (pedidos, clientes, cupones, productos,
+ingredientes, newsletter, auditoría) van por GET y también se interceptan, pero
+con una diferencia importante: **usan `pushState`, no `replaceState`**.
+
+En un guardado no tiene sentido que "atrás" te devuelva al formulario sin
+guardar. En un buscador es justo al revés: escribes "pollo", luego "lomo", y
+esperas que atrás te devuelva a "pollo". Por eso cada búsqueda añade una entrada
+al historial, y hay un `popstate` que repinta el listado al ir atrás o adelante:
+sin él la URL cambiaría pero la pantalla se quedaría con el listado anterior,
+que es peor que no tener historial.
+
+Al filtrar sí se sube el scroll al principio — un listado recién filtrado se lee
+desde arriba. Al guardar no, que es justo lo contrario de lo que se quería.
+
+Un efecto secundario que se agradece: al guardar desde un listado filtrado, el
+filtro se conserva. Antes el guardado te devolvía a la lista completa.
+
 ## Lo que sigue igual (a propósito)
 
 **El servidor renderiza la página completa.** Esto no es una API que devuelva
@@ -108,6 +127,11 @@ violaciones):
   el script inline se volvió a enganchar.
 - **Producto (29 formularios)**: sin recargar, scroll intacto en 900 px, y el
   encabezado de la cabecera y el título del documento actualizados al renombrar.
+- **Buscador de productos**: 157 filas → 26 con "pollo" → 12 con "lomo", sin
+  recargar. Atrás devuelve a "pollo" (26) y luego a la lista completa (157), con
+  el campo de búsqueda restaurado; adelante rehace el camino.
+- **Guardar desde un listado filtrado**: el filtro se conserva y el historial no
+  crece, porque el guardado usa `replaceState`.
 
 Queda sin probar de punta a punta la **subida de imagen**: `FormData` maneja los
 ficheros de forma nativa y el navegador pone el `multipart` por su cuenta, pero

@@ -155,6 +155,52 @@ function botonesDe(form: HTMLFormElement): HTMLButtonElement[] {
   return Array.from(form.querySelectorAll<HTMLButtonElement>('button[type="submit"], button:not([type])'));
 }
 
+/**
+ * Trae una pantalla del panel y la pone en su sitio, sin recargar.
+ *
+ * La usan los buscadores y el botón "atrás". Devuelve false si no ha podido,
+ * para que quien la llame navegue de verdad.
+ */
+async function traerPantalla(url: string): Promise<boolean> {
+  const raiz = main();
+  if (!raiz) return false;
+
+  const id = ++peticionEnCurso;
+  marcarOcupado(raiz, true);
+
+  try {
+    const respuesta = await fetch(url, {
+      credentials: "same-origin",
+      headers: { "X-Requested-With": "fetch" },
+    });
+
+    if (id !== peticionEnCurso) return true;
+
+    const destino = new URL(respuesta.url, location.href);
+    if (destino.pathname !== location.pathname) return false;
+
+    const html = await respuesta.text();
+    const nuevo = new DOMParser().parseFromString(html, "text/html");
+    const nuevoMain = nuevo.querySelector(MAIN);
+    if (!nuevoMain) return false;
+
+    raiz.innerHTML = nuevoMain.innerHTML;
+    reejecutarScripts(raiz);
+    // Un listado filtrado se lee desde arriba: aquí sí conviene subir.
+    raiz.scrollTop = 0;
+
+    document.title = nuevo.title || document.title;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (id === peticionEnCurso) {
+      const actual = main();
+      if (actual) marcarOcupado(actual, false);
+    }
+  }
+}
+
 async function enviar(form: HTMLFormElement, submitter: HTMLElement | null): Promise<void> {
   const raiz = main();
   if (!raiz) {
@@ -223,6 +269,7 @@ async function enviar(form: HTMLFormElement, submitter: HTMLElement | null): Pro
 
     document.title = nuevo.title || document.title;
     history.replaceState(null, "", respuesta.url);
+    ultimaUrl = destino.pathname + destino.search;
 
     const aviso = leerAviso(nuevoMain, destino);
     if (aviso) avisar(aviso.texto, aviso.error);
@@ -250,6 +297,37 @@ document.addEventListener("submit", (event) => {
 
   const metodo = (form.getAttribute("method") ?? "get").toLowerCase();
   const accion = form.getAttribute("action") ?? "";
+
+  /**
+   * Buscadores y filtros.
+   *
+   * Van por GET y no guardan nada: sólo recargan el listado con otros
+   * parámetros. Se tratan aparte porque el historial funciona al revés que en
+   * un guardado — escribes "pizza", luego "pasta", y "atrás" tiene que
+   * devolverte a "pizza". De ahí `pushState` en vez de `replaceState`.
+   */
+  if (metodo === "get" && !accion) {
+    const params = new URLSearchParams();
+    new FormData(form).forEach((valor, clave) => {
+      // Los campos vacíos no pintan nada en la URL y sólo la ensucian.
+      const texto = String(valor).trim();
+      if (texto) params.append(clave, texto);
+    });
+
+    const url = `${location.pathname}${params.toString() ? `?${params}` : ""}`;
+
+    event.preventDefault();
+    void traerPantalla(url).then((ok) => {
+      if (!ok) {
+        location.href = url;
+        return;
+      }
+      history.pushState({ adminAjax: true }, "", url);
+      ultimaUrl = url;
+    });
+    return;
+  }
+
   if (metodo !== "post" || !accion.startsWith("/api/admin/")) return;
 
   // Salir del panel tiene que recargar de verdad: cambia la sesión entera.
@@ -257,4 +335,24 @@ document.addEventListener("submit", (event) => {
 
   event.preventDefault();
   void enviar(form, (event as SubmitEvent).submitter);
+});
+
+/**
+ * El botón "atrás" del navegador.
+ *
+ * Sin esto, volver atrás tras filtrar cambiaría la URL pero dejaría el listado
+ * anterior en pantalla, que es peor que no tener historial.
+ */
+let ultimaUrl = location.pathname + location.search;
+
+window.addEventListener("popstate", () => {
+  const url = location.pathname + location.search;
+
+  // Un salto a un ancla también dispara popstate y no toca nada del listado.
+  if (url === ultimaUrl) return;
+  ultimaUrl = url;
+
+  void traerPantalla(url).then((ok) => {
+    if (!ok) location.reload();
+  });
 });
