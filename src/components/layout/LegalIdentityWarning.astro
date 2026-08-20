@@ -1,0 +1,34 @@
+---
+/**
+ * Aviso de que faltan los datos fiscales del negocio.
+ *
+ * Sale en las páginas legales mientras `src/lib/legal/business.ts` esté sin
+ * rellenar. Es deliberadamente visible: un aviso legal sin titular
+ * identificado no cumple, y lo peor que puede pasar es que parezca correcto
+ * sin serlo. Prefiero que moleste a que pase desapercibido.
+ *
+ * En cuanto se completen los datos, desaparece solo.
+ */
+import { businessIdentityComplete, missingBusinessFields } from "@/lib/legal/business";
+
+const faltan = missingBusinessFields();
+---
+
+{
+  !businessIdentityComplete() && (
+    <div class="mb-8 rounded-2xl border-2 border-amber-400 bg-amber-50 p-5">
+      <p class="text-sm font-bold text-amber-900">
+        Esta página está incompleta
+      </p>
+      <p class="mt-2 text-sm leading-6 text-amber-900">
+        Faltan por publicar los datos identificativos del titular del negocio:{" "}
+        <strong>{faltan.join(", ")}</strong>. La ley exige que estén accesibles de
+        forma permanente y gratuita, así que este sitio no debería estar abierto al
+        público hasta completarlos.
+      </p>
+      <p class="mt-2 text-xs text-amber-800">
+        Se rellenan en <code class="rounded bg-amber-100 px-1.5 py-0.5">src/lib/legal/business.ts</code>.
+      </p>
+    </div>
+  )
+}

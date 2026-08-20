@@ -1,5 +1,6 @@
 ---
 import SiteLayout from "@/layouts/SiteLayout.astro";
+import LegalIdentityWarning from "@/components/layout/LegalIdentityWarning.astro";
 import { DEFAULT_LANG, getSiteCopy } from "@/lib/i18n";
 
 const lang = Astro.locals.lang ?? DEFAULT_LANG;
@@ -8,6 +9,7 @@ const t = getSiteCopy(lang).legal;
 
 <SiteLayout title={`${t.title} · Arcadia`}>
     <section class="mx-auto w-full max-w-5xl py-6 sm:py-8">
+        <LegalIdentityWarning />
         <div
             class="rounded-[30px] border border-zinc-200 bg-[#fbfaf7] p-6 sm:p-8"
         >

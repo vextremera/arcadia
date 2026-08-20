@@ -1,0 +1,120 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import LegalIdentityWarning from "@/components/layout/LegalIdentityWarning.astro";
+import { BUSINESS } from "@/lib/legal/business";
+import { getDeliveryAreaRule } from "@/pages/api/delivery/check";
+import { formatDistance } from "@/server/delivery/area";
+
+/**
+ * Condiciones de contratación.
+ *
+ * Faltaba por completo: había aviso legal y política de privacidad, pero
+ * ningún documento que contara cómo se compra. En una venta a distancia hay
+ * que informar antes de contratar del proceso, del precio final, de los plazos
+ * y del derecho de desistimiento.
+ *
+ * Lo del desistimiento tiene truco y por eso está explicado y no escondido: la
+ * comida preparada y la que se estropea rápido **están excluidas** del plazo de
+ * catorce días. Que no haya derecho no exime de informar de que no lo hay.
+ *
+ * El radio de reparto se lee de la configuración real en vez de escribirlo a
+ * mano, para que no se quede desfasado en cuanto se cambie desde el panel.
+ */
+
+const rule = await getDeliveryAreaRule();
+
+const secciones = [
+  {
+    title: "Quién vende",
+    body: [
+      `Los pedidos realizados a través de esta web los presta ${BUSINESS.legalName || BUSINESS.tradeName}${BUSINESS.taxId ? `, con NIF ${BUSINESS.taxId}` : ""}${BUSINESS.address ? `, con domicilio en ${BUSINESS.address}` : ""}.`,
+      `Para cualquier cuestión sobre un pedido puedes escribir a ${BUSINESS.email} o llamar al ${BUSINESS.phone}.`,
+    ],
+  },
+  {
+    title: "Cómo se hace un pedido",
+    body: [
+      "Eliges los productos, los personalizas si quieres y los añades al carrito. En el checkout indicas si prefieres entrega a domicilio o recogida en el local, tus datos de contacto y la forma de pago.",
+      "El pedido queda cerrado al pulsar el botón «Pedido con obligación de pago». Hasta ese momento puedes modificar o vaciar el carrito.",
+      "Justo después recibirás en tu correo la confirmación con el detalle completo del pedido. Guárdala: es tu comprobante.",
+    ],
+  },
+  {
+    title: "Precios y pago",
+    body: [
+      "Todos los precios se muestran en euros e incluyen el IVA aplicable. El importe que ves en el resumen antes de confirmar es el total final: incluye los gastos de reparto cuando corresponda, y no se añade ningún cargo después.",
+      "Se puede pagar en efectivo a la entrega o con tarjeta, tanto en reparto como en recogida.",
+      "Los cupones de descuento se aplican sobre el subtotal y se muestran desglosados antes de confirmar.",
+    ],
+  },
+  {
+    title: "Entrega y recogida",
+    body: [
+      rule.enabled
+        ? `Repartimos dentro de un radio de ${formatDistance(rule.radiusMeters)} desde el local. En el checkout verás tu dirección sobre un mapa con la zona marcada; si queda fuera, puedes cambiarla o pasar a recoger el pedido.`
+        : "El reparto se presta en la zona habitual del restaurante. Si tu dirección queda fuera, te lo indicaremos en el checkout y podrás pasar a recogerlo.",
+      "Los pedidos se preparan dentro del horario de cocina publicado en la web. Fuera de ese horario no se pueden cursar.",
+      "El plazo de entrega depende de la carga de trabajo en cada momento; es una estimación y no un compromiso de hora exacta.",
+    ],
+  },
+  {
+    title: "Derecho de desistimiento",
+    body: [
+      "La normativa de consumo reconoce con carácter general catorce días para desistir de una compra a distancia, pero excluye expresamente los bienes que pueden deteriorarse o caducar con rapidez, y los preparados conforme a las especificaciones del consumidor o claramente personalizados.",
+      "La comida preparada de este restaurante entra en ambos supuestos, así que una vez confirmado el pedido no cabe desistimiento.",
+      "Esto no afecta a tus derechos si algo llega en mal estado, incompleto o distinto de lo pedido: en ese caso llámanos y lo resolvemos.",
+    ],
+  },
+  {
+    title: "Cancelaciones y problemas con un pedido",
+    body: [
+      "Si necesitas anular un pedido, llámanos cuanto antes: si la cocina todavía no ha empezado a prepararlo, lo cancelamos sin coste.",
+      `Para cualquier reclamación puedes escribir a ${BUSINESS.email}. Disponemos de hojas oficiales de reclamación a disposición de los clientes en el local.`,
+    ],
+  },
+  {
+    title: "Alérgenos",
+    body: [
+      "La información sobre los catorce alérgenos de declaración obligatoria está disponible en la ficha de cada producto, antes de completar la compra, y también en el local.",
+      "Nuestra cocina manipula prácticamente todos los alérgenos, así que no podemos garantizar la ausencia total de trazas. Si tienes una alergia grave, avísanos por teléfono antes de pedir.",
+    ],
+  },
+];
+---
+
+<SiteLayout title="Condiciones de contratación · Arcadia">
+  <section class="mx-auto w-full max-w-5xl py-6 sm:py-8">
+    <LegalIdentityWarning />
+
+    <div class="rounded-[30px] border border-zinc-200 bg-[#fbfaf7] p-6 sm:p-8">
+      <div class="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+        LEGAL
+      </div>
+      <h1 class="mt-3 text-3xl font-black tracking-tight text-zinc-900 sm:text-4xl">
+        Condiciones de contratación
+      </h1>
+      <p class="mt-3 max-w-3xl text-sm leading-7 text-zinc-700 sm:text-base">
+        Estas condiciones regulan los pedidos que se hacen desde esta web. Conviene
+        leerlas antes de comprar; al confirmar un pedido las estás aceptando.
+      </p>
+    </div>
+
+    <div class="mt-6 grid gap-4 sm:mt-8">
+      {
+        secciones.map((seccion) => (
+          <article class="rounded-[26px] border border-zinc-200 bg-white p-6 sm:p-7">
+            <h2 class="text-lg font-bold tracking-tight text-zinc-900">{seccion.title}</h2>
+            {seccion.body.map((parrafo) => (
+              <p class="mt-3 text-sm leading-7 text-zinc-700">{parrafo}</p>
+            ))}
+          </article>
+        ))
+      }
+    </div>
+
+    <p class="mt-6 text-xs leading-6 text-zinc-500">
+      Consulta también el <a class="underline hover:text-zinc-800" href="/legal">aviso legal</a> y
+      la <a class="underline hover:text-zinc-800" href="/privacidad">política de privacidad</a>.
+    </p>
+  </section>
+</SiteLayout>
