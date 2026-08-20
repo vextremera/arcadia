@@ -39,14 +39,15 @@ export type BusinessIdentity = {
 export const BUSINESS: BusinessIdentity = {
   tradeName: "Arcadia",
 
+  // La denominación social completa incluye la forma jurídica. El CIF empieza
+  // por B, que es precisamente la letra de una sociedad limitada.
   legalName: "EUROHOGAR2005, S.L.",
-  // ⚠️ PENDIENTE — el CIF real de la sociedad (letra + 8 caracteres).
-  taxId: "",
+  taxId: "B17876327",
   address: "Maria Aurelia Capmany i Farnés, 2, 17310, Lloret de Mar",
   email: "victorarcadia@gmail.com",
   phone: "+34 606 07 78 00",
-  // ⚠️ PENDIENTE — al ser S.L. hace falta: Registro Mercantil de Girona,
-  // tomo, folio y hoja. Está en la escritura de constitución.
+  // ⚠️ PENDIENTE — está en la escritura de constitución. Formato:
+  // "Registro Mercantil de Girona, tomo 1234, folio 56, hoja GI-7890".
   registry: "",
 };
 
@@ -87,13 +88,35 @@ export function missingBusinessFields(): string[] {
 
   /**
    * Una sociedad está inscrita en el Registro Mercantil y tiene que decir
-   * dónde. Un autónomo no, y por eso el campo sólo se exige cuando la
-   * denominación delata que hay sociedad detrás.
+   * dónde. Un autónomo no, y por eso el campo sólo se le exige a la primera.
+   *
+   * Si hay sociedad o no se decide por **la letra inicial del CIF**, no por
+   * cómo esté escrito el nombre. Antes se miraba la denominación, y quitarle
+   * el "S.L." bastaba para que el requisito desapareciera — cosa que puede
+   * pasar sin mala intención, simplemente al acortar el nombre. La letra del
+   * CIF no se puede cambiar: A es anónima, B limitada, y así.
    */
-  const esSociedad = /\b(s\.?l\.?|s\.?a\.?|s\.?l\.?u\.?|sociedad)\b/i.test(BUSINESS.legalName);
-  if (esSociedad && BUSINESS.registry.trim().length < 10) faltan.push("datos registrales");
+  const inicial = BUSINESS.taxId.trim().toUpperCase()[0] ?? "";
+  const esSociedad = "ABCDEFGHJPQRSUVN".includes(inicial) && inicial !== "";
+
+  if (esSociedad && !pareceInscripcionRegistral(BUSINESS.registry)) {
+    faltan.push("datos registrales");
+  }
 
   return faltan;
+}
+
+/**
+ * ¿Los datos registrales parecen de verdad?
+ *
+ * Una inscripción real dice registro, tomo, folio y hoja, así que lleva
+ * números sí o sí. Sin esta comprobación, un "pendiente" o un "registro de
+ * prueba" pasaba por bueno y acababa publicado en el aviso legal.
+ */
+function pareceInscripcionRegistral(valor: string): boolean {
+  const limpio = valor.trim();
+
+  return limpio.length >= 15 && /\d/.test(limpio) && /registro|tomo|folio|hoja/i.test(limpio);
 }
 
 /** Línea de identificación para el pie de los correos. */
