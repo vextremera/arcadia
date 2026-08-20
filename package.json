@@ -19,8 +19,8 @@
     "build:vercel": "npm run db:push:remote && npm run db:bootstrap:remote && npm run db:migrate:remote && astro build --remote",
     "db:bebidas": "astro db execute db/seed-bebidas.ts",
     "db:bebidas:remote": "astro db execute db/seed-bebidas.ts --remote",
-    "db:migrate": "astro db execute db/migrate-menu-v2.ts && astro db execute db/migrate-order-status.ts && astro db execute db/migrate-admin-users.ts",
-    "db:migrate:remote": "astro db execute db/migrate-menu-v2.ts --remote && astro db execute db/migrate-order-status.ts --remote && astro db execute db/migrate-admin-users.ts --remote"
+    "db:migrate": "astro db execute db/migrate-menu-v2.ts && astro db execute db/migrate-order-status.ts && astro db execute db/migrate-admin-users.ts && astro db execute db/seed-bebidas.ts",
+    "db:migrate:remote": "astro db execute db/migrate-menu-v2.ts --remote && astro db execute db/migrate-order-status.ts --remote && astro db execute db/migrate-admin-users.ts --remote && astro db execute db/seed-bebidas.ts --remote"
   },
   "dependencies": {
     "@astrojs/db": "^0.21.3",

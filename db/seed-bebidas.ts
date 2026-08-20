@@ -1,14 +1,22 @@
 /**
  * Carta de bebidas del local.
  *
- * Se ejecuta a mano, no en cada despliegue:
+ * Corre en el despliegue, dentro de `db:migrate`, pero **una sola vez**: deja
+ * una marca en AppSetting y en las siguientes pasadas no hace nada.
  *
- *   npm run db:bebidas          (base local)
- *   npm run db:bebidas:remote   (producción)
+ * Esa marca no es un capricho. El alta pone `active: true` y fija la categoría
+ * y los canales de cada bebida; si eso se repitiera en cada despliegue,
+ * cualquier cambio hecho desde el panel —desactivar una cerveza que se acabó,
+ * mover algo de familia— se desharía solo al siguiente deploy. Ya pasó en este
+ * proyecto con la configuración de operativa, y no apetece repetirlo.
  *
- * Es idempotente: si un producto ya existe por su slug, se actualiza en lugar
- * de duplicarse. Se puede repetir sin miedo, y sirve igual para corregir
- * precios en bloque más adelante.
+ * Para forzarlo de nuevo (por ejemplo tras añadir bebidas a la lista):
+ *
+ *   npm run db:bebidas -- --force
+ *   npm run db:bebidas:remote -- --force
+ *
+ * Dentro de una misma pasada sí es idempotente: empareja por nombre y
+ * actualiza en lugar de duplicar.
  *
  * ── Canales ──
  * Todas las bebidas van a la CARTA. A DOMICILIO sólo refrescos y agua: las
@@ -21,7 +29,31 @@
  * /admin/catalogo/productos antes de publicar: aquí nadie sabe lo que cuesta
  * realmente una caña en Lloret.
  */
-import { db, Category, Product, eq } from "astro:db";
+import { db, AppSetting, Category, Product, eq } from "astro:db";
+
+/** Marca de que el alta ya se hizo, para no repetirla en cada despliegue. */
+const MARCA = "seedBebidasV1";
+
+async function yaSeHizo(): Promise<boolean> {
+  const [fila] = await db
+    .select({ value: AppSetting.value })
+    .from(AppSetting)
+    .where(eq(AppSetting.key, MARCA))
+    .limit(1);
+
+  return Boolean(fila);
+}
+
+async function dejarMarca(): Promise<void> {
+  const filas = await db.select({ id: AppSetting.id }).from(AppSetting);
+  const id = filas.reduce((max, fila) => Math.max(max, Number(fila.id ?? 0)), 0) + 1;
+
+  await db.insert(AppSetting).values({
+    id,
+    key: MARCA,
+    value: { hecho: new Date().toISOString() },
+  });
+}
 
 type Familia = {
   /** Se reutiliza la categoría existente si el slug coincide. */
@@ -185,6 +217,13 @@ async function siguienteId(tabla: "Category" | "Product"): Promise<number> {
 }
 
 export default async function seedBebidas() {
+  const forzar = process.argv.includes("--force");
+
+  if (!forzar && (await yaSeHizo())) {
+    console.log("[bebidas] Ya estaban dadas de alta; no se toca nada. Usa --force para rehacerlo.");
+    return;
+  }
+
   let categoriasCreadas = 0;
   let creados = 0;
   let actualizados = 0;
@@ -197,11 +236,16 @@ export default async function seedBebidas() {
    * categoría, hay que encontrarla igual y moverla, no crear una copia.
    */
   const existentes = new Map<string, number>();
+  /** Slugs ya en uso en todo el catálogo, para no chocar con el índice único. */
+  const slugsOcupados = new Set<string>();
 
-  for (const fila of await db.select({ id: Product.id, name: Product.name }).from(Product)) {
+  for (const fila of await db
+    .select({ id: Product.id, name: Product.name, slug: Product.slug })
+    .from(Product)) {
     const nombre = String(fila.name ?? "");
     const clave = claveDeNombre(RENOMBRADOS[claveDeNombre(nombre)] ?? nombre);
     if (!existentes.has(clave)) existentes.set(clave, fila.id);
+    slugsOcupados.add(String(fila.slug ?? ""));
   }
 
   for (const familia of FAMILIAS) {
@@ -266,7 +310,19 @@ export default async function seedBebidas() {
         continue;
       }
 
-      const slug = slugify(item.name);
+      /**
+       * `Product.slug` es único, y el catálogo de producción tiene un
+       * histórico que aquí no se ve. Si el slug natural ya está ocupado por
+       * otro producto —aunque se llame distinto— el INSERT reventaría y
+       * dejaría el alta a medias. Se le añade sufijo y sigue.
+       */
+      let slug = slugify(item.name);
+
+      for (let intento = 2; slugsOcupados.has(slug); intento += 1) {
+        slug = `${slugify(item.name)}-${intento}`;
+      }
+
+      slugsOcupados.add(slug);
 
       await db.insert(Product).values({
         id: await siguienteId("Product"),
@@ -285,6 +341,8 @@ export default async function seedBebidas() {
       creados += 1;
     }
   }
+
+  if (!(await yaSeHizo())) await dejarMarca();
 
   const total = FAMILIAS.reduce((suma, familia) => suma + familia.items.length, 0);
 
