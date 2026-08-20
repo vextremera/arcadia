@@ -1,0 +1,72 @@
+---
+/**
+ * Aviso de cookies.
+ *
+ * Aceptar y rechazar pesan lo mismo: mismo tamaño, misma prominencia. No hay
+ * muro — rechazar deja usar la web entera.
+ *
+ * Qué se bloquea sin consentimiento: el mapa de Google incrustado en la
+ * portada. En su lugar se ofrece abrirlo en Google Maps, donde la decisión
+ * sobre cookies es entre el usuario y Google.
+ *
+ * Qué NO se bloquea, y por qué:
+ *
+ * - La sesión (carrito y acceso) y el idioma. Son cookies propias e
+ *   imprescindibles para prestar el servicio que el usuario ha pedido.
+ * - El captcha del acceso. Es lo que protege las cuentas de quien prueba
+ *   contraseñas, y el servidor rechaza un acceso sin su comprobación: si se
+ *   bloqueara, quien rechazara cookies no podría entrar en su cuenta. Se
+ *   informa de que está y de que es de Google, que es lo que se puede hacer.
+ *   ⚠️ Este punto conviene que lo confirme un abogado.
+ *
+ * Y lo que no hay, que simplifica mucho: ninguna analítica de terceros. Ni
+ * Google Analytics ni píxeles de redes sociales.
+ */
+---
+
+<div
+  id="cookie-banner"
+  data-cookie-banner
+  hidden
+  role="dialog"
+  aria-modal="false"
+  aria-labelledby="cookie-banner-title"
+  class="fixed inset-x-0 bottom-0 z-[90] p-3 sm:p-4"
+>
+  <div
+    class="mx-auto max-w-3xl rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_18px_60px_rgba(0,0,0,0.18)] sm:p-6"
+  >
+    <h2 id="cookie-banner-title" class="text-base font-semibold text-zinc-900">
+      Cookies
+    </h2>
+
+    <p class="mt-2 text-sm leading-6 text-zinc-600">
+      Usamos cookies propias para que funcionen el carrito, tu sesión y el idioma:
+      esas son imprescindibles. El mapa de la portada es de Google y pone cookies
+      suyas, así que <strong class="font-semibold text-zinc-900">no lo cargamos sin
+      tu permiso</strong>. No usamos analítica ni publicidad de terceros.
+      <a class="underline hover:text-zinc-900" href="/privacidad">Más información</a>.
+    </p>
+
+    <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+      <button
+        type="button"
+        data-cookie-accept
+        class="min-h-11 flex-1 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-800"
+      >
+        Aceptar
+      </button>
+      <button
+        type="button"
+        data-cookie-reject
+        class="min-h-11 flex-1 rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 transition hover:border-zinc-900"
+      >
+        Rechazar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import "@/scripts/cookies";
+</script>
