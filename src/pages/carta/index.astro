@@ -371,11 +371,14 @@ const heroStyle = {
           ) : (
             <div class="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10 xl:grid-cols-[15rem_minmax(0,1fr)]">
               <aside class="hidden lg:block">
-                {/* El header del sitio es sticky y mide 72px en escritorio:
-                    sin descontarlo, el índice se metía debajo. */}
+                {/* El índice se pega justo debajo de la barra de búsqueda.
+                    Antes se pegaba a 88px, que cae dentro de la barra (72 a
+                    141), así que al bajar se metía debajo y se comían 53px
+                    del listado de familias. La altura sale de --carta-anclaje
+                    para que barra e índice no puedan descuadrarse. */}
                 <nav
                   aria-label="Familias de la carta"
-                  class="sticky top-[5.5rem] max-h-[calc(100vh-7rem)] overflow-y-auto"
+                  class="sticky top-[var(--carta-anclaje)] max-h-[calc(100vh-var(--carta-anclaje)-1.5rem)] overflow-y-auto"
                 >
                   <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                     Familias
@@ -396,12 +399,15 @@ const heroStyle = {
                 </nav>
               </aside>
 
-              {/* El margen de scroll descuenta lo que hay fijo encima: en móvil
-                  el header (64px) más la barra de familias (54px); en
-                  escritorio sólo el header (72px). */}
+              {/* El margen de scroll descuenta todo lo que queda fijo encima:
+                  header más barra de búsqueda (con sus chips en móvil). Las
+                  cuentas estaban cortas —128px en móvil contra una barra que
+                  acaba en 186, y 96px en escritorio contra 141—, así que al
+                  pulsar una familia su título aterrizaba detrás de la barra.
+                  Ahora sale de la misma variable que usa el índice lateral. */}
               <div class="min-w-0 space-y-10 sm:space-y-12">
               {menu.map((category) => (
-                <section id={`cat-${category.slug}`} class="scroll-mt-32 lg:scroll-mt-24">
+                <section id={`cat-${category.slug}`} class="scroll-mt-[var(--carta-anclaje)]">
                   <h2 class="text-xl sm:text-2xl font-medium tracking-widest sigmar-regular">
                     {category.name}
                   </h2>
@@ -464,6 +470,40 @@ const heroStyle = {
       </div>
     </div>
   </div>
+  <style is:global>
+    /**
+     * Dónde acaba lo que queda fijo en lo alto de la carta.
+     *
+     * Encima del contenido hay dos cosas pegadas: el header del sitio y la
+     * barra de búsqueda —que en móvil lleva además la fila de chips de
+     * familias—. Tanto el índice lateral como el punto donde aterrizan las
+     * anclas tienen que quedar por debajo de las dos.
+     *
+     * Antes cada uno llevaba su propio número a ojo y ninguno cuadraba: el
+     * índice se pegaba a 88px cuando la barra llegaba a 141, y las anclas
+     * caían a 128px en móvil cuando la barra acaba en 186. El resultado era
+     * que las familias se metían debajo de la barra al bajar.
+     *
+     * Ahora sale todo de aquí. Si cambia la altura de la barra —otro alto de
+     * campo, chips a dos líneas— basta con tocar `--carta-barra-alto`.
+     */
+    :root {
+      /* Dónde empieza a pegarse la barra: la altura del header. */
+      --carta-barra-arriba: 4rem;
+      /* Buscador (44px) + chips de familias + separaciones. */
+      --carta-barra-alto: 7.625rem;
+      /* Un respiro para que el título no quede lamiendo la barra. */
+      --carta-anclaje: calc(var(--carta-barra-arriba) + var(--carta-barra-alto) + 0.75rem);
+    }
+
+    @media (min-width: 1024px) {
+      :root {
+        --carta-barra-arriba: 4.5rem;
+        /* En escritorio los chips no están: el índice va en la columna. */
+        --carta-barra-alto: 4.3125rem;
+      }
+    }
+  </style>
 </SiteLayout>
 
 <script is:inline>
