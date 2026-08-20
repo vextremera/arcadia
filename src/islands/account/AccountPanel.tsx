@@ -78,6 +78,40 @@ export default function AccountPanel() {
     const [savingNewsletter, setSavingNewsletter] = useState(false);
     const [newsletterMsg, setNewsletterMsg] = useState<string>("");
 
+    // Ejercicio de derechos: descarga y borrado de la cuenta.
+    const [email, setEmail] = useState("");
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState("");
+    const [deleting, setDeleting] = useState(false);
+    const [deleteMsg, setDeleteMsg] = useState<string>("");
+
+    async function deleteAccount() {
+        if (deleting) return;
+        setDeleting(true);
+        setDeleteMsg("");
+
+        try {
+            const res = await fetch("/api/account/data", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ intent: "delete", confirm: deleteConfirm }),
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data?.ok) {
+                setDeleteMsg(data?.message ?? "No se ha podido eliminar la cuenta.");
+                setDeleting(false);
+                return;
+            }
+
+            // La sesión ya no vale: se sale a la portada.
+            window.location.href = "/";
+        } catch {
+            setDeleteMsg("No se ha podido eliminar la cuenta.");
+            setDeleting(false);
+        }
+    }
+
     const [addresses, setAddresses] = useState<AddressDto[]>([]);
     const [editing, setEditing] = useState<AddressFormState | null>(null);
     const [savingAddress, setSavingAddress] = useState(false);
@@ -98,6 +132,7 @@ export default function AccountPanel() {
             const p = await api<ProfileResponse>("/api/account/profile");
             if (!p.ok) throw new Error(p.error || "No se pudo cargar el perfil.");
             setName(p.user?.name ?? "");
+            setEmail(p.user?.email ?? "");
             setPhone(p.profile?.phone ?? "");
             setBirthday(p.profile?.birthday ?? "");
             setNewsletterActive(!!p.newsletter?.active);
@@ -358,6 +393,71 @@ export default function AccountPanel() {
                 </div>
 
                 {newsletterMsg ? <div class="mt-3 text-sm text-zinc-600">{newsletterMsg}</div> : null}
+            </section>
+
+            {/*
+                Derechos sobre los propios datos. Poder verlos, llevárselos y
+                borrarlos no es una cortesía: es un derecho, y tiene que poder
+                ejercerse sin escribir a nadie ni esperar respuesta.
+            */}
+            <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+                <div class="text-sm font-semibold">Mis datos</div>
+                <div class="mt-1 text-sm text-zinc-600">
+                    Puedes descargar todo lo que guardamos de ti, o eliminar tu cuenta.
+                </div>
+
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+                    <a
+                        href="/api/account/data"
+                        class="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+                    >
+                        Descargar mis datos
+                    </a>
+                    <button
+                        type="button"
+                        class="inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-800 hover:bg-red-100"
+                        onClick={() => setDeleteOpen(true)}
+                    >
+                        Eliminar mi cuenta
+                    </button>
+                </div>
+
+                {deleteOpen ? (
+                    <div class="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+                        <div class="text-sm font-semibold text-red-900">Esto no se puede deshacer</div>
+                        <p class="mt-2 text-sm leading-6 text-red-900">
+                            Se borrarán tu perfil, tus direcciones, tus puntos y tu suscripción.
+                            Tus pedidos se conservan sin tus datos personales, porque la ley
+                            obliga a guardar el registro de las ventas.
+                        </p>
+                        <p class="mt-3 text-sm text-red-900">
+                            Escribe <strong>{email}</strong> para confirmar:
+                        </p>
+                        <input
+                            class="mt-2 w-full rounded-xl border border-red-300 bg-white px-3 py-2 text-sm"
+                            value={deleteConfirm}
+                            placeholder={email}
+                            onInput={(e) => setDeleteConfirm((e.target as HTMLInputElement).value)}
+                        />
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <button
+                                type="button"
+                                class={`inline-flex min-h-11 items-center justify-center rounded-xl bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 ${deleting ? "pointer-events-none opacity-60" : ""}`}
+                                onClick={deleteAccount}
+                            >
+                                {deleting ? "Eliminando…" : "Eliminar definitivamente"}
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-900"
+                                onClick={() => { setDeleteOpen(false); setDeleteConfirm(""); }}
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                        {deleteMsg ? <div class="mt-3 text-sm text-red-900">{deleteMsg}</div> : null}
+                    </div>
+                ) : null}
             </section>
 
             <section class="rounded-2xl border border-zinc-200 p-4 sm:p-5">

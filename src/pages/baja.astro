@@ -1,0 +1,65 @@
+---
+import SiteLayout from "@/layouts/SiteLayout.astro";
+import { unsubscribeByToken } from "@/server/marketing/unsubscribe";
+
+/**
+ * Baja del newsletter desde el enlace del correo.
+ *
+ * Un clic y fuera: sin cuenta, sin sesión y sin pedir la dirección. Retirar el
+ * consentimiento tiene que costar lo mismo que darlo.
+ *
+ * Se da de baja al cargar la página y no con un botón porque el enlace del
+ * correo ya es el acto voluntario. Nadie llega aquí por accidente: hace falta
+ * la clave, que sólo va en sus propios correos.
+ */
+const token = Astro.url.searchParams.get("t") ?? "";
+const email = token ? await unsubscribeByToken(token) : null;
+---
+
+<SiteLayout title="Baja del newsletter · Arcadia">
+  <section class="mx-auto w-full max-w-2xl py-10 sm:py-16">
+    <div class="rounded-[30px] border border-zinc-200 bg-[#fbfaf7] p-6 text-center sm:p-10">
+      {
+        email ? (
+          <>
+            <h1 class="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
+              Te has dado de baja
+            </h1>
+            <p class="mt-4 text-sm leading-7 text-zinc-700">
+              No volveremos a enviarte el newsletter a <strong>{email}</strong>.
+            </p>
+            <p class="mt-2 text-sm leading-7 text-zinc-600">
+              Si fue sin querer, puedes volver a suscribirte desde la portada cuando
+              quieras.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 class="text-2xl font-black tracking-tight text-zinc-900 sm:text-3xl">
+              Este enlace ya no vale
+            </h1>
+            <p class="mt-4 text-sm leading-7 text-zinc-700">
+              O ya te habías dado de baja, o el enlace está incompleto. En cualquier
+              caso, si sigues recibiendo correos escríbenos y lo resolvemos a mano.
+            </p>
+          </>
+        )
+      }
+
+      <div class="mt-8 flex flex-col justify-center gap-2 sm:flex-row">
+        <a
+          class="inline-flex min-h-11 items-center justify-center rounded-full bg-zinc-900 px-6 text-sm font-semibold text-white hover:bg-zinc-800"
+          href="/"
+        >
+          Volver a la web
+        </a>
+        <a
+          class="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-300 px-6 text-sm font-semibold text-zinc-800 hover:border-zinc-900"
+          href="/contacto"
+        >
+          Contactar
+        </a>
+      </div>
+    </div>
+  </section>
+</SiteLayout>

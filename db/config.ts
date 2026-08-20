@@ -43,10 +43,24 @@ const NewsletterSubscriber = defineTable({
     email: column.text({ unique: true }),
     userId: column.number({ optional: true, references: () => User.columns.id }),
     active: column.boolean({ default: true }),
+    /**
+     * Clave del enlace de baja que va en cada envío.
+     *
+     * Toda comunicación comercial tiene que llevar una forma sencilla y
+     * gratuita de dejar de recibirla. Antes el pie decía "si tienes cuenta,
+     * date de baja desde tu perfil", y exigir una cuenta para eso es
+     * precisamente la barrera que no puede haber.
+     *
+     * Va sin índice único a propósito: añadir una columna única obliga a SQLite
+     * a recrear la tabla entera, y este proyecto ya se ha caído dos veces en
+     * despliegue por eso. Con identificadores aleatorios la colisión es
+     * inverosímil, y la consulta filtra igual.
+     */
+    unsubscribeToken: column.text({ optional: true }),
     createdAt: column.date({ default: NOW }),
     updatedAt: column.date({ default: NOW })
   },
-  indexes: [{ on: "active" }, { on: "userId" }]
+  indexes: [{ on: "active" }, { on: "userId" }, { on: "unsubscribeToken" }]
 });
 
 const Address = defineTable({

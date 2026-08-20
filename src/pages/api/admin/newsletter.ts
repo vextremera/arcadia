@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import nodemailer from "nodemailer";
 import { db, NewsletterSubscriber, eq } from "astro:db";
 import { getRequestAuditMeta, writeAuditLog } from "@/server/audit/log";
+import { ensureUnsubscribeToken, unsubscribeUrl } from "@/server/marketing/unsubscribe";
 
 function withQuery(path: string, params: Record<string, string>) {
   const url = new URL(path, "http://local");
@@ -100,9 +101,10 @@ function textToHtml(body: string) {
 }
 
 async function sendNewsletterEmails(params: {
-  to: string[];
+  to: Array<{ id: number; email: string }>;
   subject: string;
   body: string;
+  origin: string;
 }) {
   const host = cleanEnv(import.meta.env.SMTP_HOST);
   const port = Number(cleanEnv(import.meta.env.SMTP_PORT));
@@ -152,24 +154,32 @@ async function sendNewsletterEmails(params: {
     replyTo,
   });
 
-  const footerText =
-    "Recibes este correo porque estás suscrito al newsletter de Arcadia. Si quieres darte de baja y tienes cuenta, puedes hacerlo desde tu perfil.";
-
-  const html = `${textToHtml(params.body)}
-<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb" />
-<p style="font-size:12px;color:#6b7280">${escapeHtml(footerText)}</p>`;
+  const footerText = "Recibes este correo porque te suscribiste al newsletter de Arcadia.";
 
   let sent = 0;
   let failed = 0;
 
-  for (const email of params.to) {
+  for (const suscriptor of params.to) {
+    /**
+     * El enlace de baja es distinto para cada destinatario, así que el cuerpo
+     * se monta dentro del bucle. Da de baja de un clic, sin cuenta ni sesión:
+     * es lo que exige que retirar el consentimiento sea tan fácil como darlo.
+     */
+    const email = suscriptor.email;
+    const bajaUrl = unsubscribeUrl(params.origin, await ensureUnsubscribeToken(suscriptor.id));
+
+    const html = `${textToHtml(params.body)}
+<hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb" />
+<p style="font-size:12px;color:#6b7280">${escapeHtml(footerText)}<br />
+<a href="${escapeHtml(bajaUrl)}" style="color:#6b7280">Darse de baja</a></p>`;
+
     try {
       const info = await transporter.sendMail({
         from,
         to: email,
         replyTo,
         subject: params.subject,
-        text: `${params.body}\n\n---\n${footerText}`,
+        text: `${params.body}\n\n---\n${footerText}\nDarse de baja: ${bajaUrl}`,
         html,
       });
 
@@ -298,13 +308,23 @@ export const POST: APIRoute = async (context) => {
       .from(NewsletterSubscriber)
       .where(eq(NewsletterSubscriber.active, true));
 
-    const recipients = [
-      ...new Set(
-        activeSubscribers
-          .map((row) => row.email.trim().toLowerCase())
-          .filter(Boolean),
-      ),
-    ];
+    /**
+     * Se lleva el id junto al correo, porque cada envío necesita el enlace de
+     * baja propio del suscriptor. La deduplicación pasa a ser por dirección
+     * quedándose con el primero, para no mandar dos veces a quien esté
+     * repetido con distinta capitalización.
+     */
+    const vistos = new Set<string>();
+    const recipients = activeSubscribers.reduce<Array<{ id: number; email: string }>>(
+      (lista, row) => {
+        const email = row.email.trim().toLowerCase();
+        if (!email || vistos.has(email)) return lista;
+        vistos.add(email);
+        lista.push({ id: row.id, email });
+        return lista;
+      },
+      [],
+    );
 
     if (recipients.length === 0) {
       return context.redirect(
@@ -317,6 +337,7 @@ export const POST: APIRoute = async (context) => {
         to: recipients,
         subject,
         body,
+        origin: new URL(context.request.url).origin,
       });
 
       try {
