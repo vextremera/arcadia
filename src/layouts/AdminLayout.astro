@@ -107,6 +107,7 @@ const accent = activeSection?.accent ?? "sky";
                 >
                   <div class="min-w-0">
                     <h1
+                      data-admin-page-heading
                       class="text-lg font-semibold tracking-[-0.02em] text-white sm:text-xl"
                     >
                       {pageHeading}
@@ -356,6 +357,14 @@ const accent = activeSection?.accent ?? "sky";
           }
         });
       })();
+    </script>
+
+    <!--
+      Guardado sin recargar. Va aquí, en el layout, para que valga en todas las
+      pantallas del panel sin tocar ninguno de sus formularios.
+    -->
+    <script>
+      import "@/scripts/adminAjax";
     </script>
   </body>
 </html>

@@ -249,7 +249,15 @@ function formatDateTime(value: Date | string) {
   </div>
 
   <script is:inline define:vars={{ presets }}>
-    document.addEventListener("DOMContentLoaded", () => {
+    /**
+     * Se ejecuta directamente, no en `DOMContentLoaded`.
+     *
+     * El script va detrás del marcado que necesita, así que ya está ahí. Y al
+     * guardar sin recargar (src/scripts/adminAjax.ts) el contenido se
+     * reconstruye y este script se vuelve a ejecutar, pero `DOMContentLoaded`
+     * no se dispara otra vez: el desplegable de plantillas se quedaba muerto.
+     */
+    (() => {
       const preset = document.getElementById("newsletter-preset");
       const subject = document.getElementById("newsletter-subject");
       const body = document.getElementById("newsletter-body");
@@ -261,6 +269,6 @@ function formatDateTime(value: Date | string) {
         subject.value = next.subject;
         body.value = next.body;
       });
-    });
+    })();
   </script>
 </AdminLayout>

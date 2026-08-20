@@ -374,7 +374,16 @@ const errorMessage =
   </style>
 
   <script is:inline>
-    document.addEventListener("DOMContentLoaded", () => {
+    /**
+     * Se ejecuta directamente, no en `DOMContentLoaded`.
+     *
+     * El script va detrás del marcado que necesita, así que ya está ahí. Y al
+     * guardar sin recargar (src/scripts/adminAjax.ts) el contenido se
+     * reconstruye y esto se vuelve a ejecutar, pero `DOMContentLoaded` no se
+     * dispara otra vez: la vista previa del ticket se quedaba congelada tras
+     * el primer guardado.
+     */
+    (() => {
       function renderTicketPreview(form) {
         const shell = form.closest(".admin-modal-body")?.querySelector("[data-ticket-preview]");
         if (!shell) return;
@@ -414,6 +423,6 @@ const errorMessage =
         form.addEventListener("input", () => renderTicketPreview(form));
         form.addEventListener("change", () => renderTicketPreview(form));
       });
-    });
+    })();
   </script>
 </AdminLayout>
