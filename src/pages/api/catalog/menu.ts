@@ -37,7 +37,7 @@ type ProductRow = {
   description: string | null;
   imageUrl: string | null;
   priceCents: number;
-  deliveryEnabled: boolean;
+  deliveryEnabled: boolean;
 };
 
 const NUMERIC_ORDER_CATEGORIES = new Set(["platos-combinados", "platos-infantiles"]);
@@ -94,10 +94,25 @@ export const GET: APIRoute = async () => {
       description: Product.description,
       imageUrl: Product.imageUrl,
       priceCents: Product.priceCents,
-      deliveryEnabled: Product.deliveryEnabled,
+      deliveryEnabled: Product.deliveryEnabled,
     })
     .from(Product)
-    .where(and(inArray(Product.categoryId, categoryIds), eq(Product.active, true)))
+    /**
+     * Sólo lo que se reparte.
+     *
+     * Esta ruta alimenta /pedir, que es el pedido a domicilio, y hasta ahora
+     * devolvía el catálogo entero: traía `deliveryEnabled` como dato pero no
+     * filtraba por él. El resultado es que un producto marcado como "sólo
+     * carta" se podía pedir igualmente a domicilio — con las bebidas
+     * alcohólicas, que no se reparten, eso deja de ser un detalle.
+     */
+    .where(
+      and(
+        inArray(Product.categoryId, categoryIds),
+        eq(Product.active, true),
+        eq(Product.deliveryEnabled, true),
+      ),
+    )
     .orderBy(asc(Product.categoryId), asc(Product.name))) as ProductRow[];
 
   if (products.length === 0) {
@@ -197,7 +212,7 @@ export const GET: APIRoute = async () => {
       description: string | null;
       imageUrl: string | null;
       priceCents: number;
-      deliveryEnabled: boolean;
+      deliveryEnabled: boolean;
       ingredients: string[];
       allergens: Array<{ slug: string; name: string; iconUrl: string | null }>;
       isConfigurable: boolean;
@@ -217,9 +232,18 @@ export const GET: APIRoute = async () => {
   }
 
   return json({
-    categories: categories.map((category) => ({
-      ...category,
-      products: sortProductsForCategory(category.slug, productsByCategory.get(category.id) ?? []),
-    })),
+    categories: categories
+      .map((category) => ({
+        ...category,
+        products: sortProductsForCategory(category.slug, productsByCategory.get(category.id) ?? []),
+      }))
+      /**
+       * Fuera las categorías que se quedan sin nada.
+       *
+       * Al filtrar por reparto, familias enteras se vacían — cervezas, vinos,
+       * cafés. Devolverlas igual llenaría el índice de /pedir de secciones
+       * que no llevan a ninguna parte.
+       */
+      .filter((category) => category.products.length > 0),
   });
 };
