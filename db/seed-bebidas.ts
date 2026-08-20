@@ -68,6 +68,9 @@ function claveDeNombre(nombre: string): string {
  */
 const RENOMBRADOS: Record<string, string> = {
   agua: "Agua 0,5 L",
+  // Sólo hay un cava en el local y es brut nature: mejor decirlo que dejar
+  // "Cava" a secas, que no le dice nada a quien lo está eligiendo.
+  cavabotella: "Cava Brut Nature (botella)",
 };
 
 const FAMILIAS: Familia[] = [
@@ -149,7 +152,7 @@ const FAMILIAS: Familia[] = [
       { name: "Ramón Bilbao rosado", priceCents: 1400 },
       { name: "Amantiño Albariño", priceCents: 1600 },
       // Sólo botella entera, tal como se sirve en el local.
-      { name: "Cava (botella)", priceCents: 1600 },
+      { name: "Cava Brut Nature (botella)", priceCents: 1600 },
       { name: "Sangría de vino tinto 1 L", priceCents: 1000 },
       { name: "Tinto de verano", priceCents: 300 },
     ],
