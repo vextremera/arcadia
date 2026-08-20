@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { db, Order, Payment, eq } from "astro:db";
 import { randomUUID } from "node:crypto";
 import { enqueueOrderPrints } from "@/server/printing/queue";
+import { sendOrderConfirmation } from "@/server/notify/orderConfirmation";
 
 function redirect(location: string) {
     return new Response(null, {
@@ -84,6 +85,10 @@ export const POST: APIRoute = async ({ request, session }) => {
     } catch (error) {
         console.error("[print] enqueue on payment confirm failed", error);
     }
+
+    // La confirmación al cliente sale aquí por el mismo motivo que la comanda:
+    // hasta este punto el pedido con tarjeta no era firme.
+    void sendOrderConfirmation(order.id, new URL(request.url).origin);
 
     if (session) {
         await session.delete("cart");

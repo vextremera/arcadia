@@ -31,6 +31,7 @@ import { geocodeAddress } from "@/server/delivery/geocode";
 import { checkRateLimit, clientKey, tooManyRequests } from "@/server/security/rateLimit";
 import { awardOrderPointsOnce } from "@/server/loyalty/engine";
 import { enqueueOrderPrints } from "@/server/printing/queue";
+import { sendOrderConfirmation } from "@/server/notify/orderConfirmation";
 
 type CartItemSession = {
   lineId: string;
@@ -424,6 +425,20 @@ export const POST: APIRoute = async (context) => {
   }
 
   const pm = requestedPaymentMethod;
+
+  /**
+   * El correo es obligatorio.
+   *
+   * Es donde se manda la confirmación del pedido, que hay que entregar en un
+   * soporte que el cliente pueda guardar y volver a leer. La página de
+   * seguimiento no sirve para eso: vive en el servidor y puede cambiar.
+   */
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+    return json(
+      { error: "MISSING_EMAIL", message: "Necesitamos un email válido para enviarte la confirmación del pedido." },
+      400
+    );
+  }
 
   if (!customerName || !customerPhone) {
     return json(
@@ -938,6 +953,16 @@ export const POST: APIRoute = async (context) => {
     } catch (error) {
       console.error("[print] enqueue on checkout failed", error);
     }
+
+    /**
+     * Confirmación al cliente, que la ley exige en un soporte que pueda
+     * guardar. Sólo en efectivo: con tarjeta el pedido todavía no es firme y
+     * la confirmación sale al pasar por la pasarela.
+     *
+     * Igual que la impresión, no puede tumbar un pedido válido: si el correo
+     * falla se registra y se sigue.
+     */
+    void sendOrderConfirmation(created.id, new URL(request.url).origin);
   }
 
   return json({
