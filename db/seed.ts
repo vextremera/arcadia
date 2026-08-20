@@ -7,6 +7,7 @@ import {
   db,
   User,
   UserProfile,
+  AdminUser,
   Category,
   Product,
   ProductVariant,
@@ -579,6 +580,37 @@ export default async function seed() {
   }
 
   // -----------------------
+  // Cuenta de panel
+  // -----------------------
+  /**
+   * El acceso al panel ya no sale de `User`: vive en `AdminUser` y se entra con
+   * nombre de usuario. Sin esta cuenta, un entorno recién sembrado arranca sin
+   * forma de entrar a /admin.
+   */
+  const ADMIN_USERNAME = "admin";
+
+  const existingPanelAdmin = await db
+    .select({ id: AdminUser.id })
+    .from(AdminUser)
+    .where(eq(AdminUser.username, ADMIN_USERNAME))
+    .limit(1);
+
+  if (!existingPanelAdmin.length) {
+    await db.insert(AdminUser).values({
+      id: 1,
+      username: ADMIN_USERNAME,
+      displayName: "Admin",
+      passwordHash: await hashPassword(ADMIN_PASSWORD),
+      role: "ADMIN",
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    console.log(`✅ Seed: cuenta de panel ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`);
+  }
+
+  // -----------------------
   // Categorías
   // -----------------------
   await db.insert(Category).values(
@@ -808,7 +840,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -1251,7 +1283,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -1570,7 +1602,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2053,7 +2085,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2334,7 +2366,7 @@ export default async function seed() {
 
       priceCents: cents(p.priceEur),
 
-      deliveryEnabled: true,
+      deliveryEnabled: true,
       dineInEnabled: true,
 
       active: true,
@@ -2497,7 +2529,7 @@ export default async function seed() {
       imageUrl: null,
       priceCents: 0,
 
-      deliveryEnabled: false,
+      deliveryEnabled: false,
       dineInEnabled: true,
 
       active: false, // ✅ no salen en carta/pedir

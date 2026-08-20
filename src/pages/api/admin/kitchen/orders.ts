@@ -88,8 +88,8 @@ function readCurrentStatusSince(snapshot: AddressSnapshot, status: string, creat
 }
 
 export const GET: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return json({ error: "UNAUTHORIZED" }, 401);
   }
 

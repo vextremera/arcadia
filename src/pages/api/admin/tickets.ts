@@ -52,8 +52,8 @@ async function getNextId() {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -86,7 +86,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "TICKET_TEMPLATE_CREATED",
         entityType: "ticket_template",
         entityId: String(nextId),
@@ -135,7 +135,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "TICKET_TEMPLATE_UPDATED",
         entityType: "ticket_template",
         entityId: String(templateId),
@@ -159,7 +159,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "TICKET_TEMPLATE_TOGGLED",
         entityType: "ticket_template",
         entityId: String(templateId),
@@ -179,7 +179,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "TICKET_TEMPLATE_DELETED",
         entityType: "ticket_template",
         entityId: String(templateId),

@@ -130,8 +130,8 @@ function parseChannelSelection(value: FormDataEntryValue | null): ChannelKey[] |
 const REDIRECT_PATH = "/admin/operativa";
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -213,7 +213,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "SPECIAL_DATE_SAVED",
         entityType: "special_date",
         entityId: dates.length === 1 ? `${dateFrom}:${channels.join("+")}` : `${dateFrom}..${dateTo}:${channels.join("+")}`,
@@ -330,7 +330,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "SPECIAL_DATE_SAVED",
         entityType: "special_date",
         entityId: `${dateISO}:${channel}`,
@@ -360,7 +360,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: "SPECIAL_DATE_DELETED",
         entityType: "special_date",
         entityId: `${existingRow.dateISO}:${existingRow.channel}`,

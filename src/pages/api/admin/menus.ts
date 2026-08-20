@@ -9,8 +9,8 @@ function withQuery(path: string, params: Record<string, string>) {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 

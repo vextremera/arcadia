@@ -1,0 +1,96 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import { ADMIN_ROLE_LABEL, ADMIN_ROLE_DESCRIPTION } from "@/lib/admin/roles";
+import { adminDisplayName, PASSWORD_MIN } from "@/server/auth/adminUsers";
+
+const admin = Astro.locals.admin!;
+const name = adminDisplayName(admin);
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const errorParam = url.searchParams.get("error") ?? "";
+
+const successMessage = saved === "password" ? "Contraseña actualizada." : "";
+
+const errorMessage =
+  errorParam === "wrong-current" ? "La contraseña actual no es correcta." :
+  errorParam === "weak-password" ? `La contraseña nueva debe tener al menos ${PASSWORD_MIN} caracteres.` :
+  errorParam === "mismatch" ? "Las dos contraseñas nuevas no coinciden." :
+  errorParam === "same-password" ? "La contraseña nueva tiene que ser distinta de la actual." : "";
+
+const inputClass = "w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none";
+const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-admin-muted";
+---
+
+<AdminLayout
+  title="Mi cuenta · Admin · Arcadia"
+  heading="Mi cuenta"
+  description="Tu acceso al panel y tu contraseña."
+>
+  <div class="max-w-2xl space-y-6">
+    {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
+    <Card>
+      <div class="flex flex-wrap items-center gap-4">
+        <span
+          class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-lg font-bold uppercase text-slate-200"
+          aria-hidden="true"
+        >
+          {name.slice(0, 2)}
+        </span>
+        <div class="min-w-0">
+          <p class="text-lg font-semibold text-white">{name}</p>
+          <p class="mt-0.5 text-sm text-admin-muted">Usuario: <code class="rounded bg-black/30 px-1.5 py-0.5">{admin.username}</code></p>
+        </div>
+        <div class="ml-auto">
+          <Badge tone={admin.role === "ADMIN" ? "success" : "neutral"}>
+            {ADMIN_ROLE_LABEL[admin.role]}
+          </Badge>
+        </div>
+      </div>
+
+      <p class="mt-4 text-sm leading-6 text-admin-muted">
+        {ADMIN_ROLE_DESCRIPTION[admin.role]}
+        {admin.role === "WORKER" ? " Si necesitas llegar a algo más, pídeselo a un admin total." : ""}
+      </p>
+    </Card>
+
+    <Card>
+      <h2 class="text-base font-semibold text-white">Cambiar contraseña</h2>
+      <p class="mt-1 text-xs text-admin-muted">
+        Se pide la actual aunque ya estés dentro: así, si el panel se queda abierto
+        en la tablet, nadie puede quedarse con tu cuenta cambiándote la clave.
+      </p>
+
+      <form method="post" action="/api/admin/cuenta" class="mt-5 space-y-4">
+        <div>
+          <label class={labelClass} for="currentPassword">Contraseña actual</label>
+          <input class={inputClass} id="currentPassword" type="password" name="currentPassword" autocomplete="current-password" required />
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class={labelClass} for="newPassword">Contraseña nueva</label>
+            <input class={inputClass} id="newPassword" type="password" name="newPassword" autocomplete="new-password" minlength={PASSWORD_MIN} required />
+          </div>
+          <div>
+            <label class={labelClass} for="repeatPassword">Repetir la nueva</label>
+            <input class={inputClass} id="repeatPassword" type="password" name="repeatPassword" autocomplete="new-password" minlength={PASSWORD_MIN} required />
+          </div>
+        </div>
+
+        <p class="text-xs text-admin-muted">Mínimo {PASSWORD_MIN} caracteres.</p>
+
+        <button
+          type="submit"
+          class="admin-focus inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+        >
+          Guardar contraseña
+        </button>
+      </form>
+    </Card>
+  </div>
+</AdminLayout>

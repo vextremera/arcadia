@@ -132,9 +132,8 @@ async function upsertSetting(key: string, value: unknown, id?: number) {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
-  if (!allowed) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -223,11 +222,11 @@ export const POST: APIRoute = async (context) => {
   await upsertSetting("deliveryAreaRule", nextDeliveryAreaRule, previousDeliveryAreaRule.id);
 
   const { ip, userAgent } = getRequestAuditMeta(context.request);
-  const actorUserId = user.id;
+  const actorAdminId = admin.id;
 
   try {
     await writeAuditLog({
-      actorUserId,
+      actorAdminId,
       action: "OPERATING_HOURS_UPDATED",
       entityType: "operating_hours",
       entityId: "operatingHours",
@@ -240,7 +239,7 @@ export const POST: APIRoute = async (context) => {
     });
 
     await writeAuditLog({
-      actorUserId,
+      actorAdminId,
       action: "FEES_SETTINGS_UPDATED",
       entityType: "app_setting",
       entityId: "deliveryFee",
@@ -259,7 +258,7 @@ export const POST: APIRoute = async (context) => {
     });
 
     await writeAuditLog({
-      actorUserId,
+      actorAdminId,
       action: "OPS_FLAGS_UPDATED",
       entityType: "ops_flags",
       entityId: "opsFlags",
@@ -272,7 +271,7 @@ export const POST: APIRoute = async (context) => {
     });
 
     await writeAuditLog({
-      actorUserId,
+      actorAdminId,
       action: "DELIVERY_AREA_RULE_UPDATED",
       entityType: "app_setting",
       entityId: "deliveryAreaRule",

@@ -207,15 +207,13 @@ async function sendNewsletterEmails(params: {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
-
-  if (!allowed) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
   const { ip, userAgent } = getRequestAuditMeta(context.request);
-  const actorUserId = user.id;
+  const actorAdminId = admin.id;
 
   const form = await context.request.formData();
   const intent = safeText(form.get("intent"));
@@ -254,7 +252,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
       await writeAuditLog({
-        actorUserId,
+        actorAdminId,
         action: active
           ? "NEWSLETTER_SUBSCRIBER_ENABLED"
           : "NEWSLETTER_SUBSCRIBER_DISABLED",
@@ -323,7 +321,7 @@ export const POST: APIRoute = async (context) => {
 
       try {
         await writeAuditLog({
-          actorUserId,
+          actorAdminId,
           action: "NEWSLETTER_SENT",
           entityType: "newsletter_broadcast",
           entityId: new Date().toISOString(),

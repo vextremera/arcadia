@@ -1,6 +1,7 @@
 import { defineMiddleware } from "astro:middleware";
 import { DEFAULT_LANG, resolveSiteLang } from "@/lib/i18n";
 import { applySecurityHeaders, isPrivatePath } from "@/server/security/headers";
+import { canAccessAdminPath, ADMIN_ROLE_HOME } from "@/lib/admin/roles";
 
 type RouteAccess = "public" | "account" | "admin";
 
@@ -9,10 +10,6 @@ function normalizePathname(pathname: string) {
   return pathname !== "/" && pathname.endsWith("/")
     ? pathname.slice(0, -1)
     : pathname;
-}
-
-function isAdminRole(user: App.Locals["user"]) {
-  return user?.role === "ADMIN" || user?.role === "STAFF";
 }
 
 function resolveRouteAccess(pathname: string): RouteAccess {
@@ -73,7 +70,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = sessionUser;
   }
 
+  const sessionAdmin = await context.session?.get("admin");
+  if (sessionAdmin) {
+    context.locals.admin = sessionAdmin;
+  }
+
   const user = context.locals.user;
+  const admin = context.locals.admin;
   const access = resolveRouteAccess(pathname);
 
   if (access === "account" && !user) {
@@ -83,19 +86,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return context.redirect(buildLoginRedirect(pathname, url.search), 302);
   }
 
-  if (access === "admin" && !isAdminRole(user)) {
-    if (isApiPath(pathname)) return json({ ok: false, error: "UNAUTHORIZED" }, 401);
-    return context.redirect("/admin/login", 302);
+  if (access === "admin") {
+    if (!admin) {
+      if (isApiPath(pathname)) return json({ ok: false, error: "UNAUTHORIZED" }, 401);
+      return context.redirect("/admin/login", 302);
+    }
+
+    /**
+     * El rol también se comprueba aquí, no sólo al pintar el menú.
+     * Esconder un enlace no cierra nada: la URL se puede escribir a mano.
+     */
+    if (!canAccessAdminPath(admin.role, pathname)) {
+      if (isApiPath(pathname)) return json({ ok: false, error: "FORBIDDEN" }, 403);
+      // A su portada, no a una pantalla de error: para un trabajador esto no
+      // es un fallo suyo, es que esa sección no es cosa de su turno.
+      return context.redirect(ADMIN_ROLE_HOME[admin.role], 302);
+    }
   }
 
-  if (user) {
-    if (pathname === "/admin/login" && isAdminRole(user)) {
-      return context.redirect("/admin", 302);
-    }
+  if (admin && pathname === "/admin/login") {
+    return context.redirect(ADMIN_ROLE_HOME[admin.role], 302);
+  }
 
-    if (pathname === "/login" || pathname === "/registro") {
-      return context.redirect(isAdminRole(user) ? "/admin" : "/cuenta", 302);
-    }
+  if (user && (pathname === "/login" || pathname === "/registro")) {
+    return context.redirect("/cuenta", 302);
   }
 
   const response = await next();

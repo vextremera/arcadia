@@ -48,8 +48,8 @@ function withQuery(path: string, params: Record<string, string>) {
 const REDIRECT_PATH = "/admin/catalogo/alergenos";
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -63,7 +63,7 @@ export const POST: APIRoute = async (context) => {
     try {
       const { ip, userAgent } = getRequestAuditMeta(context.request);
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action: showAllergens ? "ALLERGENS_SHOWN" : "ALLERGENS_HIDDEN",
         entityType: "catalog_flags",
         entityId: "showAllergens",

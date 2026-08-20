@@ -77,8 +77,8 @@ function toSnapshot(rows: Array<{
 const REDIRECT_PATH = "/admin/operativa";
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -155,7 +155,7 @@ export const POST: APIRoute = async (context) => {
 
   try {
     await writeAuditLog({
-      actorUserId: user.id,
+      actorAdminId: admin.id,
       action: "OPERATING_HOURS_UPDATED",
       entityType: "opening_hour",
       entityId: "weekly-schedule",

@@ -12,6 +12,7 @@
  */
 
 import type { AdminIconName } from "@/lib/admin/icons";
+import { canAccessAdminPath, type AdminRole } from "@/lib/admin/roles";
 
 export type AdminNavItem = {
   label: string;
@@ -92,9 +93,11 @@ export const ADMIN_NAV: AdminNavSection[] = [
     accent: "fuchsia",
     landing: "/admin/usuarios",
     items: [
-      { label: "Usuarios", href: "/admin/usuarios" },
+      // Clientes de la web. El equipo del bar va aparte, en su propia tabla.
+      { label: "Clientes", href: "/admin/usuarios" },
       { label: "Rankings", href: "/admin/usuarios/rankings" },
       { label: "Loyalty tiers", href: "/admin/loyalty" },
+      { label: "Equipo", href: "/admin/equipo" },
     ],
   },
   {
@@ -143,6 +146,35 @@ function normalize(pathname: string): string {
   return pathname !== "/" && pathname.endsWith("/")
     ? pathname.slice(0, -1)
     : pathname;
+}
+
+/**
+ * El menú que le toca a cada rol.
+ *
+ * Se filtra con la misma función que usa el middleware, así que lo que se ve y
+ * lo que se puede abrir no se pueden separar. Una sección se cae entera si no
+ * le queda ningún enlace visible.
+ */
+export function navForRole(role: AdminRole): AdminNavSection[] {
+  if (role === "ADMIN") return ADMIN_NAV;
+
+  return ADMIN_NAV.map((section) => {
+    const items = section.items.filter((item) => canAccessAdminPath(role, item.href));
+
+    return {
+      ...section,
+      items,
+      /**
+       * `landing` es a donde lleva la sección con el menú plegado, y no tiene
+       * por qué ser uno de sus enlaces: "Gestiones" apunta a Newsletter, que un
+       * trabajador no puede abrir. Sin recalcularlo, el menú le ofrecía un
+       * atajo que el middleware le iba a rebotar.
+       */
+      landing: canAccessAdminPath(role, section.landing)
+        ? section.landing
+        : (items[0]?.href ?? section.landing),
+    };
+  }).filter((section) => section.items.length > 0);
 }
 
 /** ¿La ruta `href` está activa para el pathname actual? */

@@ -79,9 +79,8 @@ async function upsertSetting(key: string, value: unknown, id?: number) {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
-  if (!allowed) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -91,7 +90,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   const { ip, userAgent } = getRequestAuditMeta(context.request);
-  const actorUserId = user.id;
+  const actorAdminId = admin.id;
 
   const previousDeliveryFee = await getSettingValue<DeliveryFeeSetting>("deliveryFee", { cents: 0 });
   const previousLegacyFees = await getSettingValue<LegacyFeesSetting>("fees", { deliveryFeeCents: 0 });
@@ -107,7 +106,7 @@ export const POST: APIRoute = async (context) => {
 
   try {
     await writeAuditLog({
-      actorUserId,
+      actorAdminId,
       action: "FEES_SETTINGS_UPDATED",
       entityType: "app_setting",
       entityId: "deliveryFee",

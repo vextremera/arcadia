@@ -1,8 +1,9 @@
 import type { APIRoute } from "astro";
-import { db, User, eq, and } from "astro:db";
-import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { randomUUID } from "node:crypto";
+import { hashPassword } from "@/server/auth/password";
 import { checkRateLimit, clientKey } from "@/server/security/rateLimit";
+import { findByUsername, checkPassword, markLogin, normalizeUsername } from "@/server/auth/adminUsers";
+import { ADMIN_ROLE_HOME, isAdminRole } from "@/lib/admin/roles";
 
 /** Ver la explicación en /api/auth/login: iguala el tiempo de respuesta. */
 const DUMMY_HASH = hashPassword(randomUUID());
@@ -12,15 +13,14 @@ export const POST: APIRoute = async (context) => {
   if (!session) return new Response("Session not available", { status: 500 });
 
   const form = await request.formData();
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const username = normalizeUsername(form.get("username"));
   const password = String(form.get("password") ?? "");
 
   /**
    * Cinco intentos por minuto: más estricto que el login de clientes.
    *
-   * Aquí no hay captcha y detrás está el panel completo — catálogo, pedidos,
-   * datos de clientes y usuarios. Un puñado de cuentas conocidas probadas sin
-   * límite es la vía más directa para entrar.
+   * Aquí no hay captcha y detrás está el panel completo. Y los nombres de
+   * usuario del personal son cortos, más fáciles de adivinar que un correo.
    */
   const limit = await checkRateLimit({
     key: `admin-login:${clientKey(context)}`,
@@ -30,31 +30,32 @@ export const POST: APIRoute = async (context) => {
 
   if (!limit.allowed) return redirect("/admin/login?error=rate", 302);
 
-  if (!email || !password) return redirect("/admin/login?error=invalid", 302);
+  if (!username || !password) return redirect("/admin/login?error=invalid", 302);
 
-  const [u] = await db
-    .select({
-      id: User.id,
-      email: User.email,
-      name: User.name,
-      role: User.role,
-      active: User.active,
-      passwordHash: User.passwordHash,
-    })
-    .from(User)
-    .where(and(eq(User.email, email), eq(User.active, true)))
-    .limit(1);
+  const account = await findByUsername(username);
 
-  const ok = verifyPassword(password, u?.passwordHash ?? DUMMY_HASH);
-  const allowed = u ? u.role === "ADMIN" || u.role === "STAFF" : false;
+  // Se comprueba siempre algo, exista la cuenta o no, para que las dos
+  // respuestas tarden lo mismo y no se pueda tantear qué usuarios hay.
+  const passwordOk = checkPassword(account?.passwordHash ?? DUMMY_HASH, password);
 
-  if (!u || !ok || !allowed) return redirect("/admin/login?error=invalid", 302);
+  if (!account || !account.active || !passwordOk) {
+    return redirect("/admin/login?error=invalid", 302);
+  }
 
-  // Sesión nueva al entrar, para que un identificador conocido de antes no
-  // quede convertido en una sesión de administrador.
+  // Identificador de sesión nuevo al entrar, para que uno conocido de antes no
+  // quede convertido en una sesión del panel.
   await session.regenerate();
 
-  await session.set("user", { id: u.id, email: u.email, name: u.name, role: u.role });
+  const role = isAdminRole(account.role) ? account.role : "WORKER";
 
-  return redirect("/admin", 302);
+  await session.set("admin", {
+    id: account.id,
+    username: account.username,
+    displayName: account.displayName ?? null,
+    role,
+  });
+
+  await markLogin(account.id);
+
+  return redirect(ADMIN_ROLE_HOME[role], 302);
 };

@@ -1,0 +1,182 @@
+---
+import AdminLayout from "@/layouts/AdminLayout.astro";
+import Card from "@/components/admin/ui/Card.astro";
+import Badge from "@/components/admin/ui/Badge.astro";
+import { ADMIN_ROLE_LABEL, ADMIN_ROLE_DESCRIPTION } from "@/lib/admin/roles";
+import { getAdminAccount, adminDisplayName, PASSWORD_MIN, USERNAME_MIN } from "@/server/auth/adminUsers";
+
+const admin = Astro.locals.admin!;
+const id = Number(Astro.params.id);
+const account = Number.isFinite(id) ? await getAdminAccount(Math.trunc(id)) : null;
+
+if (!account) {
+  return Astro.redirect("/admin/equipo?error=not-found", 302);
+}
+
+const esUnoMismo = account.id === admin.id;
+const name = adminDisplayName(account);
+
+const url = new URL(Astro.request.url);
+const saved = url.searchParams.get("saved") ?? "";
+const errorParam = url.searchParams.get("error") ?? "";
+
+const successMessage =
+  saved === "updated" ? "Cuenta actualizada." :
+  saved === "password" ? "Contraseña restablecida." : "";
+
+const errorMessage =
+  errorParam === "invalid-username" ? `El usuario debe tener al menos ${USERNAME_MIN} caracteres y sólo letras, números, punto, guion o guion bajo.` :
+  errorParam === "duplicate-username" ? "Ya existe otra cuenta con ese usuario." :
+  errorParam === "invalid-role" ? "El rol no es válido." :
+  errorParam === "weak-password" ? `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres.` :
+  errorParam === "self-lockout" ? "No puedes quitarte a ti mismo el rol de admin total ni desactivar tu cuenta." :
+  errorParam === "last-admin" ? "Debe quedar al menos un admin total activo." :
+  errorParam === "self-delete" ? "No puedes eliminar tu propia cuenta." : "";
+
+function formatDate(value: Date | null) {
+  if (!value) return "Nunca";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Nunca";
+  return new Intl.DateTimeFormat("es-ES", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Madrid" }).format(date);
+}
+
+const inputClass = "w-full rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm text-white focus:border-sky-400/40 focus:outline-none";
+const labelClass = "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-admin-muted";
+---
+
+<AdminLayout
+  title={`${name} · Equipo · Admin · Arcadia`}
+  heading={name}
+  description="Cuenta de acceso al panel."
+>
+  <div class="max-w-2xl space-y-6">
+    <a href="/admin/equipo" class="admin-focus inline-flex items-center gap-1.5 text-sm font-semibold text-admin-muted transition hover:text-white">
+      ← Volver al equipo
+    </a>
+
+    {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
+    {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}
+
+    <Card>
+      <div class="flex flex-wrap items-center gap-3">
+        <Badge tone={account.role === "ADMIN" ? "success" : "neutral"}>{ADMIN_ROLE_LABEL[account.role]}</Badge>
+        <Badge tone={account.active ? "cyan" : "warning"}>{account.active ? "Activa" : "Desactivada"}</Badge>
+        {esUnoMismo ? <Badge tone="violet">Eres tú</Badge> : null}
+      </div>
+      <dl class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-admin-muted">Creada</dt>
+          <dd class="mt-0.5 text-slate-200">{formatDate(account.createdAt)}</dd>
+        </div>
+        <div>
+          <dt class="text-xs uppercase tracking-wide text-admin-muted">Última entrada</dt>
+          <dd class="mt-0.5 text-slate-200">{formatDate(account.lastLoginAt)}</dd>
+        </div>
+      </dl>
+    </Card>
+
+    <Card>
+      <h2 class="text-base font-semibold text-white">Datos y permisos</h2>
+
+      <form method="post" action="/api/admin/equipo" class="mt-5 space-y-4">
+        <input type="hidden" name="intent" value="update" />
+        <input type="hidden" name="adminId" value={account.id} />
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label class={labelClass} for="username">Usuario</label>
+            <input class={inputClass} id="username" type="text" name="username" value={account.username} autocomplete="off" required />
+          </div>
+          <div>
+            <label class={labelClass} for="displayName">Nombre (opcional)</label>
+            <input class={inputClass} id="displayName" type="text" name="displayName" value={account.displayName ?? ""} autocomplete="off" />
+          </div>
+        </div>
+
+        <fieldset class="space-y-2">
+          <legend class={labelClass}>Rol</legend>
+          {
+            (["WORKER", "ADMIN"] as const).map((role) => (
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-admin-border bg-white/[0.02] p-3 transition hover:border-white/15">
+                <input class="mt-1 h-4 w-4" type="radio" name="role" value={role} checked={account.role === role} required />
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-white">{ADMIN_ROLE_LABEL[role]}</span>
+                  <span class="mt-0.5 block text-xs leading-5 text-admin-muted">{ADMIN_ROLE_DESCRIPTION[role]}</span>
+                </span>
+              </label>
+            ))
+          }
+        </fieldset>
+
+        <label class="flex items-center gap-2.5 text-sm text-slate-200">
+          <input class="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400" type="checkbox" name="active" checked={account.active} />
+          Cuenta activa
+        </label>
+
+        {
+          esUnoMismo ? (
+            <p class="text-xs leading-5 text-admin-muted">
+              Es tu propia cuenta: no puedes quitarte el rol de admin total ni desactivarte.
+              Si el panel se queda sin ningún admin, no hay forma de recuperarlo desde la web.
+            </p>
+          ) : null
+        }
+
+        <button
+          type="submit"
+          class="admin-focus inline-flex min-h-11 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 px-4 py-2.5 text-sm font-semibold text-sky-100 transition hover:border-sky-400/30 hover:bg-sky-400/15"
+        >
+          Guardar cambios
+        </button>
+      </form>
+    </Card>
+
+    <Card>
+      <h2 class="text-base font-semibold text-white">Restablecer contraseña</h2>
+      <p class="mt-1 text-xs text-admin-muted">
+        Para cuando alguien la olvida. No hace falta saber la anterior, pero conviene
+        que la persona la cambie después desde su propia cuenta.
+      </p>
+
+      <form method="post" action="/api/admin/equipo" class="mt-5 space-y-4">
+        <input type="hidden" name="intent" value="reset-password" />
+        <input type="hidden" name="adminId" value={account.id} />
+
+        <div>
+          <label class={labelClass} for="password">Contraseña nueva</label>
+          <input class={inputClass} id="password" type="password" name="password" minlength={PASSWORD_MIN} autocomplete="new-password" required />
+        </div>
+
+        <button
+          type="submit"
+          class="admin-focus inline-flex min-h-11 items-center justify-center rounded-2xl border border-admin-border bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-white/15 hover:bg-white/[0.06]"
+        >
+          Restablecer
+        </button>
+      </form>
+    </Card>
+
+    {
+      !esUnoMismo ? (
+        <Card>
+          <h2 class="text-base font-semibold text-white">Eliminar cuenta</h2>
+          <p class="mt-1 text-xs text-admin-muted">
+            Quien la use dejará de poder entrar. Lo que hizo sigue en el registro de auditoría.
+            Si sólo se va una temporada, es mejor desactivarla arriba.
+          </p>
+
+          <form method="post" action="/api/admin/equipo" class="mt-5">
+            <input type="hidden" name="intent" value="delete" />
+            <input type="hidden" name="adminId" value={account.id} />
+            <button
+              type="submit"
+              class="admin-focus inline-flex min-h-11 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:border-rose-400/30 hover:bg-rose-400/15"
+            >
+              Eliminar {name}
+            </button>
+          </form>
+        </Card>
+      ) : null
+    }
+  </div>
+</AdminLayout>

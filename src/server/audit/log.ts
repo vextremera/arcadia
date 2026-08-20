@@ -1,7 +1,10 @@
 import { db, AuditLog } from "astro:db";
 
 type AuditInput = {
+  /** Cuenta de `User`. Queda para lo que registró el panel antiguo. */
   actorUserId?: number | null;
+  /** Cuenta de `AdminUser`: quien opera el panel desde la separación. */
+  actorAdminId?: number | null;
   action: string;
   entityType: string;
   entityId: string;
@@ -21,6 +24,7 @@ export async function writeAuditLog(input: AuditInput) {
   await db.insert(AuditLog).values({
     id: nextId,
     actorUserId: input.actorUserId ?? undefined,
+    actorAdminId: input.actorAdminId ?? undefined,
     action: input.action,
     entityType: input.entityType,
     entityId: input.entityId,

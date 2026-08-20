@@ -507,7 +507,17 @@ const MediaAsset = defineTable({
 const AuditLog = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
+    /**
+     * Quién hizo el cambio.
+     *
+     * `actorUserId` apunta a `User` y queda para lo que registró el panel
+     * antiguo, cuando los administradores vivían en esa tabla. Lo nuevo se
+     * anota en `actorAdminId`. Se conservan los dos porque borrar la columna
+     * vieja dejaría el historial sin autor, que es justo lo que un registro de
+     * auditoría no se puede permitir.
+     */
     actorUserId: column.number({ optional: true, references: () => User.columns.id }),
+    actorAdminId: column.number({ optional: true }),
     action: column.text(),
     entityType: column.text(),
     entityId: column.text(),
@@ -603,6 +613,49 @@ const GeocodeCache = defineTable({
  * las claves ajenas de OrderItem, Payment, Refund, LoyaltyLedger y PrintJob:
  * el despliegue se caía ahí. Una tabla nueva es puramente aditiva.
  */
+/**
+ * Cuenta de acceso al panel.
+ *
+ * Tabla aparte de `User` a propósito. Antes el panel se abría con el mismo
+ * registro que usa un cliente para pedir a domicilio, con un `role` que decidía
+ * si además era del bar. Eso mezclaba dos cosas que no tienen nada que ver: un
+ * cliente que se registra con puntos de fidelidad y una persona que trabaja
+ * aquí. Con la tabla separada, ningún camino desde el registro público puede
+ * acabar dando acceso al panel.
+ *
+ * Se entra con nombre de usuario, no con correo: el personal comparte turnos y
+ * un nombre corto se dicta y se teclea mejor que una dirección.
+ *
+ * `ADMIN` llega a todo; `WORKER` sólo a lo que necesita un turno (ver
+ * src/lib/admin/roles.ts, que es donde vive el reparto de permisos).
+ */
+const AdminUser = defineTable({
+  columns: {
+    id: column.number({ primaryKey: true }),
+    username: column.text({ unique: true }),
+    /** Nombre para mostrar en el panel; si falta se usa el de usuario. */
+    displayName: column.text({ optional: true }),
+    passwordHash: column.text(),
+    role: column.text({ enum: ["ADMIN", "WORKER"], default: "WORKER" }),
+    active: column.boolean({ default: true }),
+    lastLoginAt: column.date({ optional: true }),
+    /**
+     * `User.id` del que salió esta cuenta al separar las tablas.
+     *
+     * Existe para que la migración sepa a quién ya trajo. Sin esta marca se
+     * volvía a fijar en el nombre de usuario, y como los choques se resuelven
+     * con sufijo ("marta", "marta2"…), cada despliegue creaba un juego nuevo de
+     * cuentas de administrador en vez de no hacer nada.
+     *
+     * Queda vacío en las cuentas creadas a mano desde el panel.
+     */
+    legacyUserId: column.number({ optional: true }),
+    createdAt: column.date({ default: NOW }),
+    updatedAt: column.date({ default: NOW })
+  },
+  indexes: [{ on: "username", unique: true }, { on: "active" }, { on: "role" }, { on: "legacyUserId" }]
+});
+
 const CheckoutClaim = defineTable({
   columns: {
     id: column.number({ primaryKey: true }),
@@ -742,6 +795,7 @@ export default defineDb({
     TicketTemplate,
     Printer,
     PrintJob,
+    AdminUser,
     CheckoutClaim,
     GeocodeCache,
 

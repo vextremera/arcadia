@@ -1,17 +1,23 @@
 ---
 import AdminIcon from "@/components/admin/AdminIcon.astro";
 import {
-  ADMIN_NAV,
+  navForRole,
   isItemActive,
   isSectionActive,
   type AdminNavAccent,
 } from "@/lib/admin/nav";
+import { ADMIN_ROLE_HOME, type AdminRole } from "@/lib/admin/roles";
 
 interface Props {
   currentPath: string;
+  role: AdminRole;
 }
 
-const { currentPath } = Astro.props as Props;
+const { currentPath, role } = Astro.props as Props;
+
+// Un trabajador sólo ve lo suyo. El middleware aplica el mismo reparto, así
+// que esconder un enlace no es la defensa: es sólo no ofrecer lo que no toca.
+const sections = navForRole(role);
 
 /**
  * Clases por acento de sección. Se escriben completas a propósito: Tailwind
@@ -82,7 +88,7 @@ const ACCENT_CLASSES: Record<
         data-admin-sidebar-brand-row
         class="flex w-full items-center gap-3 transition-all duration-200"
       >
-        <a href="/admin" data-admin-sidebar-brand-link class="min-w-0 flex-1">
+        <a href={ADMIN_ROLE_HOME[role]} data-admin-sidebar-brand-link class="min-w-0 flex-1">
           <div data-admin-sidebar-brand-inner class="flex items-center gap-3">
             <div
               class="flex h-11 w-11 shrink-0 items-center justify-center rounded-admin border border-admin-border bg-white/[0.04]"
@@ -114,7 +120,7 @@ const ACCENT_CLASSES: Record<
     >
       <div class="space-y-1.5">
         {
-          ADMIN_NAV.map((section) => {
+          sections.map((section) => {
             const sectionActive = isSectionActive(section, currentPath);
             const accent = ACCENT_CLASSES[section.accent];
 
@@ -201,7 +207,7 @@ const ACCENT_CLASSES: Record<
       class="min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-2 py-4"
     >
       {
-        ADMIN_NAV.map((section) => {
+        sections.map((section) => {
           const sectionActive = isSectionActive(section, currentPath);
 
           return (

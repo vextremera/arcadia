@@ -34,8 +34,8 @@ async function getNextPrinterId() {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  if (!user || (user.role !== "ADMIN" && user.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -46,7 +46,7 @@ export const POST: APIRoute = async (context) => {
   const audit = async (action: string, entityId: string, diff: unknown) => {
     try {
       await writeAuditLog({
-        actorUserId: user.id,
+        actorAdminId: admin.id,
         action,
         entityType: "printer",
         entityId,

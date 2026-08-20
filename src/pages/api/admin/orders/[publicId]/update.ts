@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { adminDisplayName } from "@/server/auth/adminUsers";
 import {
   and,
   db,
@@ -531,14 +532,13 @@ async function syncRefundLoyalty(params: {
 }
 
 export const POST: APIRoute = async (context) => {
-  const user = context.locals.user;
-  const allowed = user && (user.role === "ADMIN" || user.role === "STAFF");
-  if (!allowed) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
   const { ip, userAgent } = getRequestAuditMeta(context.request);
-  const actorUserId = user.id;
+  const actorAdminId = admin.id;
 
   const publicId = String(context.params.publicId ?? "").trim();
   if (!publicId) {
@@ -591,12 +591,9 @@ export const POST: APIRoute = async (context) => {
   let snapshotChanged = false;
 
   const snapshot = readSnapshot(order.addressSnapshot);
-  const actor =
-    typeof user?.name === "string" && user.name.trim()
-      ? user.name.trim()
-      : typeof user?.email === "string" && user.email.trim()
-        ? user.email.trim()
-        : "staff";
+  // Queda escrito en el historial del pedido, así que va el nombre de pila si
+  // lo hay y, si no, el de usuario, que es como se conoce a cada uno aquí.
+  const actor = adminDisplayName(admin);
 
   const method = getPaymentMethod(order);
 
@@ -982,7 +979,7 @@ export const POST: APIRoute = async (context) => {
 
     if (auditAction && auditDiff) {
       await writeAuditLog({
-        actorUserId,
+        actorAdminId,
         action: auditAction,
         entityType: "order",
         entityId: String(order.id),

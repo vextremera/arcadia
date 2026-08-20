@@ -132,8 +132,8 @@ async function insertLedgerEntry(input: {
 }
 
 export const POST: APIRoute = async (context) => {
-  const authUser = context.locals.user;
-  if (!authUser || (authUser.role !== "ADMIN" && authUser.role !== "STAFF")) {
+  const admin = context.locals.admin;
+  if (!admin) {
     return context.redirect("/admin/login");
   }
 
@@ -160,9 +160,17 @@ export const POST: APIRoute = async (context) => {
     return context.redirect(withQuery("/admin/usuarios", { error: "not-found" }));
   }
 
+  /**
+   * Esta pantalla gestiona **clientes**, no el equipo.
+   *
+   * El selector de rol ya no está: el acceso al panel dejó de salir de
+   * `User.role` y vive en su propia tabla (`AdminUser`, en /admin/equipo). La
+   * columna se conserva en la base de datos con lo que hubiera, pero desde
+   * aquí no se toca: un desplegable que ya no concede nada sólo confunde a
+   * quien lo ve.
+   */
   if (intent === "update-user") {
     const email = safeText(form.get("email")).toLowerCase();
-    const role = safeText(form.get("role")).toUpperCase();
     const name = optionalText(form.get("name"));
     const phone = optionalText(form.get("phone"));
     const birthday = optionalText(form.get("birthday"));
@@ -174,43 +182,6 @@ export const POST: APIRoute = async (context) => {
 
     if (!isValidEmail(email)) {
       return context.redirect(redirectToUser(userId, { error: "invalid-email" }));
-    }
-
-    if (!isRole(role)) {
-      return context.redirect(redirectToUser(userId, { error: "invalid-role" }));
-    }
-
-    /**
-     * Sólo un ADMIN reparte permisos.
-     *
-     * Antes bastaba con ser STAFF para llegar aquí y mandar `role=ADMIN` sobre
-     * la propia cuenta: cualquiera con acceso al pase de cocina se convertía en
-     * administrador. Lo mismo con desactivar cuentas, que sirve para dejar
-     * fuera al administrador de verdad.
-     */
-    const isPromoting = role !== user.role;
-    const isChangingAccess = active !== user.active;
-
-    if ((isPromoting || isChangingAccess) && authUser.role !== "ADMIN") {
-      return context.redirect(redirectToUser(userId, { error: "forbidden-role" }));
-    }
-
-    // Quitarse a uno mismo el rol o el acceso deja el panel sin quien lo
-    // gobierne, y no hay forma de recuperarlo desde la propia web.
-    if (userId === authUser.id && (role !== "ADMIN" || !active)) {
-      return context.redirect(redirectToUser(userId, { error: "self-lockout" }));
-    }
-
-    // Tampoco se puede dejar el sistema sin ningún administrador activo.
-    if (user.role === "ADMIN" && user.active && (role !== "ADMIN" || !active)) {
-      const admins = await db
-        .select({ id: User.id })
-        .from(User)
-        .where(and(eq(User.role, "ADMIN"), eq(User.active, true)));
-
-      if (admins.length <= 1) {
-        return context.redirect(redirectToUser(userId, { error: "last-admin" }));
-      }
     }
 
     if (birthday && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
@@ -232,7 +203,6 @@ export const POST: APIRoute = async (context) => {
       .set({
         email,
         name: name ?? undefined,
-        role,
         active,
         updatedAt: new Date(),
       })
@@ -281,8 +251,8 @@ export const POST: APIRoute = async (context) => {
       reason: "MANUAL_ADJUST",
       meta: {
         note: note ?? null,
-        adminUserId: authUser.id,
-        adminEmail: authUser.email,
+        adminUserId: admin.id,
+        adminUsername: admin.username,
         requestedDelta,
         appliedDelta,
       },
@@ -325,8 +295,8 @@ export const POST: APIRoute = async (context) => {
       reason: "PROMO_BONUS",
       meta: {
         note: note ?? null,
-        adminUserId: authUser.id,
-        adminEmail: authUser.email,
+        adminUserId: admin.id,
+        adminUsername: admin.username,
         requestedBonus,
       },
     });
