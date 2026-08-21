@@ -726,16 +726,38 @@ const summaryCards = [
       display: none;
     }
 
+    /**
+     * El menos se dibuja, no se escribe.
+     *
+     * Como carácter (−) quedaba descentrado: su posición dentro del renglón
+     * depende de las métricas de la fuente, no del alto de la caja, y con un
+     * botón redondo eso se nota. Una barra hecha con un pseudoelemento cae
+     * siempre en el centro exacto.
+     */
     .quitar-alerg button {
+      display: grid;
+      place-items: center;
       height: 100%;
       width: 100%;
       border-radius: 9999px;
-      font-size: 1.05rem;
-      font-weight: 700;
-      line-height: 1;
-      color: var(--color-admin-bg);
       background: transparent;
       cursor: pointer;
+      /* El texto queda para lectores de pantalla, no se ve. */
+      font-size: 0;
+      color: #f43f5e;
+    }
+
+    .quitar-alerg button::before {
+      content: "";
+      display: block;
+      width: 55%;
+      height: 3px;
+      border-radius: 9999px;
+      background: currentColor;
+    }
+
+    .quitar-alerg button:hover {
+      color: #fb7185;
     }
 
     .disco-alerg:hover .quitar-alerg {
@@ -805,7 +827,7 @@ const summaryCards = [
       }
 
       .quitar-alerg button {
-        color: rgba(255, 255, 255, 0.9);
+        color: #f43f5e;
         background: rgba(0, 0, 0, 0.45);
       }
     }
