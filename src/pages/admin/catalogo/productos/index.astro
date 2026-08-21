@@ -57,7 +57,7 @@ const allRows = await db
     details: Product.details,
     imageUrl: Product.imageUrl,
     priceCents: Product.priceCents,
-    deliveryEnabled: Product.deliveryEnabled,
+    deliveryEnabled: Product.deliveryEnabled,
     dineInEnabled: Product.dineInEnabled,
     active: Product.active,
     updatedAt: Product.updatedAt,
@@ -461,12 +461,31 @@ const summaryCards = [
                       </div>
                     </td>
                     <td>
+                      {/*
+                        Los alérgenos van apilados, no en fila suelta.
+
+                        Solapados ocupan bastante menos y la columna deja de
+                        crecer con cada producto que tenga muchos, que era lo
+                        que ensanchaba la tabla. El aro del color de la fila los
+                        separa visualmente aunque se pisen.
+
+                        El primero queda encima y los siguientes caen por
+                        detrás, para que se lea de izquierda a derecha igual que
+                        el resto de la tabla.
+                      */}
                       {product.allergenCount === 0 ? (
                         <span class="text-admin-faint">—</span>
                       ) : (
-                        <div class="flex items-center gap-1" title={product.allergenTitle}>
-                          {product.allergenPreview.map((allergen) => (
-                            <span class="grid h-6 w-6 shrink-0 place-items-center overflow-hidden">
+                        <div class="flex items-center" title={product.allergenTitle}>
+                          {product.allergenPreview.map((allergen, indice) => (
+                            <span
+                              class:list={[
+                                "grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full",
+                                "bg-admin-surface ring-2 ring-admin-surface",
+                                indice > 0 ? "-ml-2.5" : "",
+                              ]}
+                              style={`z-index:${product.allergenPreview.length - indice}`}
+                            >
                               {allergen.iconUrl ? (
                                 <img src={allergen.iconUrl} alt={allergen.name} class="h-[22px] w-[22px] object-contain" loading="lazy" />
                               ) : (
@@ -475,7 +494,7 @@ const summaryCards = [
                             </span>
                           ))}
                           {product.allergenCount > product.allergenPreview.length ? (
-                            <span class="text-[11px] font-semibold text-admin-muted">
+                            <span class="-ml-2.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-muted ring-2 ring-admin-surface">
                               +{product.allergenCount - product.allergenPreview.length}
                             </span>
                           ) : null}
