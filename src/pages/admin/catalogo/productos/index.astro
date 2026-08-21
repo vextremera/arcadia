@@ -679,8 +679,8 @@ const summaryCards = [
      * vecinos, cosa que un estilo en línea impediría.
      */
     .pila-alerg {
-      --disco: 2.25rem;
-      --solape: 1.35rem;
+      --disco: 2rem;
+      --solape: 0.9375rem;
     }
 
     .disco-alerg {
@@ -692,6 +692,14 @@ const summaryCards = [
       flex-shrink: 0;
       border-radius: 9999px;
       z-index: var(--z, 0);
+      /**
+       * Un filo de un píxel del color de la fila.
+       *
+       * Va como sombra y no como borde para que no cuente en la caja: si
+       * ocupara, cambiaría el solape. Es lo justo para que dos iconos pegados
+       * no se lean como una mancha, sin el cerco grueso que tenían antes.
+       */
+      box-shadow: 0 0 0 1px var(--color-admin-surface);
     }
 
     .disco-alerg.solapado {
