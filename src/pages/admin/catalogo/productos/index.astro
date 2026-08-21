@@ -492,16 +492,22 @@ const summaryCards = [
                         devuelve el foco por él: se puede corregir una fila tras
                         otra sin tocar el ratón.
                       */}
+                      {/*
+                        El `-ml-2` compensa el relleno propio del campo, para
+                        que la cifra arranque justo donde arranca el rótulo
+                        "Precio" de la cabecera. Sin eso quedaba desplazada a la
+                        derecha y la columna se leía torcida.
+                      */}
                       <form
                         method="post"
                         action={`/api/admin/products/${product.id}`}
-                        class="group/precio flex items-center gap-1"
+                        class="group/precio -ml-2 flex items-center gap-1"
                       >
                         <input type="hidden" name="intent" value="set-price" />
                         <input type="hidden" name="redirectTo" value={redirectTo} />
                         <input
                           id={`precio-${product.id}`}
-                          class="w-20 rounded-lg border border-transparent bg-transparent px-2 py-1 text-right text-sm font-semibold text-white transition hover:border-admin-border hover:bg-white/[0.03] focus:border-sky-400/40 focus:bg-white/[0.05] focus:outline-none"
+                          class="w-[4.5rem] rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm font-semibold text-white transition hover:border-admin-border hover:bg-white/[0.03] focus:border-sky-400/40 focus:bg-white/[0.05] focus:outline-none"
                           type="number"
                           name="priceEur"
                           step="0.01"
@@ -545,33 +551,34 @@ const summaryCards = [
                         fila y cada uno saca su aspa, que es cuando hace falta
                         precisión.
                       */}
-                      <div class="group/alerg flex items-center" title={product.allergenTitle}>
+                      <div class="pila-alerg flex items-center" title={product.allergenTitle}>
                         {product.allergenPreview.map((allergen, indice) => (
                           <span
-                            class:list={[
-                              "relative grid h-7 w-7 shrink-0 place-items-center rounded-full transition-[margin]",
-                              "bg-admin-surface ring-2 ring-admin-surface",
-                              indice > 0 ? "-ml-2.5 group-hover/alerg:ml-1" : "",
-                            ]}
-                            style={`z-index:${product.allergenPreview.length - indice}`}
+                            class:list={["disco-alerg", indice > 0 ? "solapado" : ""]}
+                            style={`--z:${product.allergenPreview.length - indice}`}
                           >
                             {allergen.iconUrl ? (
-                              <img src={allergen.iconUrl} alt={allergen.name} class="h-[22px] w-[22px] object-contain" loading="lazy" />
+                              <img src={allergen.iconUrl} alt={allergen.name} class="icono-alerg" loading="lazy" />
                             ) : (
-                              <span class="text-[10px] font-bold uppercase text-admin-muted">{allergen.name.slice(0, 2)}</span>
+                              <span class="text-[11px] font-bold uppercase text-admin-muted">{allergen.name.slice(0, 2)}</span>
                             )}
 
+                            {/*
+                              El menos va dentro del propio icono, centrado, y
+                              sólo aparece al apuntarlo. Un aspa colgando de la
+                              esquina no cabía: los discos se pisan y quedaba
+                              tapada por el de al lado.
+                            */}
                             <form
                               method="post"
                               action={`/api/admin/products/${product.id}/allergens`}
-                              class="absolute -right-1 -top-1 hidden group-hover/alerg:block"
+                              class="quitar-alerg"
                             >
                               <input type="hidden" name="intent" value="delete" />
                               <input type="hidden" name="productAllergenId" value={allergen.linkId} />
                               <input type="hidden" name="redirectTo" value={redirectTo} />
                               <button
                                 type="submit"
-                                class="admin-focus grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[10px] font-bold leading-none text-white transition hover:bg-rose-400"
                                 title={`Quitar ${allergen.name}`}
                                 aria-label={`Quitar ${allergen.name} de ${product.name}`}
                               >
@@ -582,7 +589,7 @@ const summaryCards = [
                         ))}
 
                         {product.allergenCount > product.allergenPreview.length ? (
-                          <span class="-ml-2.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-admin-elevated text-[10px] font-bold text-admin-muted ring-2 ring-admin-surface group-hover/alerg:ml-1">
+                          <span class="disco-alerg solapado resto-alerg" style="--z:0">
                             +{product.allergenCount - product.allergenPreview.length}
                           </span>
                         ) : null}
@@ -598,13 +605,8 @@ const summaryCards = [
                           if (disponibles.length === 0) return null;
 
                           return (
-                            <details class="relative ml-1.5">
-                              <summary
-                                class="admin-focus grid h-6 w-6 cursor-pointer list-none place-items-center rounded-full border border-dashed border-admin-border-strong text-xs font-bold text-admin-muted transition hover:border-sky-400/40 hover:text-sky-300"
-                                title={`Añadir alérgeno a ${product.name}`}
-                              >
-                                +
-                              </summary>
+                            <details class="anadir-alerg">
+                              <summary title={`Añadir alérgeno a ${product.name}`}>+</summary>
 
                               <form
                                 method="post"
@@ -669,23 +671,142 @@ const summaryCards = [
 
   <style is:global>
     /**
+     * Pila de alérgenos del listado.
+     *
+     * Se escribe en CSS y no con utilidades porque hay dos cosas que Tailwind
+     * no da cómodas: el z-index de cada disco tiene que venir del marcado —lo
+     * fija el orden— y al apuntar uno hay que subirlo por encima de sus
+     * vecinos, cosa que un estilo en línea impediría.
+     */
+    .pila-alerg {
+      --disco: 2.25rem;
+      --solape: 1.35rem;
+    }
+
+    .disco-alerg {
+      position: relative;
+      display: grid;
+      place-items: center;
+      height: var(--disco);
+      width: var(--disco);
+      flex-shrink: 0;
+      border-radius: 9999px;
+      z-index: var(--z, 0);
+    }
+
+    .disco-alerg.solapado {
+      margin-left: calc(var(--solape) * -1);
+    }
+
+    .icono-alerg {
+      height: 100%;
+      width: 100%;
+      object-fit: contain;
+      transition: filter 0.15s ease;
+    }
+
+    /**
+     * Al apuntar un disco sube por encima de los que lo tapan.
+     *
+     * Sin esto el menos quedaría medio escondido detrás del icono siguiente,
+     * porque los discos no se separan: se quedan apilados a propósito.
+     */
+    .disco-alerg:hover {
+      z-index: 20;
+    }
+
+    .disco-alerg:hover .icono-alerg {
+      /* Lo aclara para que el menos de encima se lea sin taparlo del todo. */
+      filter: brightness(2.4) saturate(0.25);
+    }
+
+    .quitar-alerg {
+      position: absolute;
+      inset: 0;
+      display: none;
+    }
+
+    .quitar-alerg button {
+      height: 100%;
+      width: 100%;
+      border-radius: 9999px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-admin-bg);
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .disco-alerg:hover .quitar-alerg {
+      display: block;
+    }
+
+    .resto-alerg {
+      background: var(--color-admin-elevated);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-admin-muted);
+    }
+
+    /* El "+" sólo asoma al pasar por la fila, y discreto. */
+    .anadir-alerg {
+      position: relative;
+      margin-left: 0.5rem;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    tr:hover .anadir-alerg,
+    .anadir-alerg[open] {
+      opacity: 1;
+    }
+
+    .anadir-alerg > summary {
+      display: grid;
+      place-items: center;
+      height: 1.5rem;
+      width: 1.5rem;
+      cursor: pointer;
+      list-style: none;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      color: var(--color-admin-faint);
+      transition: color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .anadir-alerg > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .anadir-alerg > summary:hover {
+      color: var(--color-admin-text);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    /**
      * En pantalla táctil no hay "pasar por encima".
      *
-     * Los alérgenos se separan y sacan su aspa con `group-hover`, y Tailwind
-     * mete esas reglas dentro de `@media (hover: hover)`. En una tablet —que
-     * es justo donde se usa esto en cocina— ese medio no se cumple nunca, así
-     * que no habría forma de quitar un alérgeno desde el listado.
-     *
-     * Con puntero grueso se muestran ya separados y con las aspas visibles.
-     * Ocupa algo más, pero es la diferencia entre poder tocarlo y no.
+     * Todo lo de arriba cuelga de :hover, y en una tablet —que es justo donde
+     * se usa esto en cocina— eso no ocurre nunca: no habría forma de quitar un
+     * alérgeno ni de ver el "+". Con puntero grueso se dejan a la vista.
      */
     @media (pointer: coarse) {
-      .group\/alerg > span + span {
-        margin-left: 0.25rem;
+      .anadir-alerg {
+        opacity: 1;
       }
 
-      .group\/alerg form {
+      .disco-alerg.solapado {
+        margin-left: -0.35rem;
+      }
+
+      .quitar-alerg {
         display: block;
+      }
+
+      .quitar-alerg button {
+        color: rgba(255, 255, 255, 0.9);
+        background: rgba(0, 0, 0, 0.45);
       }
     }
   </style>
