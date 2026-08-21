@@ -11,9 +11,17 @@ import { ADMIN_ROLE_HOME, type AdminRole } from "@/lib/admin/roles";
 interface Props {
   currentPath: string;
   role: AdminRole;
+  /**
+   * "drawer" es la copia que vive dentro del panel deslizante de móvil.
+   *
+   * La diferencia está sólo en el contenedor: la fija se esconde por debajo de
+   * xl y puede contraerse a rail; la del panel está siempre visible dentro de
+   * él y nunca se contrae, porque ahí no habría dónde.
+   */
+  variant?: "fixed" | "drawer";
 }
 
-const { currentPath, role } = Astro.props as Props;
+const { currentPath, role, variant = "fixed" } = Astro.props as Props;
 
 // Un trabajador sólo ve lo suyo. El middleware aplica el mismo reparto, así
 // que esconder un enlace no es la defensa: es sólo no ofrecer lo que no toca.
@@ -74,9 +82,14 @@ const ACCENT_CLASSES: Record<
 ---
 
 <aside
-  data-admin-sidebar
-  style="width: var(--admin-sidebar-width)"
-  class="hidden h-dvh min-w-0 shrink-0 overflow-hidden bg-admin-surface-2 text-slate-100 xl:flex xl:flex-col xl:transition-[width] xl:duration-200 xl:ease-out"
+  data-admin-sidebar={variant === "fixed" ? "" : undefined}
+  style={variant === "fixed" ? "width: var(--admin-sidebar-width)" : undefined}
+  class:list={[
+    "h-dvh min-w-0 shrink-0 overflow-hidden bg-admin-surface-2 text-slate-100",
+    variant === "fixed"
+      ? "hidden xl:flex xl:flex-col xl:transition-[width] xl:duration-200 xl:ease-out"
+      : "flex w-full flex-col",
+  ]}
 >
   <div class="flex h-dvh flex-col overflow-hidden">
     <!-- Marca. El botón de contraer vive en el header de página (AdminLayout). -->

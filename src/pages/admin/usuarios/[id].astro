@@ -139,7 +139,7 @@ const errorMessage =
   "";
 ---
 
-<AdminLayout title={`${user.name ?? user.email} · Usuarios · Admin · Arcadia`} heading={user.name ?? user.email} description="Perfil, loyalty, direcciones, pedidos y ledger de puntos.">
+<AdminLayout title={`${user.name ?? user.email} · Usuarios · Admin · Arcadia`} heading={user.name ?? user.email} description="Perfil, loyalty, direcciones, pedidos y ledger de puntos." back={{ href: "/admin/usuarios", label: "Clientes" }}>
   <div class="space-y-6">
     {successMessage ? <section class="rounded-admin-lg border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm text-emerald-200">{successMessage}</section> : null}
     {errorMessage ? <section class="rounded-admin-lg border border-rose-400/20 bg-rose-400/10 px-5 py-3 text-sm text-rose-200">{errorMessage}</section> : null}

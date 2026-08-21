@@ -406,6 +406,7 @@ const thermalPrinters = (await getPrinters()).filter((printer) => printer.enable
   title={`Pedido ${order.publicId} · Admin · Arcadia`}
   heading={`Pedido ${order.publicId}`}
   description="Workflow, cobro, líneas, actividad y devoluciones del pedido."
+  back={{ href: "/admin/pedidos", label: "Pedidos" }}
 >
   <div class="mb-6 flex flex-wrap gap-3">
     <a

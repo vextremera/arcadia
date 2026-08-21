@@ -439,6 +439,7 @@ const errorMessages = notices.map((n) => n.error).filter(Boolean);
   title={`${product.name} · Productos · Admin · Arcadia`}
   heading={product.name}
   description="Ficha completa: variantes, ingredientes, modificadores y alérgenos."
+  back={{ href: "/admin/catalogo/productos", label: "Productos" }}
 >
   <div class="space-y-6">
     {successMessages.map((message) => (

@@ -5,17 +5,29 @@ import AdminIcon from "@/components/admin/AdminIcon.astro";
 import { ADMIN_NAV, isSectionActive } from "@/lib/admin/nav";
 import { ADMIN_ROLE_LABEL } from "@/lib/admin/roles";
 import { adminDisplayName } from "@/server/auth/adminUsers";
+import { getPrinters } from "@/server/printing/queue";
+import { db, Order, eq } from "astro:db";
 
 type Props = {
   title?: string;
   heading?: string;
   description?: string;
+  /**
+   * De dónde se venía, para poder volver.
+   *
+   * Las pantallas de detalle —un producto, un cliente, un pedido— se abren
+   * desde un listado, y no había forma de regresar salvo el botón del
+   * navegador o volver a buscar la sección en el menú. Se pasa desde la propia
+   * página porque sólo ella sabe a qué listado pertenece.
+   */
+  back?: { href: string; label: string };
 };
 
 const {
   title = "Admin · Arcadia",
   heading,
   description,
+  back,
 } = Astro.props as Props;
 
 /**
@@ -25,6 +37,43 @@ const {
  */
 const admin = Astro.locals.admin ?? { id: 0, username: "", displayName: null, role: "WORKER" as const };
 const adminName = adminDisplayName(admin);
+
+/**
+ * Los dos indicadores de la cabecera, que antes eran de adorno.
+ *
+ * Se consultan en el layout para que estén en todas las pantallas: la gracia
+ * de un aviso es verlo estés donde estés, no sólo si entras en cocina. Son dos
+ * consultas ligeras y el panel lo usan cuatro personas.
+ *
+ * Si algo falla se muestran en cero y apagados. Un contador roto no puede
+ * tumbar la página entera del panel.
+ */
+let pedidosPendientes = 0;
+let impresorasEnLinea = 0;
+
+try {
+  const [pendientes, impresoras] = await Promise.all([
+    db.select({ id: Order.id }).from(Order).where(eq(Order.status, "PENDING")),
+    getPrinters(),
+  ]);
+
+  pedidosPendientes = pendientes.length;
+
+  // Misma ventana que usa la pantalla de impresoras para darlas por vivas.
+  const VENTANA_MS = 3 * 60 * 1000;
+  impresorasEnLinea = impresoras.filter((impresora) => {
+    if (!impresora.lastSeenAt) return false;
+    const visto = impresora.lastSeenAt instanceof Date ? impresora.lastSeenAt : new Date(impresora.lastSeenAt);
+    return Date.now() - visto.getTime() < VENTANA_MS;
+  }).length;
+} catch (error) {
+  console.error("[admin-layout] no se pudieron leer los indicadores", error);
+}
+
+const impresorasTitulo =
+  impresorasEnLinea > 0
+    ? `${impresorasEnLinea} impresora(s) conectada(s)`
+    : "Sin impresoras conectadas";
 
 const pathname = Astro.url.pathname;
 const pageHeading = heading ?? "Admin";
@@ -63,6 +112,54 @@ const accent = activeSection?.accent ?? "sky";
       data-sidebar-collapsed="false"
       class="h-dvh bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.05),transparent_28%),linear-gradient(180deg,#0a0a0b_0%,#141416_100%)]"
     >
+      {/*
+        Menú lateral en pantallas pequeñas.
+
+        Es el mismo componente que la barra de escritorio, montado dentro de un
+        panel deslizante. Se repite el marcado en vez de mover el de al lado
+        porque son dos comportamientos distintos —uno fijo y contraíble, otro
+        que se abre y se cierra— y compartir un solo nodo obligaría a moverlo
+        por el DOM al cambiar de tamaño.
+      */}
+      <div
+        id="admin-drawer"
+        data-admin-drawer
+        class="fixed inset-0 z-50 hidden xl:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menú del panel"
+      >
+        <div
+          data-admin-drawer-backdrop
+          class="absolute inset-0 bg-black/60"
+          aria-hidden="true"
+        >
+        </div>
+
+        <div class="absolute inset-y-0 left-0 w-[17rem] max-w-[85vw] overflow-hidden shadow-2xl">
+          <button
+            type="button"
+            data-admin-drawer-close
+            class="admin-focus absolute right-2 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-admin text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+            aria-label="Cerrar menú"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              class="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+
+          <AdminSidebar currentPath={pathname} role={admin.role} variant="drawer" />
+        </div>
+      </div>
+
       <div class="flex h-dvh w-full gap-0 overflow-hidden">
         <AdminSidebar currentPath={pathname} role={admin.role} />
 
@@ -77,6 +174,39 @@ const accent = activeSection?.accent ?? "sky";
               <div
                 class="flex items-center gap-4 px-5 py-3 sm:px-6 lg:px-8 xl:h-full xl:px-6 xl:py-0"
               >
+                {/*
+                  Abrir el menú en pantallas pequeñas.
+
+                  Por debajo de xl la barra lateral está oculta y su botón de
+                  contraer también, así que no había forma de cambiar de
+                  sección: el panel se quedaba en la pantalla en la que
+                  entraras. Este botón sólo aparece ahí y despliega el menú
+                  como panel lateral.
+                */}
+                <button
+                  type="button"
+                  data-admin-drawer-open
+                  class="admin-focus inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-admin text-slate-400 transition hover:bg-white/[0.06] hover:text-white xl:hidden"
+                  aria-label="Abrir menú"
+                  aria-controls="admin-drawer"
+                  aria-expanded="false"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    class="h-[22px] w-[22px]"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 6h16"></path>
+                    <path d="M4 12h16"></path>
+                    <path d="M4 18h16"></path>
+                  </svg>
+                </button>
+
                 <button
                   type="button"
                   id="admin-sidebar-toggle"
@@ -106,6 +236,29 @@ const accent = activeSection?.accent ?? "sky";
                   class="flex w-full min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"
                 >
                   <div class="min-w-0">
+                    {
+                      back ? (
+                        <a
+                          href={back.href}
+                          class="admin-focus -ml-1 mb-1 inline-flex min-h-8 items-center gap-1.5 rounded-admin px-1 text-xs font-semibold text-admin-muted transition hover:text-white"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            class="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M15 18l-6-6 6-6" />
+                          </svg>
+                          {back.label}
+                        </a>
+                      ) : null
+                    }
+
                     <h1
                       data-admin-page-heading
                       class="text-lg font-semibold tracking-[-0.02em] text-white sm:text-xl"
@@ -123,27 +276,57 @@ const accent = activeSection?.accent ?? "sky";
                   </div>
 
                   <div class="flex shrink-0 items-center gap-2 lg:justify-end">
-                    <!-- Estado de impresora (mock — se cablea en la fase de impresoras) -->
-                    <span
-                      class="inline-flex items-center gap-2 px-1 text-xs font-semibold text-slate-400"
-                      title="Estado de impresora (demo)"
+                    {/*
+                      Estado real de las impresoras. Era un indicador de adorno
+                      con el punto siempre gris; ahora refleja si el puente del
+                      local ha dado señales hace poco, que es lo único que
+                      distingue "va a salir papel" de "no va a salir".
+                    */}
+                    <a
+                      href="/admin/impresoras"
+                      class="admin-focus inline-flex min-h-10 items-center gap-2 rounded-admin px-2 text-xs font-semibold text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                      title={impresorasTitulo}
                     >
                       <AdminIcon name="printer" class="h-[22px] w-[22px]" />
                       <span class="hidden sm:inline">Impresora</span>
                       <span
-                        class="inline-flex h-2 w-2 rounded-full bg-slate-500"
+                        class:list={[
+                          "inline-flex h-2 w-2 rounded-full",
+                          impresorasEnLinea > 0 ? "bg-emerald-400" : "bg-slate-500",
+                        ]}
                         aria-hidden="true"
                       ></span>
-                    </span>
+                    </a>
 
-                    <button
-                      type="button"
-                      class="admin-focus inline-flex h-10 w-10 items-center justify-center rounded-admin text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
-                      aria-label="Notificaciones"
-                      title="Notificaciones"
+                    {/*
+                      La campana no hacía nada: era un botón sin comportamiento.
+                      Ahora cuenta los pedidos que están esperando en cocina y
+                      lleva al pase, que es la única notificación que de verdad
+                      importa en un turno.
+                    */}
+                    <a
+                      href="/admin/cocina"
+                      class="admin-focus relative inline-flex h-10 w-10 items-center justify-center rounded-admin text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                      aria-label={
+                        pedidosPendientes > 0
+                          ? `${pedidosPendientes} pedido(s) esperando en cocina`
+                          : "Sin pedidos pendientes"
+                      }
+                      title={
+                        pedidosPendientes > 0
+                          ? `${pedidosPendientes} pedido(s) esperando en cocina`
+                          : "Sin pedidos pendientes"
+                      }
                     >
                       <AdminIcon name="bell" class="h-[22px] w-[22px]" />
-                    </button>
+                      {
+                        pedidosPendientes > 0 ? (
+                          <span class="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-4 text-white">
+                            {pedidosPendientes > 9 ? "9+" : pedidosPendientes}
+                          </span>
+                        ) : null
+                      }
+                    </a>
 
                     <!--
                       Quién está dentro. En una cocina el panel se queda abierto
@@ -280,6 +463,28 @@ const accent = activeSection?.accent ?? "sky";
           justify-content: center;
         }
       }
+
+      /**
+       * El menú de móvil nunca se contrae.
+       *
+       * Vive dentro del mismo `#admin-shell`, así que heredaba las reglas de
+       * arriba y se quedaba en modo rail —iconos sin texto— cuando alguien
+       * había contraído la barra de escritorio. Aquí nunca hay que ahorrar
+       * ancho: el panel se abre y se cierra entero.
+       */
+      [data-admin-drawer] [data-admin-sidebar-brand-text],
+      [data-admin-drawer] [data-admin-sidebar-group-title],
+      [data-admin-drawer] [data-admin-sidebar-item-copy] {
+        display: revert;
+      }
+
+      [data-admin-drawer] [data-admin-nav-full] {
+        display: block;
+      }
+
+      [data-admin-drawer] [data-admin-nav-rail] {
+        display: none;
+      }
     </style>
 
     <script is:inline>
@@ -365,6 +570,58 @@ const accent = activeSection?.accent ?? "sky";
     -->
     <script>
       import "@/scripts/adminAjax";
+    </script>
+    <script is:inline>
+      /**
+       * Abrir y cerrar el menú en pantallas pequeñas.
+       *
+       * Se cierra al pulsar fuera, con Escape y al elegir una sección — esto
+       * último importa: al navegar sin recargar (src/scripts/adminAjax.ts) la
+       * página no se rehace, así que el panel se quedaría abierto encima de lo
+       * que acabas de abrir.
+       */
+      (() => {
+        const panel = document.querySelector("[data-admin-drawer]");
+        const abrir = document.querySelector("[data-admin-drawer-open]");
+        if (!panel || !abrir) return;
+
+        /**
+         * No se toca el scroll del body a propósito.
+         *
+         * El panel ya nace con `overflow-hidden` —el scroll del admin vive
+         * dentro del `main`—, así que no hace falta bloquearlo al abrir. Y
+         * quitárselo al cerrar rompía el encaje del layout, que cuenta con esa
+         * clase para contener el alto.
+         */
+        const mostrar = (visible) => {
+          panel.classList.toggle("hidden", !visible);
+          abrir.setAttribute("aria-expanded", visible ? "true" : "false");
+        };
+
+        abrir.addEventListener("click", () => mostrar(true));
+
+        panel.addEventListener("click", (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+
+          if (
+            target.closest("[data-admin-drawer-close]") ||
+            target.closest("[data-admin-drawer-backdrop]") ||
+            target.closest("a[href]")
+          ) {
+            mostrar(false);
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !panel.classList.contains("hidden")) mostrar(false);
+        });
+
+        // Al pasar a escritorio la barra fija reaparece y el panel sobra.
+        window.matchMedia("(min-width: 1280px)").addEventListener("change", (e) => {
+          if (e.matches) mostrar(false);
+        });
+      })();
     </script>
   </body>
 </html>
