@@ -715,6 +715,10 @@ const summaryCards = [
       z-index: 20;
     }
 
+    .disco-alerg:hover .icono-alerg {
+      /* Lo aclara para que el menos de encima se lea sin taparlo del todo. */
+      filter: brightness(2.4) saturate(0.25);
+    }
 
     .quitar-alerg {
       position: absolute;
@@ -722,45 +726,16 @@ const summaryCards = [
       display: none;
     }
 
-    /**
-     * El menos se dibuja, no se escribe.
-     *
-     * Como carácter (−) quedaba descentrado: su posición dentro del renglón
-     * depende de las métricas de la fuente, no del alto de la caja, y con un
-     * botón redondo eso se nota. Una barra hecha con un pseudoelemento cae
-     * siempre en el centro exacto.
-     */
     .quitar-alerg button {
-      display: grid;
-      place-items: center;
       height: 100%;
       width: 100%;
       border-radius: 9999px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-admin-bg);
+      background: transparent;
       cursor: pointer;
-      /* El texto queda para lectores de pantalla, no se ve. */
-      font-size: 0;
-      /**
-       * Rojo encima del icono, con el menos en blanco.
-       *
-       * No es opaco del todo a propósito: por debajo se sigue adivinando qué
-       * alérgeno se va a quitar, que es la diferencia entre pulsar a ciegas y
-       * saber lo que se está haciendo.
-       */
-      background: rgba(244, 63, 94, 0.88);
-      color: #ffffff;
-    }
-
-    .quitar-alerg button::before {
-      content: "";
-      display: block;
-      width: 55%;
-      height: 3px;
-      border-radius: 9999px;
-      background: currentColor;
-    }
-
-    .quitar-alerg button:hover {
-      background: rgb(244, 63, 94);
     }
 
     .disco-alerg:hover .quitar-alerg {
@@ -830,9 +805,8 @@ const summaryCards = [
       }
 
       .quitar-alerg button {
-        /* En táctil está siempre visible, así que se deja más translúcido
-           para no esconder el icono del todo. */
-        background: rgba(244, 63, 94, 0.7);
+        color: rgba(255, 255, 255, 0.9);
+        background: rgba(0, 0, 0, 0.45);
       }
     }
   </style>
