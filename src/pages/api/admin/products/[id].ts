@@ -72,7 +72,7 @@ export const POST: APIRoute = async (context) => {
       details: Product.details,
       imageUrl: Product.imageUrl,
       priceCents: Product.priceCents,
-      deliveryEnabled: Product.deliveryEnabled,
+      deliveryEnabled: Product.deliveryEnabled,
       dineInEnabled: Product.dineInEnabled,
       active: Product.active,
     })
@@ -101,6 +101,30 @@ export const POST: APIRoute = async (context) => {
         active: nextActive,
         updatedAt: new Date(),
       })
+      .where(eq(Product.id, id));
+
+    return context.redirect(withQuery(redirectTo, { saved: "1" }));
+  }
+
+  /**
+   * Cambiar sólo el precio, desde el listado.
+   *
+   * Existe aparte de `save-base` porque aquélla exige el formulario completo
+   * —nombre, slug, categoría— y desde la tabla sólo se manda el importe.
+   * Corregir un precio es lo que más se hace y no compensa abrir la ficha
+   * entera para eso.
+   */
+  if (intent === "set-price") {
+    const priceCents = parseEurToCents(form.get("priceEur"));
+    const redirectTo = safeRedirectTo(form.get("redirectTo"), "/admin/catalogo/productos");
+
+    if (priceCents === null || priceCents < 0) {
+      return context.redirect(withQuery(redirectTo, { error: "invalid-price" }));
+    }
+
+    await db
+      .update(Product)
+      .set({ priceCents, updatedAt: new Date() })
       .where(eq(Product.id, id));
 
     return context.redirect(withQuery(redirectTo, { saved: "1" }));
@@ -185,7 +209,7 @@ export const POST: APIRoute = async (context) => {
       details: toNullableText(form.get("details")),
       imageUrl: nextImageUrl,
       priceCents,
-      deliveryEnabled: form.get("deliveryEnabled") === "on",
+      deliveryEnabled: form.get("deliveryEnabled") === "on",
       dineInEnabled: form.get("dineInEnabled") === "on",
       active: form.get("active") === "on",
       updatedAt: new Date(),

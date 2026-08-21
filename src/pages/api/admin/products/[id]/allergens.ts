@@ -18,6 +18,30 @@ function redirectToProduct(productId: number, params: Record<string, string> = {
   return `${withQuery(`/admin/catalogo/productos/${productId}`, params)}#alergenos`;
 }
 
+/**
+ * A dónde volver tras tocar los alérgenos.
+ *
+ * Estas acciones también se usan desde el listado, donde se pueden añadir y
+ * quitar sin abrir la ficha. Volver siempre al detalle sacaría de la tabla a
+ * quien está repasando varios productos seguidos.
+ *
+ * Sólo se admiten rutas del propio panel: el destino viene del formulario y no
+ * puede servir para mandar a nadie fuera.
+ */
+function destinoTras(
+  productId: number,
+  redirectTo: FormDataEntryValue | null,
+  params: Record<string, string> = {},
+) {
+  const crudo = String(redirectTo ?? "").trim();
+
+  if (crudo.startsWith("/admin/") && !crudo.startsWith("//")) {
+    return withQuery(crudo, params);
+  }
+
+  return redirectToProduct(productId, params);
+}
+
 export const POST: APIRoute = async (context) => {
   const admin = context.locals.admin;
   if (!admin) {
@@ -86,7 +110,7 @@ export const POST: APIRoute = async (context) => {
       createdAt: new Date(),
     });
 
-    return context.redirect(redirectToProduct(productId, { allergenSaved: "1" }));
+    return context.redirect(destinoTras(productId, form.get("redirectTo"), { saved: "1" }));
   }
 
   if (intent === "delete") {
@@ -114,7 +138,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     await db.delete(ProductAllergen).where(eq(ProductAllergen.id, productAllergenId));
-    return context.redirect(redirectToProduct(productId, { allergenSaved: "1" }));
+    return context.redirect(destinoTras(productId, form.get("redirectTo"), { saved: "1" }));
   }
 
   return context.redirect(redirectToProduct(productId, { allergenError: "invalid-intent" }));
